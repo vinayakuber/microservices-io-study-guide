@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Refuse a commit if the explain-program gate fails (R1-R11).
+set -e
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+if node tools/explain_program_gate.js; then
+  exit 0
+else
+  echo "COMMIT BLOCKED: explain-program gate failed. Fix the reported blocks, then re-commit." >&2
+  exit 1
+fi

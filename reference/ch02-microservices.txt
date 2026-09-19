@@ -1,0 +1,219 @@
+# Microservice architecture
+
+Source: https://microservices.io/patterns/microservices.html
+
+Microservice Architecture pattern 
+ Microservice Architecture 
+ Patterns 
+ Articles 
+ Presentations 
+ Adopt 
+ Refactoring 
+ Testing 
+ Modernization Help 
+ About 
+ Microservice Architecture pattern 
+ pattern
+ application architecture
+ microservice architecture
+ Pattern: Microservice Architecture 
+ Want to learn how to design a microservice architecture? 
+ Take a look at Assemblage, a microservice architecture definition process .
+ In my workshop, you will learn about to use Assemblage to design a microsevice architecture for your application.
+ Upcoming public workshop: Designing Microservices: Responsibilities, APIs and Collaborations at Explore DDD 2026. 
+ Context 
+ You are developing a business-critical enterprise application.
+You need to deliver changes rapidly, frequently and reliably - as measured by the DORA metrics - in order for your business to thrive in today’s volatile, uncertain, complex and ambiguous world.
+Consequently, your engineering organization is organized into small, loosely coupled, cross-functional teams as described by Team Topologies .
+Each team delivers software using DevOps practices as defined by the DevOps handbook .
+In particular, it practices continuous deployment.
+The team delivers a stream of small, frequent changes that are tested by an automated deployment pipeline and deployed into production. 
+ A team is responsible for one or more subdomains.
+A subdomain is an implementable model of a slice of business functionality, a.k.a. business capability.
+It consists of business logic, which consists of business entities (a.k.a. DDD aggregates) that implement business rules, and adapters, which communicate with the outside world.
+A Java-based subdomain, for example, consists of classes organized into packages that’s compiled into a JAR file. 
+ The subdomains implement the application’s behavior, which consists of a set of (system) operations.
+An operation is invoked in one of three ways: synchronous and asynchronous requests from clients; events published by other applications and services; and the passing of time.
+It mutates and queries business entities in one or more subdomains. 
+ Problem 
+ How to organize the subdomains into one or more deployable/executable components? 
+ Forces 
+ There are five dark energy forces : 
+ Simple components - simple components consisting of few subdomains are easier to understand and maintain than complex components 
+ Team autonomy - a team needs to be able to develop, test and deploy their software independently of other teams 
+ Fast deployment pipeline - fast feedback and high deployment frequency are essential and are enabled by a fast deployment pipeline, which in turn requires components that are fast to build and test. 
+ Support multiple technology stacks - subdomains are sometimes implemented using a variety of technologies; and developers need to evolve the application’s technology stack, e.g. use current versions of languages and frameworks 
+ Segregate by characteristics - e.g. resource requirements to improve scalability, their availability requirements to improve availability, their security requirements to improve security, etc. 
+ There are five dark matter forces : 
+ Simple interactions - an operation that’s local to a component or consists of a few simple interactions between components is easier to understand and troubleshoot than a distributed operation, especially one consisting of complex interactions 
+ Efficient interactions - a distributed operation that involves lots of network round trips and large data transfers can be too inefficient 
+ Prefer ACID over BASE - it’s easier to implement an operation as an ACID transaction rather than, for example, eventually consistent sagas 
+ Minimize runtime coupling - to maximize the availability and reduce the latency of an operation 
+ Minimize design time coupling - reduce the likelihood of changing services in lockstep, which reduces productivity 
+ Solution 
+ Design an architecture that structures the application as a set of two or more independently deployable , loosely coupled , components, a.k.a. services .
+Each service consists of one or more subdomains.
+Each subdomain is part of a single service except for shared library subdomains that are used by multiple services.
+A service is owned by the team (or teams) that owns the (non-library) subdomains. 
+ An API gateway is typically the application’s entry point.
+Some system operations will be local to a single service, while others will be distributed across multiple services.
+A distributed system operation is implemented using the service collaboration patterns . 
+ In order to be independently deployable each service typically has its own source code repository and its own deployment pipeline, which builds, tests and deploys the service. 
+ Examples 
+ Fictitious e-commerce application 
+ Let’s imagine that you are building an e-commerce application that takes orders from customers, verifies inventory and available credit, and ships them.
+The application consists of several components including the StoreFrontUI, which implements the user interface, along with some backend services for checking credit,
+maintaining inventory and shipping orders.
+The application consists of a set of services. 
+ Show me the code 
+ Please see the example applications developed by Chris Richardson .
+These examples on Github illustrate various aspects of the microservice architecture. 
+ Resulting context 
+ Benefits 
+ This solution has a number of benefits: 
+ Simple services - each service consists of a small number of subdomains - possibly just one - and so is easier to understand and maintain 
+ Team autonomy - a team can develop, test and deploy their service independently of other teams 
+ Fast deployment pipeline - each service is fast to test since it’s relatively small, and can be deployed independently 
+ Support multiple technology stacks - different services can use different technology stacks and can be upgraded independently 
+ Segregate subdomains by their characteristics - subdomains can be segregated by their characteristics into separate services in order to improve scalability, availability, security etc 
+ Drawbacks 
+ This solution has a number of ( potential ) drawbacks: 
+ Some distributed operations might be complex, and difficult to understand and troubleshoot 
+ Some distributed operations might be potentially inefficient 
+ Some operations might need to be implemented using complex, eventually consistent (non-ACID) transaction management since loose coupling requires each service to have its own database . 
+ Some distributed operations might involve tight runtime coupling between services, which reduces their availability. 
+ Risk of tight design-time coupling between services, which requires time consuming lockstep changes 
+ Issues 
+ There are many issues that you must address when designing an architecture. 
+ Designing a good (monolithic or microservice) architecture with Assemblage 
+ There are two key issues that you must address.
+The first issue is whether to use the monolithic or microservice architecture.
+And then, if you choose to use the microservice architecture, the next key challenge is to define a good service architecture .
+You must avoid (or at least minimize) the potential drawbacks: complex, inefficient interactions; complex eventually consistent transactions; and tight runtime coupling. 
+ Assemblage , is an architecture definition process that uses the dark energy and dark matter forces to group the subdomains in a way that results in good microservice architecture. 
+ The result of applying Assemblage is either a monolithic architecture or a microservice architecture. 
+ The dark energy and dark matter forces play a major role in shaping the service architecture and also heavily influence the design of the distributed operations mentioned below. 
+ Designing distributed operations 
+ Another key design challenge when using microservices, is implementing distributed operations, which span multiple services.
+This is especially challenging since each service has its own database .
+The solution is to use the service collaboration patterns , which implement distributed operations as a series of local transactions: 
+ There are four service collaboration patterns: 
+ Saga , which implements a distributed command as a series of local transactions 
+ Command-side replica , which replicas read-only data to the service that implements a command 
+ API composition , which implements a distributed query as a series of local queries 
+ CQRS , which implements a distributed query as a series of local queries 
+ The Saga, Command-side replica and CQRS patterns use asynchronous messaging.
+Services typically need to use the Transaction Outbox pattern to atomically update persistent business entities and send a message. 
+ Related patterns 
+ There are many patterns related to the Microservices architecture pattern. The Monolithic architecture is an alternative to the microservice architecture.
+The other patterns in the Microservice architecture architecture pattern address issues that you will encounter when applying this pattern. 
+ Sservice collaboration patterns:
+ Saga , which implements a distributed command as a series of local transactions 
+ Command-side replica , which replicas read-only data to the service that implements a command 
+ API composition , which implements a distributed query as a series of local queries 
+ CQRS , which implements a distributed query as a series of local queries 
+ The Messaging and Remote Procedure Invocation patterns are two different ways that services can communicate. 
+ The Database per Service pattern describes how each service has its own database in order to ensure loose coupling. 
+ The API Gateway pattern defines how clients access the services in a microservice architecture. 
+ The Client-side Discovery and Server-side Discovery patterns are used to route requests for a client to an available service instance in a microservice architecture. 
+ Testing patterns: Service Component Test and Service Integration Contract Test 
+ Circuit Breaker 
+ Access Token 
+ Observability patterns:
+ Log aggregation 
+ Application metrics 
+ Audit logging 
+ Distributed tracing 
+ Exception tracking 
+ Health check API 
+ Log deployments and changes 
+ UI patterns:
+ Server-side page fragment composition 
+ Client-side UI composition 
+ The Single Service per Host and Multiple Services per Host patterns are two different deployment strategies. 
+ Cross-cutting concerns patterns: Microservice chassis pattern and Externalized configuration 
+ Known uses 
+ Most large scale web sites including Netflix , Amazon 
+and eBay have evolved from a monolithic architecture to a microservice architecture. 
+ Netflix, which is a very popular video streaming service that’s responsible for up to 30% of Internet traffic, has a large scale, service-oriented architecture.
+They handle over a billion calls per day to their video streaming API from over 800 different kinds of devices.
+Each API call fans out to an average of six calls to backend services. 
+ Amazon.com originally had a two-tier architecture.
+In order to scale they migrated to a service-oriented architecture consisting of hundreds of backend services.
+Several applications call these services including the applications that implement the Amazon.com website and the web service API.
+The Amazon.com website application calls 100-150 services to get the data that used to build a web page. 
+ The auction site ebay.com also evolved from a monolithic architecture to a service-oriented architecture.
+The application tier consists of multiple independent applications.
+Each application implements the business logic for a specific function area such as buying or selling.
+Each application uses X-axis splits and some applications such as search use Z-axis splits.
+Ebay.com also applies a combination of X-, Y- and Z-style scaling to the database tier. 
+ There are numerous other examples of companies using the microservice architecture. 
+ Examples 
+ Chris Richardson has examples of microservices-based applications. 
+ See also 
+ Jfokus 2020 - Cubes, Hexagons, Triangles, and More - Understanding Microservices - provides a good introduction to the microservice architecture. 
+ Microservices patterns 
+ pattern
+ application architecture
+ microservice architecture
+ Modernization Help 
+ Copyright © 2026 Chris Richardson • All rights reserved 
+ About Microservices.io 
+ Microservices.io is created by Chris Richardson , software architect, creator of the original CloudFoundry.com, and author of Microservices Patterns . Chris helps organizations modernize their architecture to enable fast flow and GenAI-powered software delivery.
+ Need help modernizing your architecture? 
+ Avoid the trap of creating a modern legacy system — a new architecture with the same old problems. 
+ Contact me to discuss your modernization goals.
+ Get Help 
+ Microservices Patterns, 2nd edition 
+ I am very excited to announce that the MEAP for the second edition of my book, Microservices Patterns is now available!
+ Learn more 
+ Latest articles 
+ Writing better problem reports: 6 essential details 
+-->
+ ASK CHRIS 
+ ? 
+ Got a question about microservices? 
+ Fill in this form . If I can, I'll write a blog post that answers your question. 
+ NEED HELP? 
+ I help organizations improve agility and competitiveness through better software architecture.
+ Learn more about my consulting engagements , and training workshops .
+ PREMIUM CONTENT 
+ Premium content now available for paid subscribers at premium.microservices.io .
+ MICROSERVICES WORKSHOPS 
+ Chris teaches comprehensive workshops for architects and developers that will enable your organization use microservices effectively.
+ Avoid the pitfalls of adopting microservices and learn essential topics, such as service decomposition and design and how to refactor a monolith to microservices.
+ Learn more 
+ Remote consulting session 
+ Got a specific microservice architecture-related question? For example: 
+ Wondering whether your organization should adopt microservices? 
+ Want to know how to migrate your monolith to microservices? 
+ Facing a tricky microservice architecture design problem? 
+ Consider signing up for a two hour, highly focussed, consulting session. 
+ ASSESS your architecture 
+ Assess your application's microservice architecture and identify what needs to be improved. Engage Chris to conduct an architect review. 
+ LEARN about microservices 
+ Chris offers numerous other resources for learning the microservice architecture. 
+ Get the book: Microservices Patterns 
+ Read Chris Richardson's book:
+ Example microservices applications 
+ Want to see an example? Check out Chris Richardson's example applications.
+ See code 
+ Virtual bootcamp: Distributed data patterns in a microservice architecture 
+ My virtual bootcamp, distributed data patterns in a microservice architecture, is now open for enrollment! 
+ It covers the key distributed data management patterns including Saga, API Composition, and CQRS. 
+ It consists of video lectures, code labs, and a weekly ask-me-anything video conference repeated in multiple timezones. 
+ The regular price is $395/person but use coupon OFFEFKCW to sign up for $95 (valid until Sept 30th, 2025).
+ There are deeper discounts for buying multiple seats.
+ Learn more 
+ Learn how to create a service template and microservice chassis 
+ Take a look at my Manning LiveProject that teaches you how to develop a service template and microservice chassis.
+ Signup for the newsletter For Email Marketing you can trust. 
+ BUILD microservices 
+ Ready to start using the microservice architecture?
+ Consulting services 
+ Engage Chris to create a microservices adoption roadmap and help you define your microservice architecture, 
+ The Eventuate platform 
+ Use the Eventuate.io platform to tackle distributed data management challenges in your microservices architecture. 
+ Eventuate is Chris's latest startup. It makes it easy to use the Saga pattern to manage transactions and the CQRS pattern to implement queries. 
+ Join the microservices google group 
+ Please enable JavaScript to view the comments powered by Disqus.

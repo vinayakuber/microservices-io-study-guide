@@ -1,0 +1,125 @@
+// Chapter 1 — Monolithic Architecture (Part 1: Architecture)
+registerChapter({
+  id: 'ch01',
+  num: 1,
+  title: 'Monolithic Architecture',
+  pattern: 'Structure the application as a single deployable/executable component that uses a single database and contains all subdomains, so every operation is local.',
+  aka: 'Chris Richardson · Microservice Patterns Ch. 1 · microservices.io /patterns/monolithic.html',
+  part: 1,
+  flow: [
+    {
+      section: 'Subdomains and operations',
+      color: 'orange',
+      motivation: `The unit being organized is the subdomain — a slice of business functionality — and the behavior is a set of operations that mutate and query business entities.`,
+      steps: [
+        { num: 1, title: 'A subdomain is business functionality', detail: 'A subdomain is an implementable model of a slice of business functionality, a.k.a. a business capability.' },
+        { num: 2, title: 'Business logic is entities plus adapters', detail: 'It consists of business logic — business entities (DDD aggregates) that implement business rules — plus adapters that communicate with the outside world.' },
+        { num: 3, title: 'Operations are the behavior', detail: 'The subdomains implement the application\'s behavior, a set of system operations that mutate and query business entities.' },
+        { num: 4, title: 'Operations arrive three ways', detail: 'An operation is invoked by a synchronous or asynchronous client request, by an event from another application or service, or by the passing of time.' }
+      ],
+      program: `// ORDER SIDE — one operation runs entirely inside ONE component (no network hops)
+// PARTIES: CLI = customer client · APP = the monolith · DB = its single database
+// STATE (before):
+//    order_entities : { "PO-2001": {status:"DRAFT"} }
+//    inventory_entities : { "SKU-77": {qty:5} }
+// DEF: placeOrder · CALLED BY: CLI sending a synchronous request to APP
+// -> order_id : "PO-2001" · -> sku : "SKU-77" · -> qty : 2
+//    step 1 · reserve stock : inventory_entities["SKU-77"].qty : 5 -> 3   BECAUSE the operation mutates the Inventory subdomain's entity
+//    step 2 · mark the order : order_entities["PO-2001"].status : "DRAFT" -> "CONFIRMED"
+//    step 3 · record the credit check : credit_check : "none" -> "approved"   BECAUSE the Credit subdomain runs in the same process
+// <- order_status : "CONFIRMED" · 0 network hops (all subdomains share one component)`
+    },
+    {
+      section: 'The five dark energy forces',
+      color: 'orange',
+      motivation: `Five forces push the architecture toward many small components; they are the reasons a monolith eventually hurts.`,
+      steps: [
+        { num: 1, title: 'Simple components', detail: 'Simple components consisting of few subdomains are easier to understand and maintain than complex components.' },
+        { num: 2, title: 'Team autonomy', detail: 'A team needs to develop, test and deploy its software independently of other teams.' },
+        { num: 3, title: 'Fast deployment pipeline', detail: 'Fast feedback and high deployment frequency require components that are fast to build and test.' },
+        { num: 4, title: 'Support multiple technology stacks', detail: 'Subdomains are sometimes implemented in a variety of technologies, and developers need to evolve the stack.' },
+        { num: 5, title: 'Segregate by characteristics', detail: 'Subdomains may need different resource, availability and security characteristics, so they should be segregable.' }
+      ],
+      program: `// PIPELINE SIDE — one team's change rebuilds the ONE shared component
+// PARTIES: TA = Team Orders · TBL = Team Billing · CI = the single pipeline
+// STATE (before):
+//    component : { subdomains: ["Orders","Billing"], artifact: "app.war" }
+//    tests_run : 20
+//    instances : 4
+//    instances_restarted : 0
+// DEF: change · CALLED BY: TA committing a one-line fix in the Orders subdomain
+// -> commit : "fix tax rounding in Orders"
+//    step 1 · rebuild the whole artifact : build_scope : "Orders only" -> "Orders + Billing (entire WAR)"
+//    step 2 · rerun every subdomain's tests : tests_run : 20 -> 200   BECAUSE one artifact means every subdomain retests
+//    step 3 · redeploy all instances : instances_restarted : 0 -> 4   BECAUSE a single WAR replaces every instance, including Billing's traffic
+// <- release : "app.war" shipped · both teams' code goes out together
+//    alt TBL has a broken test : TA's fix is blocked -> team autonomy lost`
+    },
+    {
+      section: 'The five dark matter forces',
+      color: 'orange',
+      motivation: `Five opposing forces pull the architecture toward few components and local interactions; the monolith wins on every one of them.`,
+      steps: [
+        { num: 1, title: 'Simple interactions', detail: 'An operation that is local to a component, or a few simple interactions, is easier to understand and troubleshoot than a distributed one.' },
+        { num: 2, title: 'Efficient interactions', detail: 'A distributed operation with many network round trips and large data transfers can be too inefficient.' },
+        { num: 3, title: 'Prefer ACID over BASE', detail: 'It is easier to implement an operation as an ACID transaction than as an eventually consistent saga.' },
+        { num: 4, title: 'Minimize runtime coupling', detail: 'Less runtime coupling maximizes availability and reduces the latency of an operation.' },
+        { num: 5, title: 'Minimize design-time coupling', detail: 'Less design-time coupling reduces lockstep changes across services, which improves productivity.' }
+      ],
+      program: `// DATABASE SIDE — one operation spanning two subdomains stays ACID in ONE database
+// PARTIES: APP = the monolith · DB = its single database
+// STATE (before):
+//    order_entities : { "PO-2001": {status:"DRAFT", total:0} }
+//    credit_entities : { "CUST-9": {used:100} }
+// DEF: placeOrder · CALLED BY: APP, invoked synchronously
+// -> order_id : "PO-2001" · -> customer : "CUST-9" · -> amount : 40
+//    step 1 · BEGIN local transaction T1 on DB (a single transaction, not a saga)
+//    step 2 · write the order : order_entities["PO-2001"].status : "DRAFT" -> "PLACED"
+//    step 3 · record the total : order_entities["PO-2001"].total : 0 -> 40
+//    step 4 · consume credit : credit_entities["CUST-9"].used : 100 -> 140   BECAUSE both subdomains' rows live in the one database
+//    step 5 · COMMIT T1 -> both writes durable together (atomic)
+// <- result : "COMMITTED" · no eventual consistency, no distributed transaction
+//    alt credit limit exceeded : ROLLBACK T1 -> total back to 0 and used back to 100 (all-or-nothing)`
+    },
+    {
+      section: 'The monolith solution and its containment',
+      color: 'orange',
+      motivation: `The single component resolves the dark matter forces but risks the dark energy ones; the craft is containing those risks as the app grows.`,
+      steps: [
+        { num: 1, title: 'Single component, single database', detail: 'Structure the application as one deployable/executable component using a single database, containing all subdomains.' },
+        { num: 2, title: 'All operations are local', detail: 'Because there is a single component, interactions are local, efficient and typically ACID.' },
+        { num: 3, title: 'Drawbacks grow with size', detail: 'The drawbacks — complexity, less team autonomy, a slow pipeline, one stack, no segregation — worsen as the app and team count grow.' },
+        { num: 4, title: 'Contain with a modular monolith', detail: 'Organize subdomains into vertical slices of presentation, business and persistence logic, and speed up the pipeline.' }
+      ],
+      program: `// BUILD SIDE — a modular monolith localizes a change to one vertical slice
+// PARTIES: DEV = a developer in Team Orders · CI = build tool with incremental builds
+// STATE (before):
+//    modules : { "orders": {changed:false}, "billing": {changed:false} }
+//    rebuilt_modules : []
+//    skipped_modules : 0
+//    tests_run : 200
+// DEF: change · CALLED BY: DEV editing one file in the orders slice
+// -> file : "orders/pricing.kt"
+//    step 1 · detect the dirty module : modules["orders"].changed : false -> true
+//    step 2 · incremental build : rebuilt_modules : [] -> ["orders"]   BECAUSE only the orders module changed
+//    step 3 · skip the clean module : skipped_modules : 0 -> 1
+//    step 4 · run only orders tests : tests_run : 200 -> 20   BECAUSE billing was not recompiled
+// <- build : "orders" rebuilt · billing skipped
+//    alt layered (non-modular) monolith : rebuild ALL slices -> tests_run : 20 -> 200 (back to full)`
+    }
+  ],
+  concepts: {
+    cards: [
+      { tag: 'problem', tagLabel: 'Problem', title: 'All subdomains in one component', content: '<p><strong>Why.</strong> The monolithic architecture puts every subdomain into one deployable component, so no single team can evolve its slice in isolation.</p><p><strong>Claim.</strong> The single component resolves the five dark matter forces — interactions stay local and efficient, ACID is easy, and there is no runtime or design-time coupling between components.</p><p><strong>Grounding.</strong> The pattern\'s solution specifies a single deployable/executable component using a single database; all operations are local because there is a single component.</p><p><strong>In the wild.</strong> Netflix, Amazon.com and eBay each began as monoliths, and most web applications before 2012 were built this way.</p>' },
+      { tag: 'solution', tagLabel: 'Solution', title: 'Single component + single database', content: '<p><strong>Why.</strong> Keeping all subdomains in one process and one database makes every operation a local call with no network round trips.</p><p><strong>Claim.</strong> Structure the application as a single deployable/executable component that uses a single database and contains all of the application\'s subdomains.</p><p><strong>Grounding.</strong> A Java web application ships as a single WAR file on a container such as Tomcat; a Rails application is a single directory hierarchy deployed via Phusion Passenger on Apache/Nginx or JRuby on Tomcat.</p><p><strong>In the wild.</strong> You can run multiple instances behind a load balancer to scale and improve availability.</p>' },
+      { tag: 'tradeoff', tagLabel: 'Tradeoff', title: 'The dark energy forces come back', content: '<p><strong>Why.</strong> As the application grows in size and in number of teams, the monolith\'s drawbacks become more severe.</p><p><strong>Claim.</strong> A monolith is harder to understand and maintain, gives teams less autonomy, slows the deployment pipeline, locks in a single technology stack, and cannot segregate subdomains by their characteristics.</p><p><strong>Grounding.</strong> The resulting-context drawbacks are that all teams share one code base and must coordinate, and one large application must be built and tested together.</p><p><strong>In the wild.</strong> The deployment pipeline is potentially slow since there is a single large application that needs to be built and tested.</p>' },
+      { tag: 'tradeoff', tagLabel: 'Tradeoff', title: 'A modular monolith contains the damage', content: '<p><strong>Why.</strong> The key challenge is minimizing the drawbacks rather than eliminating the monolith outright.</p><p><strong>Claim.</strong> You can increase maintainability and team autonomy by organizing subdomains into vertical slices (presentation, business and persistence logic) and accelerate the pipeline with an automated merge queue, incremental builds, and parallelized build and test steps.</p><p><strong>Grounding.</strong> The issues section lists modularizing the monolith and applying physical design principles to reduce build-time coupling.</p><p><strong>In the wild.</strong> These mitigations reduce, but do not remove, the dark energy forces; the microservice architecture is the alternative pattern that addresses the limitations.</p>' }
+    ]
+  },
+  quiz: [
+    { "question": "What is a subdomain in this pattern?", "options": ["A. A deployable component that runs on Tomcat", "B. An implementable model of a slice of business functionality", "C. A load balancer in front of the monolith", "D. A message broker that delivers events"], "answer": 2, "explanation": "A subdomain is an implementable model of a slice of business functionality, a.k.a. a business capability — the unit the architecture organizes, not a deployment artifact or infrastructure (so A, C and D are wrong).", "conceptRef": "All subdomains in one component" },
+    { "question": "Which force is one of the five dark ENERGY forces?", "options": ["A. Simple interactions", "B. Efficient interactions", "C. Team autonomy", "D. Prefer ACID over BASE"], "answer": 3, "explanation": "The five dark energy forces — simple components, team autonomy, fast deployment pipeline, multiple technology stacks, segregate by characteristics — push toward many components. Simple interactions, efficient interactions and ACID are dark matter forces that pull toward one component.", "conceptRef": "The dark energy forces come back" },
+    { "question": "How are operations implemented in the monolithic solution?", "options": ["A. As distributed sagas across services", "B. As local operations, since there is a single component", "C. Via an API gateway", "D. As eventually consistent transactions"], "answer": 2, "explanation": "Since there is a single component, all operations are local — no distributed transactions, API gateway or eventual consistency is needed inside the monolith, which is why A, C and D are wrong.", "conceptRef": "Single component + single database" },
+    { "question": "What happens to the monolith's drawbacks as the application grows?", "options": ["A. They disappear because operations stay local", "B. They become more severe as size and team count increase", "C. They only affect the deployment pipeline", "D. They are solved by running more instances"], "answer": 2, "explanation": "The drawbacks (complexity, less team autonomy, slow pipeline, single stack, no segregation) become more severe as the application grows in size and complexity and the number of teams increases; running more instances only scales, it does not fix these.", "conceptRef": "A modular monolith contains the damage" }
+  ]
+});

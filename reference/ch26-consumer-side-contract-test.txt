@@ -1,0 +1,79 @@
+# Consumer-side contract test
+
+Source: https://microservices.io/patterns/testing/consumer-side-contract-test.html
+
+Pattern: Consumer-side contract test 
+ Microservice Architecture 
+ Patterns 
+ Articles 
+ Presentations 
+ Adopt 
+ Refactoring 
+ Testing 
+ Modernization Help 
+ About 
+ Pattern: Consumer-side contract test 
+ pattern
+ Verify that the client of a service can communicate with the service. 
+ pattern
+ Modernization Help 
+ Copyright © 2026 Chris Richardson • All rights reserved 
+ About Microservices.io 
+ Microservices.io is created by Chris Richardson , software architect, creator of the original CloudFoundry.com, and author of Microservices Patterns . Chris helps organizations modernize their architecture to enable fast flow and GenAI-powered software delivery.
+ Need help modernizing your architecture? 
+ Avoid the trap of creating a modern legacy system — a new architecture with the same old problems. 
+ Contact me to discuss your modernization goals.
+ Get Help 
+ Microservices Patterns, 2nd edition 
+ I am very excited to announce that the MEAP for the second edition of my book, Microservices Patterns is now available!
+ Learn more 
+ Latest articles 
+ Writing better problem reports: 6 essential details 
+-->
+ ASK CHRIS 
+ ? 
+ Got a question about microservices? 
+ Fill in this form . If I can, I'll write a blog post that answers your question. 
+ NEED HELP? 
+ I help organizations improve agility and competitiveness through better software architecture.
+ Learn more about my consulting engagements , and training workshops .
+ PREMIUM CONTENT 
+ Premium content now available for paid subscribers at premium.microservices.io .
+ MICROSERVICES WORKSHOPS 
+ Chris teaches comprehensive workshops for architects and developers that will enable your organization use microservices effectively.
+ Avoid the pitfalls of adopting microservices and learn essential topics, such as service decomposition and design and how to refactor a monolith to microservices.
+ Learn more 
+ Remote consulting session 
+ Got a specific microservice architecture-related question? For example: 
+ Wondering whether your organization should adopt microservices? 
+ Want to know how to migrate your monolith to microservices? 
+ Facing a tricky microservice architecture design problem? 
+ Consider signing up for a two hour, highly focussed, consulting session. 
+ ASSESS your architecture 
+ Assess your application's microservice architecture and identify what needs to be improved. Engage Chris to conduct an architect review. 
+ LEARN about microservices 
+ Chris offers numerous other resources for learning the microservice architecture. 
+ Get the book: Microservices Patterns 
+ Read Chris Richardson's book:
+ Example microservices applications 
+ Want to see an example? Check out Chris Richardson's example applications.
+ See code 
+ Virtual bootcamp: Distributed data patterns in a microservice architecture 
+ My virtual bootcamp, distributed data patterns in a microservice architecture, is now open for enrollment! 
+ It covers the key distributed data management patterns including Saga, API Composition, and CQRS. 
+ It consists of video lectures, code labs, and a weekly ask-me-anything video conference repeated in multiple timezones. 
+ The regular price is $395/person but use coupon OFFEFKCW to sign up for $95 (valid until Sept 30th, 2025).
+ There are deeper discounts for buying multiple seats.
+ Learn more 
+ Learn how to create a service template and microservice chassis 
+ Take a look at my Manning LiveProject that teaches you how to develop a service template and microservice chassis.
+ Signup for the newsletter For Email Marketing you can trust. 
+ BUILD microservices 
+ Ready to start using the microservice architecture?
+ Consulting services 
+ Engage Chris to create a microservices adoption roadmap and help you define your microservice architecture, 
+ The Eventuate platform 
+ Use the Eventuate.io platform to tackle distributed data management challenges in your microservices architecture. 
+ Eventuate is Chris's latest startup. It makes it easy to use the Saga pattern to manage transactions and the CQRS pattern to implement queries. 
+ Join the microservices google group 
+ Please enable JavaScript to view the comments powered by Disqus.

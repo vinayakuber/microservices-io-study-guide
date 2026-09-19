@@ -1,0 +1,112 @@
+registerChapter({
+  id: 'ch37',
+  num: 37,
+  title: 'Service per Container',
+  pattern: 'Package each service as a (Docker) container image and deploy each service instance as a container.',
+  aka: 'Chris Richardson · Microservice Patterns p.393 · microservices.io /patterns/deployment/service-per-container.html',
+  part: 9,
+  flow: [
+    {
+      section: 'Package the service as an image',
+      color: 'orange',
+      motivation: `Without a uniform package, every service needs its own build and start procedure. A container image gives every service the same shape regardless of the language, framework, or version it was built with.`,
+      steps: [
+        { num: 1, title: 'Write a Dockerfile', detail: 'A Dockerfile wraps the service code plus its runtime so the image is self-contained.' },
+        { num: 2, title: 'Build the image', detail: '<strong>docker build</strong> turns the source into an image the cluster can run.' },
+        { num: 3, title: 'Tag with a version', detail: 'Pin a version tag so the cluster can select specific releases instead of an unstable latest.' },
+        { num: 4, title: 'Push to a registry', detail: 'The cluster pulls the image from a registry, so a push makes it deployable everywhere.' }
+      ],
+      program: `// BUILD SIDE — turn one service's code into a container image so every tech stack deploys the same way
+// PARTIES: BLD = build pipeline · REG = container registry
+// STATE (before):
+//    image : null                       // nothing built yet
+//    tag : "latest"                     // default tag before versioning
+// DEF: package version 1.4.2 · CALLED BY: BLD on every source commit
+// -> service : "restaurant-service" · -> version : "1.4.2"
+//    step 1 · docker build · image : null -> "rsvc:1.4.2"  BECAUSE the Dockerfile wraps the JAR plus its JVM runtime
+//    step 2 · docker tag · tag : "latest" -> "1.4.2"       // pin the version so the cluster can select releases
+//    step 3 · docker push · copies : 0 -> 1                BECAUSE REG now holds one copy the cluster can pull
+// <- image : "rsvc:1.4.2" in REG · 1 image ready to run as N containers
+//    alt next commit : version : "1.4.2" -> "1.4.3"        BECAUSE a new commit builds a fresh image tag`
+    },
+    {
+      section: 'Run each instance as a container',
+      color: 'orange',
+      motivation: `Each service runs as multiple instances for throughput and availability. Deploying each instance as a container makes scaling a matter of changing a count.`,
+      steps: [
+        { num: 1, title: 'Pull the image', detail: 'A host pulls the shared image once, then launches as many containers as needed from it.' },
+        { num: 2, title: 'Set the replica count', detail: 'Scaling up or down means changing the number of container instances, with no rebuild.' },
+        { num: 3, title: 'Spread traffic across replicas', detail: 'A load balancer routes requests across all running containers.' }
+      ],
+      program: `// RUNTIME SIDE — scale a service by changing its container count, with no rebuild or redeploy
+// PARTIES: SVC = restaurant-service · CLUSTER = the Kubernetes cluster
+// STATE (before):
+//    replicas : 2                       // two containers currently serving traffic
+//    image : "rsvc:1.4.2"               // the single image every replica runs
+// DEF: scale to 4 · CALLED BY: CLUSTER when measured load rises
+// -> desired_replicas : 4
+//    step 1 · set replicas · replicas : 2 -> 4   BECAUSE Kubernetes starts 2 more containers from the same image
+//    step 2 · schedule · unplaced : 2 -> 0       // both new containers land on healthy hosts
+//    step 3 · route · endpoints : 2 -> 4         // the load balancer now spreads traffic over 4
+// <- instances : 4  · same image "rsvc:1.4.2", zero rebuilds
+//    alt load drops : replicas : 4 -> 1          BECAUSE Kubernetes terminates 3 containers to save resources`
+    },
+    {
+      section: 'Constrain CPU and memory per container',
+      color: 'orange',
+      motivation: `A service must not consume unbounded resources. The container is the boundary where CPU and memory limits are imposed, and where each instance stays isolated from its neighbors.`,
+      steps: [
+        { num: 1, title: 'Declare the limit', detail: 'The pod spec names the CPU and memory cap before the container runs.' },
+        { num: 2, title: 'Throttle beyond the cap', detail: 'The container runtime blocks any consumption above the declared limit.' },
+        { num: 3, title: 'Isolate neighbors', detail: 'Each container keeps its own separate cap, so one cannot starve the others.' }
+      ],
+      program: `// RUNTIME SIDE — constrain one container's CPU so a noisy neighbor cannot starve the others
+// PARTIES: SVC = restaurant-service · HOST = the machine running the containers
+// STATE (before):
+//    caps : {}                           // per-container limits, none set yet
+//    usage : 0.9                         // this container's current CPU (fraction of a core)
+// DEF: set cpu cap 0.5 · CALLED BY: SVC's pod spec at deploy time
+// -> cpu_limit : 0.5
+//    step 1 · apply cap · caps : {} -> {"cpu":0.5}   BECAUSE the runtime records the limit before the container runs
+//    step 2 · throttle · usage : 0.9 -> 0.5          // the excess 0.4 is blocked, not granted
+//    step 3 · isolate · neighbors : 0 -> 1           // a second container keeps its own separate cap
+// <- cpu_cap : 0.5  · one container cannot consume another's share
+//    alt no cap declared : usage : 0.5 -> 0.9        BECAUSE without a limit the container grabs the idle CPU`
+    },
+    {
+      section: 'Fast to build and start, thinner infrastructure',
+      color: 'orange',
+      motivation: `Containers are extremely fast to build and start, but the tooling around them is not as mature as the tooling for virtual machines. Choosing containers means trading infrastructure richness for speed.`,
+      steps: [
+        { num: 1, title: 'Start only the app process', detail: 'A container starts the application process, not an entire OS, so it boots much faster than a VM.' },
+        { num: 2, title: 'Package much faster than an AMI', detail: 'It is about 100x faster to package an application as a Docker container than as an AMI.' },
+        { num: 3, title: 'Accept the tradeoff', detail: 'Container deployment infrastructure is not as rich as the mature VM-based IaaS ecosystem.' }
+      ],
+      program: `// TRADEOFF SIDE — one service, two packaging choices, measured start times
+// PARTIES: CNT = container path · VMACH = virtual-machine path
+// STATE (before):
+//    boot : {"container":0, "vm":0}      // measured start times in seconds, both 0
+// DEF: time start of service 1.4.2 · CALLED BY: a deploy test on the same service
+// -> service : "rsvc:1.4.2"
+//    step 1 · start container · boot.container : 0 -> 3    BECAUSE only the application process starts
+//    step 2 · start VM · boot.vm : 0 -> 30                 BECAUSE an entire OS must boot first
+//    step 3 · compare · ratio : 0 -> 10                    // 30 s / 3 s = 10x faster container start
+// <- container : 3 s · VM : 30 s  · container wins on speed, loses on infrastructure maturity
+//    alt package step : image : 0 -> 1 in ~seconds · AMI : 0 -> 1 in ~minutes  BECAUSE the reference notes ~100x faster packaging`
+    }
+  ],
+  concepts: {
+    cards: [
+      { tag: 'problem', tagLabel: 'Problem', title: 'Many languages, one deployment path', content: '<p><strong>Why.</strong> A microservice system is built from services written in a variety of languages, frameworks, and framework versions, and each service runs as multiple instances for throughput and availability.</p><p><strong>Claim.</strong> Without a uniform packaging unit, every service needs its own build and start procedure, so deployment cannot be reliable or fast.</p><p><strong>Grounding.</strong> The pattern forces list the variety of technologies, the need for independent deployability and scalability, and the need to build and deploy quickly.</p><p><strong>In the wild.</strong> Docker became an extremely popular way to package and deploy services because it gives every service one uniform shape.</p>' },
+      { tag: 'solution', tagLabel: 'Solution', title: 'A container image per service', content: '<p><strong>Why.</strong> Each service instance must be isolated, independently scalable, and constrained in the CPU and memory it consumes.</p><p><strong>Claim.</strong> Package the service as a Docker container image and deploy each service instance as a container; the container encapsulates the technology used to build the service.</p><p><strong>Grounding.</strong> The solution says the service is packaged as a container image and each instance is a container, clustered by Kubernetes, Marathon/Mesos, or Amazon EC2 Container Service.</p><p><strong>In the wild.</strong> All services are started and stopped in exactly the same way because the container hides the runtime details.</p>' },
+      { tag: 'tradeoff', tagLabel: 'Tradeoff', title: 'Fast to build and start', content: '<p><strong>Why.</strong> You must deploy the application quickly and cost-effectively.</p><p><strong>Claim.</strong> Containers are extremely fast to build and start; it is about 100x faster to package an application as a Docker container than as an AMI, and a container starts much faster than a VM.</p><p><strong>Grounding.</strong> The resulting context says a container starts faster because only the application process starts rather than an entire OS.</p><p><strong>In the wild.</strong> Teams that need rapid redeploys pick containers over VM images for exactly this speed.</p>' },
+      { tag: 'tradeoff', tagLabel: 'Tradeoff', title: 'Thinner infrastructure than VMs', content: '<p><strong>Why.</strong> You want deployment to be reliable and cost-effective.</p><p><strong>Claim.</strong> The infrastructure for deploying containers is not as rich as the infrastructure for deploying virtual machines.</p><p><strong>Grounding.</strong> The resulting context lists this as the main drawback of the container approach.</p><p><strong>In the wild.</strong> Teams may prefer the Service Instance per VM pattern when they need the mature IaaS tooling such as autoscaling groups and load balancers.</p>' }
+    ]
+  },
+  quiz: [
+    { "question": "What is the solution of the Service per Container pattern?", "options": ["A. Package each service as a VM image and deploy each instance as a VM", "B. Package the service as a Docker container image and deploy each instance as a container", "C. Deploy the service as a language-specific JAR or WAR", "D. Hide all servers behind a serverless platform"], "answer": 2, "explanation": "The pattern packages each service as a container image and runs each instance as a container (B). A is the Service per VM pattern, C is language-specific packaging, and D is serverless deployment.", "conceptRef": "A container image per service" },
+    { "question": "Which of these is NOT a benefit listed for the container approach?", "options": ["A. Straightforward to scale up and down by changing the container count", "B. Each service instance is isolated", "C. A container imposes limits on CPU and memory", "D. Container deployment infrastructure is richer than VM infrastructure"], "answer": 4, "explanation": "The reference lists the opposite as a drawback — container infrastructure is not as rich as VM infrastructure, so D is false. A, B, and C are all listed benefits.", "conceptRef": "Thinner infrastructure than VMs" },
+    { "question": "Why does a Docker container start much faster than a virtual machine?", "options": ["A. The container runs in the cloud", "B. Only the application process starts rather than an entire OS", "C. Containers use less disk space", "D. The container does not need a registry"], "answer": 2, "explanation": "A container starts faster because only the application process starts rather than an entire OS (B). The other options are not the reason given in the reference.", "conceptRef": "Fast to build and start" },
+    { "question": "Which clustering frameworks are named for deploying containers?", "options": ["A. Kubernetes, Marathon/Mesos, and Amazon EC2 Container Service", "B. Elastic Beanstalk and Lambda", "C. CloudFoundry only", "D. None — containers run directly on laptops"], "answer": 1, "explanation": "The reference names Kubernetes, Marathon/Mesos, and Amazon EC2 Container Service (A). The other options are not named in the pattern.", "conceptRef": "A container image per service" }
+  ]
+});

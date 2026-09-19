@@ -1,0 +1,112 @@
+registerChapter({
+  id: 'ch42',
+  num: 42,
+  title: 'Sidecar',
+  pattern: 'Implement cross-cutting concerns in a sidecar process or container that runs alongside the service instance.',
+  aka: 'Chris Richardson · Microservice Patterns p.410 · microservices.io /patterns/deployment/sidecar.html',
+  part: 9,
+  flow: [
+    {
+      section: 'Colocate a sidecar with each instance',
+      color: 'orange',
+      motivation: `Cross-cutting concerns belong outside the service code. A sidecar process or container that runs alongside the service instance carries those concerns, so the service stays focused on business logic.`,
+      steps: [
+        { num: 1, title: 'Run the service instance', detail: 'The service instance runs as its own process or container.' },
+        { num: 2, title: 'Run a sidecar alongside it', detail: 'A separate sidecar process or container runs alongside the service instance.' },
+        { num: 3, title: 'Move concerns into the sidecar', detail: 'The sidecar implements the cross-cutting concerns instead of the service.' }
+      ],
+      program: `// COLOCATE SIDE — run a sidecar process alongside each service instance so concerns live outside the service
+// PARTIES: POD = the deployment unit (one host) · SVC = Order Service instance · SIDE = the sidecar
+// STATE (before):
+//    processes : {}                     // processes in this pod, none yet
+//    concerns : []                      // cross-cutting concerns, not yet attached
+// DEF: start 2 processes (service + sidecar) · CALLED BY: POD at deploy time
+// -> service : "order-service" · -> sidecar : "order-sidecar"
+//    step 1 · start SVC · processes : {} -> {"order-service"}   BECAUSE the service instance runs as its own process
+//    step 2 · start SIDE · processes : {"order-service"} -> {"order-service","order-sidecar"}  // the sidecar runs ALONGSIDE the service
+//    step 3 · attach concerns · concerns : [] -> ["tracing","metrics"]   // the sidecar carries cross-cutting concerns, not the service
+// <- processes : 2  · concerns : 2  · the service and sidecar share one host
+//    alt container form : sidecar : "order-sidecar" -> "order-sidecar-container"  BECAUSE a sidecar can be a container instead of a process`
+    },
+    {
+      section: 'Intercept outbound traffic',
+      color: 'orange',
+      motivation: `The sidecar sits between the service and its outbound traffic, so it can act on every call that leaves. This is where a concern such as distributed tracing attaches a unique id.`,
+      steps: [
+        { num: 1, title: 'Sit in the traffic path', detail: 'The sidecar stands between the service and its outbound calls.' },
+        { num: 2, title: 'Intercept the request', detail: 'The sidecar sees each outbound request before it leaves.' },
+        { num: 3, title: 'Apply the concern', detail: 'The sidecar stamps the request with a trace id and forwards it.' }
+      ],
+      program: `// OUTBOUND SIDE — the sidecar mediates every call leaving the service, attaching a trace id
+// PARTIES: SVC = Order Service · SIDE = its sidecar · DB = the database SVC calls
+// STATE (before):
+//    request : {}                       // the outbound call before interception
+//    trace_id : null                    // no id assigned yet
+// DEF: mediate call 1 to DB · CALLED BY: SVC sending a query
+// -> call : "SELECT * FROM orders" · -> target : "db:5432"
+//    step 1 · intercept · request : {} -> {"call":"SELECT * FROM orders"}  BECAUSE the sidecar sits between the service and its outbound traffic
+//    step 2 · trace · trace_id : null -> "trc-77c1"                        // the sidecar stamps a unique id for distributed tracing
+//    step 3 · forward · sent : 0 -> 1                                      // the stamped call leaves for the DB
+// <- call : "SELECT * FROM orders" sent to db:5432 · trace_id "trc-77c1"
+//    alt reply path : reply : 0 -> 1   BECAUSE the same sidecar also mediates the inbound reply`
+    },
+    {
+      section: 'Intercept inbound traffic',
+      color: 'orange',
+      motivation: `Inbound traffic passes through the sidecar too. A monitoring service can ping the sidecar for health, and the sidecar records metrics — observability without touching the service.`,
+      steps: [
+        { num: 1, title: 'Own the health URL', detail: 'The sidecar answers the health-check URL that a monitoring service pings.' },
+        { num: 2, title: 'Count the requests', detail: 'The sidecar records metrics about the requests it mediates.' },
+        { num: 3, title: 'Report to the monitor', detail: 'The measurements are emitted so operators can see what the service is doing.' }
+      ],
+      program: `// INBOUND SIDE — a monitor pings the sidecar, which answers for the service without touching its code
+// PARTIES: MON = monitoring service · SIDE = the sidecar · SVC = Order Service
+// STATE (before):
+//    health : {}                        // health endpoint state, unknown
+//    metric : 0                         // request counter, zero
+// DEF: ping health URL every 10 s · CALLED BY: MON
+// -> health_url : "/health"
+//    step 1 · answer · health : {} -> {"status":"UP"}   BECAUSE the sidecar owns the health-check URL the monitor pings
+//    step 2 · count · metric : 0 -> 1                   // the sidecar records one measured request
+//    step 3 · report · samples : 0 -> 1                 // the metric is emitted to the monitor
+// <- health : "UP"  · metric : 1  · observability handled by the sidecar, service code unchanged
+//    alt DOWN : health : {"status":"UP"} -> {"status":"DOWN"}   BECAUSE the service process failed behind the sidecar`
+    },
+    {
+      section: 'Sidecars form a service mesh',
+      color: 'orange',
+      motivation: `A single sidecar handles one instance. When every instance has a sidecar, the set of sidecars collectively mediates all in and out traffic — which is how a service mesh is often implemented.`,
+      steps: [
+        { num: 1, title: 'Give every instance a sidecar', detail: 'Each service instance gets its own sidecar.' },
+        { num: 2, title: 'Route hop to hop', detail: 'One sidecar forwards to the next, which hands the call to the next service.' },
+        { num: 3, title: 'Mediate all traffic', detail: 'Together the sidecars mediate all communication in and out of every service.' }
+      ],
+      program: `// MESH SIDE — when every instance has a sidecar, the set of sidecars mediates all traffic: a service mesh
+// PARTIES: SIDEA = sidecar of Order Service · SIDEB = sidecar of Customer Service · SVCB = Customer Service
+// STATE (before):
+//    sidecars : {}                      // sidecars deployed across the system, none yet
+//    hops : 0                           // mediated service-to-service hops
+// DEF: make call 1 from A to B · CALLED BY: Order Service calling Customer Service
+// -> next : "customer-service"
+//    step 1 · deploy sidecars · sidecars : {} -> {"a","b"}   BECAUSE each service instance gets its own sidecar
+//    step 2 · route · hops : 0 -> 1                          // SIDEA forwards to SIDEB, which hands it to SVCB
+//    step 3 · form mesh · mediated : 0 -> 1                  // the sidecars collectively mediate all in/out communication
+// <- hops : 1  · a mesh is often implemented using the sidecar pattern
+//    alt one sidecar only : sidecars : {"a","b"} -> {"a"}   BECAUSE without sidecars on every service, traffic is not fully mediated`
+    }
+  ],
+  concepts: {
+    cards: [
+      { tag: 'problem', tagLabel: 'Problem', title: 'Cross-cutting concerns pollute service code', content: '<p><strong>Why.</strong> In a system of services, every instance must handle the same non-business concerns.</p><p><strong>Claim.</strong> Writing configuration, logging, health checks, metrics, and tracing into each service duplicates code and drags every service away from its business logic.</p><p><strong>Grounding.</strong> The sidecar pattern exists to implement cross-cutting concerns, which the service mesh chapter enumerates as externalized configuration, logging, health checks, metrics, and distributed tracing.</p><p><strong>In the wild.</strong> The sidecar is the mechanism that moves those concerns out of the service.</p>' },
+      { tag: 'solution', tagLabel: 'Solution', title: 'A sidecar alongside each instance', content: '<p><strong>Why.</strong> The concern code should live somewhere that is not the service.</p><p><strong>Claim.</strong> Implement cross-cutting concerns in a sidecar process or container that runs alongside the service instance.</p><p><strong>Grounding.</strong> The solution states the sidecar runs alongside the service instance, so the two share a host and the sidecar can act on the service\'s traffic.</p><p><strong>In the wild.</strong> The same sidecar answers health pings, attaches trace ids, and records metrics for its service.</p>' },
+      { tag: 'tradeoff', tagLabel: 'Tradeoff', title: 'Concerns out of the code, at the cost of another process', content: '<p><strong>Why.</strong> You want observability and configuration without rewriting them per service.</p><p><strong>Claim.</strong> The sidecar centralizes cross-cutting concerns, but you now deploy and operate a second process or container per instance.</p><p><strong>Grounding.</strong> The solution says the sidecar is a separate process or container, so it is an extra runtime component alongside the service.</p><p><strong>In the wild.</strong> Teams accept the extra component because it keeps the service code clean and language-agnostic.</p>' },
+      { tag: 'tradeoff', tagLabel: 'Tradeoff', title: 'Sidecars are the building blocks of a mesh', content: '<p><strong>Why.</strong> One sidecar per instance scales naturally across a whole system.</p><p><strong>Claim.</strong> When every instance has a sidecar, the sidecars collectively mediate all communication in and out of each service — a service mesh.</p><p><strong>Grounding.</strong> The service mesh chapter notes a mesh is often implemented using the sidecar pattern, and the mesh mediates all traffic in and out.</p><p><strong>In the wild.</strong> A full mesh is often just the sidecar pattern applied consistently to every instance.</p>' }
+    ]
+  },
+  quiz: [
+    { "question": "What is the solution of the Sidecar pattern?", "options": ["A. Run all services in one process", "B. Implement cross-cutting concerns in a sidecar process or container running alongside the service instance", "C. Package services as VMs", "D. Use a serverless platform"], "answer": 2, "explanation": "The solution is to implement cross-cutting concerns in a sidecar process or container that runs alongside the service instance (B). The other options describe different patterns.", "conceptRef": "A sidecar alongside each instance" },
+    { "question": "Where does the sidecar run relative to the service instance?", "options": ["A. In a separate data center", "B. Alongside the service instance, sharing its host", "C. Only in the cloud provider's control plane", "D. Inside the service's own JVM"], "answer": 2, "explanation": "The sidecar is a process or container that runs alongside the service instance (B), so it shares the host and can act on the service's traffic.", "conceptRef": "A sidecar alongside each instance" },
+    { "question": "Which larger pattern is often implemented using sidecars?", "options": ["A. The service mesh", "B. The saga", "C. CQRS", "D. API composition"], "answer": 1, "explanation": "A service mesh is often implemented using the sidecar pattern (A). Saga, CQRS, and API composition are unrelated patterns.", "conceptRef": "Sidecars are the building blocks of a mesh" },
+    { "question": "What kinds of concerns does the sidecar implement?", "options": ["A. Cross-cutting concerns such as configuration, logging, health checks, metrics, and tracing", "B. Business rules for order placement", "C. Database schema migrations", "D. UI rendering"], "answer": 1, "explanation": "The sidecar implements cross-cutting concerns (A), such as the configuration, logging, health checks, metrics, and tracing listed in the service mesh chapter. The other options are business or unrelated responsibilities.", "conceptRef": "Cross-cutting concerns pollute service code" }
+  ]
+});

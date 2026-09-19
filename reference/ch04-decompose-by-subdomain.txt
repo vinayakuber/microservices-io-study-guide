@@ -1,0 +1,143 @@
+# Decompose by subdomain
+
+Source: https://microservices.io/patterns/decomposition/decompose-by-subdomain.html
+
+Pattern: Decompose by subdomain 
+ Microservice Architecture 
+ Patterns 
+ Articles 
+ Presentations 
+ Adopt 
+ Refactoring 
+ Testing 
+ Modernization Help 
+ About 
+ Pattern: Decompose by subdomain 
+ pattern
+ Context 
+ You are developing a large, complex application and want to use the microservice architecture .
+The microservice architecture structures an application as a set of loosely coupled services.
+The goal of the microservice architecture is to accelerate software development by enabling continuous delivery/deployment. 
+ The microservice architecture does this in two ways: 
+ Simplifies testing and enables components to deployed independently 
+ Structures the engineering organization as a collection of small (6-10 members), autonomous teams, each of which is responsible for one or more services 
+ These benefits are not automatically guaranteed.
+Instead, they can only be achieved by the careful functional decomposition of the application into services. 
+ A service must be small enough to be developed by a small team and to be easily tested.
+A useful guideline from object-oriented design (OOD) is the Single Responsibility Principle ( SRP ).
+The SRP defines a responsibility of a class as a reason to change, and states that a class should only have one reason to change.
+It make sense to apply the SRP to service design as well and design services that are cohesive and implement a small set of strongly related functions. 
+ The application also be decomposed in a way so that most new and changed requirements only affect a single service.
+That is because changes that affect multiple services requires coordination across multiple teams, which slows down development.
+Another useful principle from OOD is the Common Closure Principle (CCP), which states that classes that change for the same reason should be in the same package.
+Perhaps, for instance, two classes implement different aspects of the same business rule.
+The goal is that when that business rule changes developers, only need to change code in a small number - ideally only one - of packages.
+This kind of thinking makes sense when designing services since it will help ensure that each change should impact only one service. 
+ Problem 
+ How to decompose an application into services? 
+ Forces 
+ The architecture must be stable 
+ Services must be cohesive.
+A service should implement a small set of strongly related functions. 
+ Services must conform to the Common Closure Principle - things that change together should be packaged together - to ensure that each change affect only one service 
+ Services must be loosely coupled - each service as an API that encapsulates its implementation.
+The implementation can be changed without affecting clients 
+ A service should be testable 
+ Each service be small enough to be developed by a “two pizza” team, i.e. a team of 6-10 people 
+ Each team that owns one or more services must be autonomous.
+A team must be able to develop and deploy their services with minimal collaboration with other teams. 
+ Solution 
+ Define services corresponding to Domain-Driven Design (DDD) subdomains.
+DDD refers to the application’s problem space - the business - as the domain.
+A domain is consists of multiple subdomains.
+Each subdomain corresponds to a different part of the business. 
+ Subdomains can be classified as follows: 
+ Core - key differentiator for the business and the most valuable part of the application 
+ Supporting - related to what the business does but not a differentiator. These can be implemented in-house or outsourced. 
+ Generic - not specific to the business and are ideally implemented using off the shelf software 
+ Examples 
+ The subdomains of an online store include: 
+ Product catalog 
+ Inventory management 
+ Order management 
+ Delivery management 
+ … 
+ The corresponding microservice architecture would have services corresponding to each of these subdomains. 
+ Resulting Context 
+ This pattern has the following benefits: 
+ Stable architecture since the subdomains are relatively stable 
+ Development teams are cross-functional, autonomous, and organized around delivering business value rather than technical features 
+ Services are cohesive and loosely coupled 
+ Issues 
+ There are the following issues to address: 
+ How to identify the subdomains? 
+Identifying subdomains and hence services requires an understanding of the business.
+Like business capabilities, subdomains are identified by analyzing the business and its organizational structure and identifying the different areas of expertise.
+Subdomains are best identified using an iterative process.
+Good starting points for identifying subdomains are: 
+ organization structure - different groups within an organization might correspond to subdomains 
+ high-level domain model - subdomains often have a key domain object 
+ Related patterns 
+ The Decompose by business capability pattern is an alternative pattern 
+ pattern
+ Modernization Help 
+ Copyright © 2026 Chris Richardson • All rights reserved 
+ About Microservices.io 
+ Microservices.io is created by Chris Richardson , software architect, creator of the original CloudFoundry.com, and author of Microservices Patterns . Chris helps organizations modernize their architecture to enable fast flow and GenAI-powered software delivery.
+ Need help modernizing your architecture? 
+ Avoid the trap of creating a modern legacy system — a new architecture with the same old problems. 
+ Contact me to discuss your modernization goals.
+ Get Help 
+ Microservices Patterns, 2nd edition 
+ I am very excited to announce that the MEAP for the second edition of my book, Microservices Patterns is now available!
+ Learn more 
+ Latest articles 
+ Writing better problem reports: 6 essential details 
+-->
+ ASK CHRIS 
+ ? 
+ Got a question about microservices? 
+ Fill in this form . If I can, I'll write a blog post that answers your question. 
+ NEED HELP? 
+ I help organizations improve agility and competitiveness through better software architecture.
+ Learn more about my consulting engagements , and training workshops .
+ PREMIUM CONTENT 
+ Premium content now available for paid subscribers at premium.microservices.io .
+ MICROSERVICES WORKSHOPS 
+ Chris teaches comprehensive workshops for architects and developers that will enable your organization use microservices effectively.
+ Avoid the pitfalls of adopting microservices and learn essential topics, such as service decomposition and design and how to refactor a monolith to microservices.
+ Learn more 
+ Remote consulting session 
+ Got a specific microservice architecture-related question? For example: 
+ Wondering whether your organization should adopt microservices? 
+ Want to know how to migrate your monolith to microservices? 
+ Facing a tricky microservice architecture design problem? 
+ Consider signing up for a two hour, highly focussed, consulting session. 
+ ASSESS your architecture 
+ Assess your application's microservice architecture and identify what needs to be improved. Engage Chris to conduct an architect review. 
+ LEARN about microservices 
+ Chris offers numerous other resources for learning the microservice architecture. 
+ Get the book: Microservices Patterns 
+ Read Chris Richardson's book:
+ Example microservices applications 
+ Want to see an example? Check out Chris Richardson's example applications.
+ See code 
+ Virtual bootcamp: Distributed data patterns in a microservice architecture 
+ My virtual bootcamp, distributed data patterns in a microservice architecture, is now open for enrollment! 
+ It covers the key distributed data management patterns including Saga, API Composition, and CQRS. 
+ It consists of video lectures, code labs, and a weekly ask-me-anything video conference repeated in multiple timezones. 
+ The regular price is $395/person but use coupon OFFEFKCW to sign up for $95 (valid until Sept 30th, 2025).
+ There are deeper discounts for buying multiple seats.
+ Learn more 
+ Learn how to create a service template and microservice chassis 
+ Take a look at my Manning LiveProject that teaches you how to develop a service template and microservice chassis.
+ Signup for the newsletter For Email Marketing you can trust. 
+ BUILD microservices 
+ Ready to start using the microservice architecture?
+ Consulting services 
+ Engage Chris to create a microservices adoption roadmap and help you define your microservice architecture, 
+ The Eventuate platform 
+ Use the Eventuate.io platform to tackle distributed data management challenges in your microservices architecture. 
+ Eventuate is Chris's latest startup. It makes it easy to use the Saga pattern to manage transactions and the CQRS pattern to implement queries. 
+ Join the microservices google group 
+ Please enable JavaScript to view the comments powered by Disqus.

@@ -1,0 +1,44 @@
+# Backends for frontends
+
+Source: Microservice Patterns (Manning 2018), book p.265 (API gateway chapter)
+
+The solution is to have an API gateway for each client, the so-called Backends for
+frontends (BFF) pattern, which was pioneered by Phil Calcado and his colleagues at
+SoundCloud. Each API module becomes its own standalone API gateway that's developed
+and operated by a single client team.
+
+Pattern: Backends for frontends
+Implement a separate API gateway for each type of client. See
+http://microservices.io/patterns/apigateway.html.
+
+A client team owns their API module. As they change the client, they can change the
+API module and not ask the API gateway team to make the changes.
+
+The public API team owns and operates their API gateway, the mobile team owns and
+operates theirs, and so on. In theory, different API gateways could be developed using
+different technology stacks. But that risks duplicating code for common functionality,
+such as the code that implements edge functions. Ideally, all API gateways use the same
+technology stack. The common functionality is a shared library implemented by the API
+gateway team.
+
+Besides clearly defining responsibilities, the BFF pattern has other benefits. The API
+modules are isolated from one another, which improves reliability. One misbehaving API
+can't easily impact other APIs. It also improves observability, because different API
+modules are different processes. Another benefit of the BFF pattern is that each API is
+independently scalable. The BFF pattern also reduces startup time because each API
+gateway is a smaller, simpler application.
+
+Drawbacks (shared with API gateway): it is yet another highly available component that
+must be developed, deployed, and managed. There's also a risk that the API gateway
+becomes a development bottleneck. It's important that the process for updating the API
+gateway be as lightweight as possible. Otherwise, developers will be forced to wait in
+line to update the gateway.
+
+Netflix example: the Netflix streaming service is available on hundreds of device types.
+Initially Netflix attempted a one-size-fits-all API, but that didn't work well because of
+the diverse devices and their needs. Today Netflix uses an API gateway implementing a
+separate API for each device; the client device team develops and owns the API
+implementation. Netflix is moving to an architecture similar to BFF: client teams write
+API modules using NodeJS, each API module runs its own Docker container, and the
+scripts invoke a second API gateway that exposes service APIs via Netflix Falcor
+(declarative, dynamic API composition).

@@ -1,0 +1,111 @@
+# Domain model
+
+Source: Microservice Patterns (Manning 2018), book p.150
+
+149
+Business logic organization patterns
+business logic: the procedural Transaction script pattern, and the object-oriented
+Domain model pattern.
+5.1.1
+Designing business logic using the Transaction script pattern
+Although I’m a strong advocate of the object-oriented approach, there are some situa-
+tions where it is overkill, such as when you are developing simple business logic. In such
+a situation, a better approach is to write procedural code and use what the book Patterns
+of Enterprise Application Architecture by Martin Fowler (Addison-Wesley Professional, 2002)
+calls the Transaction script pattern. Rather than doing any object-oriented design, you
+write a method called a transaction script to handle each request from the presentation
+tier. As figure 5.2 shows, an important characteristic of this approach is that the classes
+that implement behavior are separate from those that store state.
+When using the Transaction script pattern, the scripts are usually located in service
+classes, which in this example is the OrderService class. A service class has one
+method for each request/system operation. The method implements the business
+logic for that request. It accesses the database using data access objects (DAOs), such
+as the OrderDao. The data objects, which in this example is the Order class, are pure
+data with little or no behavior.
+This style of design is highly procedural and relies on few of the capabilities of object-
+oriented programming (OOP) languages. This what you would create if you were writ-
+ing the application in C or another non-OOP language. Nevertheless, you shouldn’t be
+Pattern: Transaction script
+Organize the business logic as a collection of procedural transaction scripts, one for
+each type of request.
+createOrder()
+reviseOrder()
+cancelOrder()
+...
+OrderService
+Classes with
+behavior
+Classes
+with state
+save(Order)
+ﬁndOrderById()
+...
+OrderDao
+orderId
+orderLineItems
+...
+Order
+Figure 5.2
+Organizing business logic 
+as transaction scripts. In a typical 
+transaction script–based design, one 
+set of classes implements behavior 
+and another set stores state. The 
+transaction scripts are organized into 
+classes that typically have no state. 
+The scripts use data classes, which 
+typically have no behavior.
+ 
+
+
+150
+CHAPTER 5
+Designing business logic in a microservice architecture
+ashamed to use a procedural design when it’s appropriate. This approach works well
+for simple business logic. The drawback is that this tends not to be a good way to
+implement complex business logic. 
+5.1.2
+Designing business logic using the Domain model pattern
+The simplicity of the procedural approach can be quite seductive. You can write code with-
+out having to carefully consider how to organize the classes. The problem is that if your
+business logic becomes complex, you can end up with code that’s a nightmare to main-
+tain. In fact, in the same way that a monolithic application has a habit of continually grow-
+ing, transaction scripts have the same problem. Consequently, unless you’re writing an
+extremely simple application, you should resist the temptation to write procedural code
+and instead apply the Domain model pattern and develop an object-oriented design.
+In an object-oriented design, the business logic consists of an object model, a network
+of relatively small classes. These classes typically correspond directly to concepts from
+the problem domain. In such a design some classes have only either state or behavior,
+but many contain both, which is the hallmark of a well-designed class. Figure 5.3
+shows an example of the Domain model pattern.
+Pattern: Domain model
+Organize the business logic as an object model consisting of classes that have state
+and behavior.
+createOrder()
+reviseOrder()
+cancelOrder()
+...
+OrderService
+deliveryTime
+deliveryAddress
+DeliveryInformation
+ﬁndOrderById()
+...
+OrderRepository
+Some classes have only state.
+Many classes have
+state and behavior.
+Uses
+Some classes have only behavior.
+«private»
+orderId
+orderLineItems
+...
+revise()
+cancel()
+«static»
+create()
+Order
+Figure 5.3
+Organizing business logic as a domain model. The majority of 
+the business logic consists of classes that have state and behavior.

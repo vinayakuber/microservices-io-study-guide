@@ -1,0 +1,145 @@
+# Messaging
+
+Source: https://microservices.io/patterns/communication-style/messaging.html
+
+Pattern: Messaging 
+ Microservice Architecture 
+ Patterns 
+ Articles 
+ Presentations 
+ Adopt 
+ Refactoring 
+ Testing 
+ Modernization Help 
+ About 
+ Pattern: Messaging 
+ pattern
+ inter-service communication
+ service api
+ service design
+ Context 
+ You have applied the Microservice architecture pattern .
+Services must handle requests from the application’s clients.
+Furthermore, services often collaborate to handle those requests.
+Consequently, they must use an inter-process communication protocol. 
+ Forces 
+ Services often need to collaborate 
+ Synchronous communicate results in tight runtime coupling, both the client and service must be available for the duration of the request 
+ Problem 
+ How do services in a microservice architecture communicate? 
+ Solution 
+ Use asynchronous messaging for inter-service communication.
+Services communicating by exchanging messages over messaging channels. 
+ There are several different styles of asynchronous communication: 
+ Request/response - a service sends a request message to a recipient and expects to receive a reply message promptly 
+ Notifications - a sender sends a message a recipient but does not expect a reply. Nor is one sent. 
+ Request/asynchronous response - a service sends a request message to a recipient and expects to receive a reply message eventually 
+ Publish/subscribe - a service publishes a message to zero or more recipients 
+ Publish/asynchronous response - a service publishes a request to one or recipients, some of whom send back a reply 
+ Examples 
+ There are numerous examples of asynchronous messaging technologies 
+ Apache Kafka 
+ RabbitMQ 
+ OrderService from the FTGO Example application publishes an Order Created event when it creates an Order . 
+ public class OrderService { 
+ ... 
+ public Order createOrder ( long consumerId , long restaurantId , 
+ List < MenuItemIdAndQuantity > lineItems ) { 
+ Restaurant restaurant = restaurantRepository . findById ( restaurantId ) 
+ . orElseThrow (() -> new RestaurantNotFoundException ( restaurantId )); 
+ List < OrderLineItem > orderLineItems = makeOrderLineItems ( lineItems , restaurant ); 
+ ResultWithDomainEvents < Order , OrderDomainEvent > orderAndEvents = 
+ Order . createOrder ( consumerId , restaurant , orderLineItems ); 
+ Order order = orderAndEvents . result ; 
+ orderRepository . save ( order ); 
+ orderAggregateEventPublisher . publish ( order , orderAndEvents . events ); 
+ OrderDetails orderDetails = new OrderDetails ( consumerId , restaurantId , orderLineItems , order . getOrderTotal ()); 
+ CreateOrderSagaState data = new CreateOrderSagaState ( order . getId (), orderDetails ); 
+ createOrderSagaManager . create ( data , Order . class , order . getId ()); 
+ meterRegistry . ifPresent ( mr -> mr . counter ( "placed_orders" ). increment ()); 
+ return order ; 
+ } 
+ Resulting context 
+ This pattern has the following benefits: 
+ Loose runtime coupling since it decouples the message sender from the consumer 
+ Improved availability since the message broker buffers messages until the consumer is able to process them 
+ Supports a variety of communication patterns including request/reply, notifications, request/async response, publish/subscribe, publish/async response etc 
+ This pattern has the following drawbacks: 
+ Additional complexity of message broker, which must be highly available 
+ This pattern has the following issues: 
+ Request/reply-style communication is more complex 
+ Related patterns 
+ The Saga pattern and CQRS pattern use messaging 
+ The Transactional Outbox pattern enables messages to be sent as part of a database transaction 
+ The Externalized configuration pattern supplies the (logical) message channel names and the location of the message broker 
+ The Domain-specific protocol pattern is an alternative pattern 
+ The RPI pattern is an alternative pattern 
+ See also 
+ My book Microservices patterns describes inter-communication in depth 
+ Enterprise Integration Patterns - a comprehensive set of message patterns 
+ The Eventuate Tram framework , which implements transaction messaging for microservices 
+ pattern
+ inter-service communication
+ service api
+ service design
+ Modernization Help 
+ Copyright © 2026 Chris Richardson • All rights reserved 
+ About Microservices.io 
+ Microservices.io is created by Chris Richardson , software architect, creator of the original CloudFoundry.com, and author of Microservices Patterns . Chris helps organizations modernize their architecture to enable fast flow and GenAI-powered software delivery.
+ Need help modernizing your architecture? 
+ Avoid the trap of creating a modern legacy system — a new architecture with the same old problems. 
+ Contact me to discuss your modernization goals.
+ Get Help 
+ Microservices Patterns, 2nd edition 
+ I am very excited to announce that the MEAP for the second edition of my book, Microservices Patterns is now available!
+ Learn more 
+ Latest articles 
+ Writing better problem reports: 6 essential details 
+-->
+ ASK CHRIS 
+ ? 
+ Got a question about microservices? 
+ Fill in this form . If I can, I'll write a blog post that answers your question. 
+ NEED HELP? 
+ I help organizations improve agility and competitiveness through better software architecture.
+ Learn more about my consulting engagements , and training workshops .
+ PREMIUM CONTENT 
+ Premium content now available for paid subscribers at premium.microservices.io .
+ MICROSERVICES WORKSHOPS 
+ Chris teaches comprehensive workshops for architects and developers that will enable your organization use microservices effectively.
+ Avoid the pitfalls of adopting microservices and learn essential topics, such as service decomposition and design and how to refactor a monolith to microservices.
+ Learn more 
+ Remote consulting session 
+ Got a specific microservice architecture-related question? For example: 
+ Wondering whether your organization should adopt microservices? 
+ Want to know how to migrate your monolith to microservices? 
+ Facing a tricky microservice architecture design problem? 
+ Consider signing up for a two hour, highly focussed, consulting session. 
+ ASSESS your architecture 
+ Assess your application's microservice architecture and identify what needs to be improved. Engage Chris to conduct an architect review. 
+ LEARN about microservices 
+ Chris offers numerous other resources for learning the microservice architecture. 
+ Get the book: Microservices Patterns 
+ Read Chris Richardson's book:
+ Example microservices applications 
+ Want to see an example? Check out Chris Richardson's example applications.
+ See code 
+ Virtual bootcamp: Distributed data patterns in a microservice architecture 
+ My virtual bootcamp, distributed data patterns in a microservice architecture, is now open for enrollment! 
+ It covers the key distributed data management patterns including Saga, API Composition, and CQRS. 
+ It consists of video lectures, code labs, and a weekly ask-me-anything video conference repeated in multiple timezones. 
+ The regular price is $395/person but use coupon OFFEFKCW to sign up for $95 (valid until Sept 30th, 2025).
+ There are deeper discounts for buying multiple seats.
+ Learn more 
+ Learn how to create a service template and microservice chassis 
+ Take a look at my Manning LiveProject that teaches you how to develop a service template and microservice chassis.
+ Signup for the newsletter For Email Marketing you can trust. 
+ BUILD microservices 
+ Ready to start using the microservice architecture?
+ Consulting services 
+ Engage Chris to create a microservices adoption roadmap and help you define your microservice architecture, 
+ The Eventuate platform 
+ Use the Eventuate.io platform to tackle distributed data management challenges in your microservices architecture. 
+ Eventuate is Chris's latest startup. It makes it easy to use the Saga pattern to manage transactions and the CQRS pattern to implement queries. 
+ Join the microservices google group 
+ Please enable JavaScript to view the comments powered by Disqus.

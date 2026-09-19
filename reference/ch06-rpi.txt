@@ -1,0 +1,140 @@
+# Remote procedure invocation
+
+Source: https://microservices.io/patterns/communication-style/rpi.html
+
+Pattern: Remote Procedure Invocation (RPI) 
+ Microservice Architecture 
+ Patterns 
+ Articles 
+ Presentations 
+ Adopt 
+ Refactoring 
+ Testing 
+ Modernization Help 
+ About 
+ Pattern: Remote Procedure Invocation (RPI) 
+ pattern
+ inter-service communication
+ service api
+ service design
+ Context 
+ You have applied the Microservice architecture pattern .
+Services must handle requests from the application’s clients.
+Furthermore, services must sometimes collaborate to handle those requests.
+They must use an inter-process communication protocol. 
+ Forces 
+ Services often need to collaborate 
+ Synchronous communicate results in tight runtime coupling, both the client and service must be available for the duration of the request 
+ Problem 
+ How do services in a microservice architecture communicate? 
+ Solution 
+ Use RPI for inter-service communication.
+The client uses a request/reply-based protocol to make requests to a service. 
+ Examples 
+ There are numerous examples of RPI technologies 
+ REST 
+ gRPC 
+ Apache Thrift 
+ RegistrationServiceProxy from the Microservices Example application is an example of a component, which is written in Scala, that makes a REST request using the Spring Framework’s RestTemplate : 
+ @Component 
+ class RegistrationServiceProxy @Autowired ()( restTemplate : RestTemplate ) extends RegistrationService { 
+ @Value ( "${user_registration_url}" ) 
+ var userRegistrationUrl : String = _ 
+ @HystrixCommand ( commandProperties = Array ( new HystrixProperty ( name = "execution.isolation.thread.timeoutInMilliseconds" , value = "800" ))) 
+ override def registerUser ( emailAddress : String , password : String ) : Either [ RegistrationError , String ] = { 
+ try { 
+ val response = restTemplate . postForEntity ( userRegistrationUrl , 
+ RegistrationBackendRequest ( emailAddress , password ), 
+ classOf [ RegistrationBackendResponse ]) 
+ response . getStatusCode match { 
+ case HttpStatus . OK => 
+ Right ( response . getBody . id ) 
+ } 
+ } catch { 
+ case e : HttpClientErrorException if e.getStatusCode = = HttpStatus . CONFLICT => 
+ Left ( DuplicateRegistrationError ) 
+ } 
+ } 
+ } 
+ The value of user_registration_url is supplied using Externalized configuration . 
+ Resulting context 
+ This pattern has the following benefits: 
+ Simple and familiar 
+ Request/reply is easy 
+ Simpler system since there in no intermediate broker 
+ This pattern has the following drawbacks: 
+ Usually only supports request/reply and not other interaction patterns such as notifications, request/async response, publish/subscribe, publish/async response 
+ Reduced availability since the client and the service must be available for the duration of the interaction 
+ This pattern has the following issues: 
+ Client needs to discover locations of service instances 
+ Related patterns 
+ The Domain-specific protocol is an alternative pattern 
+ The Messaging is an alternative pattern 
+ Externalized configuration supplies the (logical) network location, e.g. URL, of the service. 
+ A client must use either Client-side discovery and Server-side discovery to locate a service instance 
+ A client will typically use the Circuit Breaker pattern to improve reliability 
+ pattern
+ inter-service communication
+ service api
+ service design
+ Modernization Help 
+ Copyright © 2026 Chris Richardson • All rights reserved 
+ About Microservices.io 
+ Microservices.io is created by Chris Richardson , software architect, creator of the original CloudFoundry.com, and author of Microservices Patterns . Chris helps organizations modernize their architecture to enable fast flow and GenAI-powered software delivery.
+ Need help modernizing your architecture? 
+ Avoid the trap of creating a modern legacy system — a new architecture with the same old problems. 
+ Contact me to discuss your modernization goals.
+ Get Help 
+ Microservices Patterns, 2nd edition 
+ I am very excited to announce that the MEAP for the second edition of my book, Microservices Patterns is now available!
+ Learn more 
+ Latest articles 
+ Writing better problem reports: 6 essential details 
+-->
+ ASK CHRIS 
+ ? 
+ Got a question about microservices? 
+ Fill in this form . If I can, I'll write a blog post that answers your question. 
+ NEED HELP? 
+ I help organizations improve agility and competitiveness through better software architecture.
+ Learn more about my consulting engagements , and training workshops .
+ PREMIUM CONTENT 
+ Premium content now available for paid subscribers at premium.microservices.io .
+ MICROSERVICES WORKSHOPS 
+ Chris teaches comprehensive workshops for architects and developers that will enable your organization use microservices effectively.
+ Avoid the pitfalls of adopting microservices and learn essential topics, such as service decomposition and design and how to refactor a monolith to microservices.
+ Learn more 
+ Remote consulting session 
+ Got a specific microservice architecture-related question? For example: 
+ Wondering whether your organization should adopt microservices? 
+ Want to know how to migrate your monolith to microservices? 
+ Facing a tricky microservice architecture design problem? 
+ Consider signing up for a two hour, highly focussed, consulting session. 
+ ASSESS your architecture 
+ Assess your application's microservice architecture and identify what needs to be improved. Engage Chris to conduct an architect review. 
+ LEARN about microservices 
+ Chris offers numerous other resources for learning the microservice architecture. 
+ Get the book: Microservices Patterns 
+ Read Chris Richardson's book:
+ Example microservices applications 
+ Want to see an example? Check out Chris Richardson's example applications.
+ See code 
+ Virtual bootcamp: Distributed data patterns in a microservice architecture 
+ My virtual bootcamp, distributed data patterns in a microservice architecture, is now open for enrollment! 
+ It covers the key distributed data management patterns including Saga, API Composition, and CQRS. 
+ It consists of video lectures, code labs, and a weekly ask-me-anything video conference repeated in multiple timezones. 
+ The regular price is $395/person but use coupon OFFEFKCW to sign up for $95 (valid until Sept 30th, 2025).
+ There are deeper discounts for buying multiple seats.
+ Learn more 
+ Learn how to create a service template and microservice chassis 
+ Take a look at my Manning LiveProject that teaches you how to develop a service template and microservice chassis.
+ Signup for the newsletter For Email Marketing you can trust. 
+ BUILD microservices 
+ Ready to start using the microservice architecture?
+ Consulting services 
+ Engage Chris to create a microservices adoption roadmap and help you define your microservice architecture, 
+ The Eventuate platform 
+ Use the Eventuate.io platform to tackle distributed data management challenges in your microservices architecture. 
+ Eventuate is Chris's latest startup. It makes it easy to use the Saga pattern to manage transactions and the CQRS pattern to implement queries. 
+ Join the microservices google group 
+ Please enable JavaScript to view the comments powered by Disqus.

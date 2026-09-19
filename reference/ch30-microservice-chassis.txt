@@ -1,0 +1,150 @@
+# Microservice chassis
+
+Source: https://microservices.io/patterns/microservice-chassis.html
+
+Pattern: Microservice chassis 
+ Microservice Architecture 
+ Patterns 
+ Articles 
+ Presentations 
+ Adopt 
+ Refactoring 
+ Testing 
+ Modernization Help 
+ About 
+ Pattern: Microservice chassis 
+ pattern
+ service design
+ microservice chassis
+ Context 
+ Want to learn more about this pattern? 
+ Take a look at my Manning LiveProject that teaches you how to develop a service template and microservice chassis.
+ When you start the development of an application you often spend a significant amount of time writing the build logic and putting in place the mechanisms to handle cross-cutting concerns.
+The build logic builds, and tests the application and also packages into a production-ready format, such as a Docker container image.
+For example, the majority of the build logic for a Java application is implemented using Gradle or Maven.
+It might also consist of configuration scripts for build automation tool, such as CircleCI or Github Actions.
+On the surface, the build logic appears to be quite simple.
+However, even defining a carefully curated set of dependencies can be remarkably challenging. 
+ In addition to the build logic, you need to handle cross cutting concerns.
+Examples of cross-cutting concerns include: 
+ Security - for example, REST APIs must be secured by requiring an Access Token 
+ Externalized configuration - includes credentials, and network locations of external services such as databases and message brokers 
+ Logging - configuring of a logging framework such as log4j or logback 
+ Health check - a url that a monitoring service can “ping” to determine the health of the application 
+ Metrics - measurements that provide insight into what the application is doing and how it is performing 
+ Distributed tracing - instrument services with code that assigns each external request an unique identifier that is passed between services. 
+ As well as these generic cross-cutting concerns, there are also cross-cutting concerns that are specific to the technologies that an application uses.
+Applications that use infrastructure services such as databases or a message brokers require boilerplate configuration in order to do that.
+For example, applications that use a relational database must be configured with a connection pool.
+Web applications that process HTTP requests also need boilerplate configuration. 
+ It is common to spend one or two days, sometimes even longer, writing the build logic and implementing cross-cutting concerns.
+If you going to spend months or years developing a monolithic application then the upfront investment is insignificant.
+The situation is very different, however, if you are developing an application that has the microservice architecture .
+There are tens or hundreds of services.
+You will frequently create new services, each of which will only take days or weeks to develop.
+You cannot afford to spend a few days setting up every service.
+What is even worse is that in a microservice architecture there are additional cross-cutting concerns that you have to deal with including service registration and discovery, and circuit breakers for reliably handling partial failure. 
+ One solution is to create a Service Template , which is a source code template that a developer can copy in order to quickly start developing a new service.
+The drawback, however, of a Service Template is that it’s a form of copy/paste programming: when the build logic and cross-cutting concerns logic needs to change, each service must be updated individually. 
+ Problem 
+ How can a team quickly create and setup a maintainable code base for a production-ready service so they can start developing its business logic? 
+ Forces 
+ A service must implement
+ Build logic that builds, and tests the application and also packages into a production-ready format, such as a Docker container image. 
+ Cross-cutting concerns such as externalized configuration, logging, health checks, metrics, service registration and discovery, circuit breakers. There are also cross-cutting concerns that are specific to the technologies that the microservices uses. 
+ Creating a new microservice should be fast and easy 
+ It should be fast and straightforward to update existing services when the requirements for build logic and cross-cutting concerns change. 
+ Create a microservice chassis framework that can be foundation for developing your microservices.
+The chassis implements 
+ Reusable build logic that builds, and tests a service. This includes, for example, Gradle Plugins. 
+ Mechanisms that handle cross-cutting concerns. The chassis typically assembles and configures a collection of frameworks and libraries that implement this functionality. 
+ The Service Template is a sample service that uses the microservice chassis. 
+ Examples of frameworks that are the starting point for creating a microservice chassis: 
+ Java
+ Spring Boot and Spring Cloud 
+ Dropwizard 
+ Go
+ Gizmo 
+ Micro 
+ Go kit 
+ Resulting context 
+ The main benefit of a microservice chassis is that it’s faster and easier to keep the dependencies, build logic and cross-cutting concern logic up to date.
+You simply release a new version of the microservice chassis framework that contains the needed changes, and update each service to the use new version. 
+ One issue is that you need a microservice chassis for each programming language/framework that you want to use.
+This can be an obstacle to adopting a new programming language or framework. 
+ There are the following related patterns: 
+ Service Template - a template for a service that developers can copy to create a new application. It’s either an alternative to the Microservice Chassis pattern; or it uses a Microservice Chassis and simply contains the code and configuration that doesn’t belong in the chassis 
+ Microservices - this pattern motivates the need for the Microservice Chassis pattern 
+ Self Registration - the microservice chassis is often responsible for registering the service with the service registry 
+ Client-side discovery - the microservice chassis is often responsible for client-side service discovery 
+ Circuit Breaker - the microservice chassis framework might implement this pattern 
+ Distributed tracing - the microservice chassis framework might instrument the code 
+ Service Template often uses a Microservice Chassis 
+ See also 
+ This excellent Service Template blog post by @ph1 
+ Learn more 
+ Take a look at my Manning LiveProject that teaches you how to develop a service template and microservice chassis. 
+ pattern
+ service design
+ microservice chassis
+ Modernization Help 
+ Copyright © 2026 Chris Richardson • All rights reserved 
+ About Microservices.io 
+ Microservices.io is created by Chris Richardson , software architect, creator of the original CloudFoundry.com, and author of Microservices Patterns . Chris helps organizations modernize their architecture to enable fast flow and GenAI-powered software delivery.
+ Need help modernizing your architecture? 
+ Avoid the trap of creating a modern legacy system — a new architecture with the same old problems. 
+ Contact me to discuss your modernization goals.
+ Get Help 
+ Microservices Patterns, 2nd edition 
+ I am very excited to announce that the MEAP for the second edition of my book, Microservices Patterns is now available!
+ Learn more 
+ Latest articles 
+ Writing better problem reports: 6 essential details 
+-->
+ ASK CHRIS 
+ ? 
+ Got a question about microservices? 
+ Fill in this form . If I can, I'll write a blog post that answers your question. 
+ NEED HELP? 
+ I help organizations improve agility and competitiveness through better software architecture.
+ Learn more about my consulting engagements , and training workshops .
+ PREMIUM CONTENT 
+ Premium content now available for paid subscribers at premium.microservices.io .
+ MICROSERVICES WORKSHOPS 
+ Chris teaches comprehensive workshops for architects and developers that will enable your organization use microservices effectively.
+ Avoid the pitfalls of adopting microservices and learn essential topics, such as service decomposition and design and how to refactor a monolith to microservices.
+ Learn more 
+ Remote consulting session 
+ Got a specific microservice architecture-related question? For example: 
+ Wondering whether your organization should adopt microservices? 
+ Want to know how to migrate your monolith to microservices? 
+ Facing a tricky microservice architecture design problem? 
+ Consider signing up for a two hour, highly focussed, consulting session. 
+ ASSESS your architecture 
+ Assess your application's microservice architecture and identify what needs to be improved. Engage Chris to conduct an architect review. 
+ LEARN about microservices 
+ Chris offers numerous other resources for learning the microservice architecture. 
+ Get the book: Microservices Patterns 
+ Read Chris Richardson's book:
+ Example microservices applications 
+ Want to see an example? Check out Chris Richardson's example applications.
+ See code 
+ Virtual bootcamp: Distributed data patterns in a microservice architecture 
+ My virtual bootcamp, distributed data patterns in a microservice architecture, is now open for enrollment! 
+ It covers the key distributed data management patterns including Saga, API Composition, and CQRS. 
+ It consists of video lectures, code labs, and a weekly ask-me-anything video conference repeated in multiple timezones. 
+ The regular price is $395/person but use coupon OFFEFKCW to sign up for $95 (valid until Sept 30th, 2025).
+ There are deeper discounts for buying multiple seats.
+ Learn more 
+ Learn how to create a service template and microservice chassis 
+ Take a look at my Manning LiveProject that teaches you how to develop a service template and microservice chassis.
+ Signup for the newsletter For Email Marketing you can trust. 
+ BUILD microservices 
+ Ready to start using the microservice architecture?
+ Consulting services 
+ Engage Chris to create a microservices adoption roadmap and help you define your microservice architecture, 
+ The Eventuate platform 
+ Use the Eventuate.io platform to tackle distributed data management challenges in your microservices architecture. 
+ Eventuate is Chris's latest startup. It makes it easy to use the Saga pattern to manage transactions and the CQRS pattern to implement queries. 
+ Join the microservices google group 
+ Please enable JavaScript to view the comments powered by Disqus.

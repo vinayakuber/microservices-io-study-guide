@@ -1,0 +1,120 @@
+# Server-side discovery
+
+Source: https://microservices.io/patterns/server-side-discovery.html
+
+Pattern: Server-side service discovery 
+ Microservice Architecture 
+ Patterns 
+ Articles 
+ Presentations 
+ Adopt 
+ Refactoring 
+ Testing 
+ Modernization Help 
+ About 
+ Pattern: Server-side service discovery 
+ pattern
+ inter-service communication
+ service discovery
+ Context 
+ Services typically need to call one another.
+In a monolithic application, services invoke one another through language-level method or procedure calls.
+In a traditional distributed system deployment, services run at fixed, well known locations (hosts and ports) and so can easily call one another using HTTP/REST or some RPC mechanism.
+However, a modern microservice-based application typically runs in a virtualized or containerized environments where the number of instances of a service and their locations changes dynamically. 
+ Consequently, you must implement a mechanism for that enables the clients of service to make requests to a dynamically changing set of ephemeral service instances. 
+ Problem 
+ How does the client of a service - the API gateway or another service - discover the location of a service instance? 
+ Forces 
+ Each instance of a service exposes a remote API such as HTTP/REST, or Thrift etc. at a particular location (host and port) 
+ The number of services instances and their locations changes dynamically. 
+ Virtual machines and containers are usually assigned dynamic IP addresses. 
+ The number of services instances might vary dynamically. For example, an EC2 Autoscaling Group adjusts the number of instances based on load. 
+ Solution 
+ When making a request to a service, the client makes a request via a router (a.k.a load balancer) that runs at a well known location.
+The router queries a service registry , which might be built into the router, and forwards the request to an available service instance. 
+ The following diagram shows the structure of this pattern. 
+ Examples 
+ An AWS Elastic Load Balancer (ELB) is an example of a server-side discovery router.
+A client makes HTTP(s) requests (or opens TCP connections) to the ELB, which load balances the traffic amongst a set of EC2 instances.
+An ELB can load balance either external traffic from the Internet or, when deployed in a VPC, load balance internal traffic.
+An ELB also functions as a Service Registry .
+EC2 instances are registered with the ELB either explicitly via an API call or automatically as part of an auto-scaling group. 
+ Some clustering solutions such as Kubernetes and Marathon run a proxy on each host that functions as a server-side discovery router.
+In order to access a service, a client connects to the local proxy using the port assigned to that service.
+The proxy then forwards the request to a service instance running somewhere in the cluster. 
+ Resulting context 
+ Server-side service discovery has a number of benefits: 
+ Compared to client-side discovery , the client code is simpler since it does not have to deal with discovery. Instead, a client simply makes a request to the router 
+ Some cloud environments provide this functionality, e.g. AWS Elastic Load Balancer 
+ It also has the following drawbacks: 
+ Unless it’s part of the cloud environment, the router must is another system component that must be installed and configured. It will also need to be replicated for availability and capacity. 
+ The router must support the necessary communication protocols (e.g HTTP, gRPC, Thrift, etc) unless it is TCP-based router 
+ More network hops are required than when using Client Side Discovery 
+ Related patterns 
+ A router uses Service Registry 
+ A router might use a Circuit Breaker to invoke services 
+ Client Side Discovery is an alternative solution 
+ pattern
+ inter-service communication
+ service discovery
+ Modernization Help 
+ Copyright © 2026 Chris Richardson • All rights reserved 
+ About Microservices.io 
+ Microservices.io is created by Chris Richardson , software architect, creator of the original CloudFoundry.com, and author of Microservices Patterns . Chris helps organizations modernize their architecture to enable fast flow and GenAI-powered software delivery.
+ Need help modernizing your architecture? 
+ Avoid the trap of creating a modern legacy system — a new architecture with the same old problems. 
+ Contact me to discuss your modernization goals.
+ Get Help 
+ Microservices Patterns, 2nd edition 
+ I am very excited to announce that the MEAP for the second edition of my book, Microservices Patterns is now available!
+ Learn more 
+ Latest articles 
+ Writing better problem reports: 6 essential details 
+-->
+ ASK CHRIS 
+ ? 
+ Got a question about microservices? 
+ Fill in this form . If I can, I'll write a blog post that answers your question. 
+ NEED HELP? 
+ I help organizations improve agility and competitiveness through better software architecture.
+ Learn more about my consulting engagements , and training workshops .
+ PREMIUM CONTENT 
+ Premium content now available for paid subscribers at premium.microservices.io .
+ MICROSERVICES WORKSHOPS 
+ Chris teaches comprehensive workshops for architects and developers that will enable your organization use microservices effectively.
+ Avoid the pitfalls of adopting microservices and learn essential topics, such as service decomposition and design and how to refactor a monolith to microservices.
+ Learn more 
+ Remote consulting session 
+ Got a specific microservice architecture-related question? For example: 
+ Wondering whether your organization should adopt microservices? 
+ Want to know how to migrate your monolith to microservices? 
+ Facing a tricky microservice architecture design problem? 
+ Consider signing up for a two hour, highly focussed, consulting session. 
+ ASSESS your architecture 
+ Assess your application's microservice architecture and identify what needs to be improved. Engage Chris to conduct an architect review. 
+ LEARN about microservices 
+ Chris offers numerous other resources for learning the microservice architecture. 
+ Get the book: Microservices Patterns 
+ Read Chris Richardson's book:
+ Example microservices applications 
+ Want to see an example? Check out Chris Richardson's example applications.
+ See code 
+ Virtual bootcamp: Distributed data patterns in a microservice architecture 
+ My virtual bootcamp, distributed data patterns in a microservice architecture, is now open for enrollment! 
+ It covers the key distributed data management patterns including Saga, API Composition, and CQRS. 
+ It consists of video lectures, code labs, and a weekly ask-me-anything video conference repeated in multiple timezones. 
+ The regular price is $395/person but use coupon OFFEFKCW to sign up for $95 (valid until Sept 30th, 2025).
+ There are deeper discounts for buying multiple seats.
+ Learn more 
+ Learn how to create a service template and microservice chassis 
+ Take a look at my Manning LiveProject that teaches you how to develop a service template and microservice chassis.
+ Signup for the newsletter For Email Marketing you can trust. 
+ BUILD microservices 
+ Ready to start using the microservice architecture?
+ Consulting services 
+ Engage Chris to create a microservices adoption roadmap and help you define your microservice architecture, 
+ The Eventuate platform 
+ Use the Eventuate.io platform to tackle distributed data management challenges in your microservices architecture. 
+ Eventuate is Chris's latest startup. It makes it easy to use the Saga pattern to manage transactions and the CQRS pattern to implement queries. 
+ Join the microservices google group 
+ Please enable JavaScript to view the comments powered by Disqus.
