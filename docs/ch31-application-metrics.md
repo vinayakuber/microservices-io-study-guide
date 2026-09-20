@@ -152,6 +152,176 @@ flowchart TD
 ```
 
 
+## Interview Questions
+
+### Q1
+
+The team cannot tell how many orders are being created, because the service is a black box beyond its request totals. They instrument create_order with a counter.
+
+**Interviewer's question:** What is the Application Metrics solution, and why must the instrumentation have minimal runtime overhead?
+
+**Solution:** Instrument the service to gather statistics about individual operations — a counter increments on each completed operation — and the increment must be cheap because the force is minimal runtime overhead.
+
+**System-design components:**
+- Order Service
+- counter (orders_created)
+- metrics service
+- create_order operation
+
+```mermaid
+flowchart LR
+  C["Client"] -->|"POST orders"| S["Order Service"]
+  S -->|"increment"| N["counter: orders_created"]
+  N -->|"0 -> 3"| M["central metrics service"]
+```
+
+```java
+// ORDER SERVICE SIDE — a counter gathers statistics about one operation, with minimal overhead
+// PARTIES: SVC = Order Service · MS = metrics service (Prometheus)
+// STATE (before):
+//    counters : { orders_created: 0 }
+// DEF: create_order · CALLED BY: client requests arriving at SVC
+// -> request1 : "PO-2001"
+//    step 1 · handle request1, increment the counter    counters.orders_created : 0 -> 1   BECAUSE one create_order completed
+// -> request2 : "PO-2002"
+//    step 2 · handle request2, increment                counters.orders_created : 1 -> 2
+// -> request3 : "PO-2003"
+//    step 3 · handle request3, increment                counters.orders_created : 2 -> 3
+// <- outcome : counters : { orders_created: 3 } · the increment is one in-memory add per call, not a per-request network hop
+```
+
+_This is the chapter's instrument-an-operation step: a counter gathers per-operation statistics at minimal overhead._
+
+_Covers:_ Instrumenting an operation
+
+_From the 28 problems:_ 20-metrics-monitoring
+
+### Q2
+
+The counters on each service are only useful once collected somewhere central. The team is choosing between having the service push or the metrics service pull.
+
+**Interviewer's question:** Which two aggregation models does the pattern describe, and what lands in the central service?
+
+**Solution:** Push — the service pushes metrics to the metrics service — and pull — the metrics service pulls (scrapes) metrics from the service. Either way the central service holds the values for reporting and alerting.
+
+**System-design components:**
+- Order Service
+- central metrics service
+- push model
+- pull model
+
+```mermaid
+flowchart LR
+  S["Order Service"] -->|"push: POST metrics"| M["metrics service"]
+  M -->|"pull: GET /metrics"| S
+  M -->|"reports + alerts"| R["dashboards"]
+```
+
+```java
+// AGGREGATION SIDE — the central metrics service receives two values via push or via pull
+// PARTIES: SVC = Order Service · MS = metrics service
+// STATE (before):
+//    MS.view : { orders_created: 0, request_ms_sum: 0 }
+// DEF: aggregate · CALLED BY: MS reporting and alerting on the values
+// -> counter : 3 · -> sum : 123                // = 3 create_order calls, 3 x 41 ms = 123 ms
+//    step 1 (push) · SVC POSTs {"orders_created":3} to MS      MS.view.orders_created : 0 -> 3
+//    step 2 (push) · SVC POSTs {"request_ms_sum":123} to MS    MS.view.request_ms_sum : 0 -> 123
+//    step 3 (push) · MS now has both values to report and alert on
+// <- outcome : MS.view : { orders_created: 3, request_ms_sum: 123 } · push = the service pushes metrics to the metrics service
+//    alt pull : MS GETs /metrics -> body "orders_created 3 request_ms_sum 123" -> MS.view : {0,0} -> {3,123}   BECAUSE the metrics service pulls the metric from the service
+```
+
+_This is the chapter's push-and-pull aggregation step: the central service turns per-service counters into reporting and alerting._
+
+_Covers:_ Aggregating: push and pull
+
+_From the 28 problems:_ 20-metrics-monitoring
+
+### Q3
+
+A code review finds observe() calls for the request-duration histogram woven between the save() calls inside the business method, making the flow hard to read.
+
+**Interviewer's question:** What does it cost to instrument with metrics, beyond the runtime overhead?
+
+**Solution:** The drawback is that metrics code is intertwined with business logic, making the business logic more complicated — the histogram increment sits inline in the business method.
+
+**System-design components:**
+- Order Service
+- histogram (request_ms)
+- observe() calls
+- save() calls
+
+```mermaid
+flowchart LR
+  B["create_order method"] -->|"save()"| S["business logic"]
+  B -->|"observe()"| H["histogram"]
+  H -.->|"intertwined with"| S
+```
+
+```java
+// ORDER SERVICE SIDE — the histogram increment sits inline in business logic, tangling the code
+// PARTIES: SVC = Order Service
+// STATE (before):
+//    hist : { request_ms: [] }
+// DEF: create_order · CALLED BY: three client requests
+// -> request1 : "PO-2004" · started_at : 100 · ended_at : 141
+//    step 1 · save order, then observe : hist.request_ms : [] -> [41]          BECAUSE 141 - 100 = 41 ms
+// -> request2 : "PO-2005" · started_at : 200 · ended_at : 237
+//    step 2 · save order, then observe : hist.request_ms : [41] -> [41,37]     BECAUSE 237 - 200 = 37 ms
+// -> request3 : "PO-2006" · started_at : 300 · ended_at : 348
+//    step 3 · save order, then observe : hist.request_ms : [41,37] -> [41,37,48]   BECAUSE 348 - 300 = 48 ms
+// <- outcome : hist : { request_ms: [41,37,48] } · three observe() calls are woven between the save() calls
+```
+
+_This is the chapter's intertwined-code drawback: observe() and save() sit side by side, complicating the business logic._
+
+_Covers:_ What it costs
+
+_From the 28 problems:_ 20-metrics-monitoring
+
+### Q4
+
+The metrics service must hold many series and run somewhere, and the team wants to know what that costs before committing to Prometheus.
+
+**Interviewer's question:** What infrastructure does aggregating metrics require, and how does it trade against the per-request overhead?
+
+**Solution:** Aggregating metrics can require significant infrastructure — running a central metrics service such as Prometheus or AWS CloudWatch — even though the per-request overhead stays low.
+
+**System-design components:**
+- central metrics service
+- Prometheus / AWS CloudWatch
+- many time series
+
+```mermaid
+flowchart LR
+  S["Services"] -->|"push/pull"| M["central metrics service"]
+  M -->|"holds"| T["many series"]
+  M -->|"adds ops cost"| C["infrastructure"]
+  S -.->|"per-request stays cheap"| X["in-memory add"]
+```
+
+```java
+// METRICS SERVICE SIDE — the central service holds many series, so aggregation costs real infrastructure
+// PARTIES: SVC = Order Service · MS = metrics service (Prometheus)
+// STATE (before):
+//    series : {}                              // time series MS holds, keyed by metric name
+//    series_count : 0
+//    per_request_cost : "in-memory add"       // what each increment costs in the service
+// DEF: scrape · CALLED BY: MS pulling metrics from SVC on an interval
+// -> interval_seconds : 15
+//    step 1 · MS scrapes /metrics    series : {} -> {"orders_created":3,"request_ms":[41,37,48]}
+//    step 2 · MS counts the series it now stores    series_count : 0 -> 2  BECAUSE orders_created and request_ms each become a stored series
+//    step 3 · the per-request cost stays cheap    per_request_cost : "in-memory add" -> "in-memory add"  BECAUSE the overhead is in the service's counter, not the scrape
+// <- series_count : 2 · the central service runs as extra infrastructure, while each request still costs one in-memory add
+//    alt no central service : counters stay on individual services -> no dashboard, no alerting, and each service's numbers die with its process
+```
+
+_This is the chapter's aggregation-infrastructure issue: the central metrics service is operational cost, even though per-request overhead is minimal._
+
+_Covers:_ Aggregating: push and pull · What it costs
+
+_From the 28 problems:_ 20-metrics-monitoring
+
 ## Key Concepts
 
 ### The Problem
@@ -162,6 +332,13 @@ flowchart TD
 ### The Solution
 
 Instrument a service to gather statistics about individual operations and aggregate them in a centralized metrics service that provides reporting and alerting.
+
+```mermaid
+flowchart LR
+  C["Client"] -->|"POST orders"| S["Order Service"]
+  S -->|"increment"| N["counter: orders_created"]
+  N -->|"0 -> 3"| M["central metrics service"]
+```
 
 
 ### Key Facts

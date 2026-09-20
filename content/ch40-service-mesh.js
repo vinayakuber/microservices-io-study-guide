@@ -96,6 +96,111 @@ registerChapter({
 //    alt no mesh : injected : 1 -> 0   BECAUSE without a mesh each service must implement these concerns itself`
     }
   ],
+  interview: [
+    {
+      scenario: 'Every service in your fleet duplicates the same cross-cutting behavior — logging, metrics, tracing — and each implementation has drifted from the others. You want those concerns out of the service code entirely.',
+      q: 'How does the Service mesh pattern move cross-cutting concerns out of each service?',
+      solution: 'A mesh that mediates all communication in and out of each service lets a proxy attached to the service intercept each outbound call and apply the concern on the traffic instead of inside the service.',
+      components: ['Mesh — mediates all traffic', 'Sidecar proxy — per service', 'Outbound interception — sees each call', 'Concern applied on traffic — not in code'],
+      diagram: `flowchart LR
+  SVC["Order Service"] -->|"SELECT * FROM orders"| PROXY["Sidecar proxy"]
+  PROXY -->|"traced call"| DB["db:5432"]
+  PROXY -->|"attaches"| ID["trace id"]`,
+      code: `// MESH SIDE — a proxy intercepts every call out of a service, mediating all communication
+// PARTIES: SVC = Order Service · PROXY = its sidecar proxy · DB = the database SVC calls
+// STATE (before):
+//    request : {}                       // the outbound call, not yet intercepted
+//    trace_id : null                    // no distributed-tracing id yet
+// DEF: intercept outbound call 1 to DB · CALLED BY: SVC sending a query
+// -> call : "SELECT * FROM orders" · -> target : "db:5432"
+//    step 1 · intercept   // request : {} -> {"call":"SELECT * FROM orders","to":"db:5432"}   BECAUSE the mesh mediates ALL traffic in and out
+//    step 2 · trace   // trace_id : null -> "trc-9f2a"   // the proxy assigns a unique id to the request
+//    step 3 · forward   // sent : 0 -> 1   // the proxy forwards the traced call to the DB
+// <- call : "SELECT * FROM orders" delivered to db:5432 · trace_id "trc-9f2a" attached
+//    alt inbound reply : reply : 0 -> 1   BECAUSE the same proxy also mediates the response back into SVC`,
+      tieback: 'This is the mediation stage — intercepting every call in and out and applying the concern at the proxy.',
+      refs: ['Mediate all traffic through the mesh'],
+      problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
+    },
+    {
+      scenario: 'A single external request fans out across four services and you need to reconstruct the whole chain later. Each service logs locally, so nothing ties the pieces together.',
+      q: 'How does the mesh enable distributed tracing across services?',
+      solution: 'The proxy gives each external request a unique identifier that is passed between services, and each service hop records a span against the shared id so the chain is reconstructable.',
+      components: ['Unique identifier — assigned by the proxy', 'Shared id — passed between services', 'Span per hop — recorded against the id', 'Reconstructable chain — the goal'],
+      diagram: `flowchart LR
+  P1["Proxy A"] -->|"id trc-9f2a"| SVCB["Customer Service"]
+  SVCB -->|"same id"| P2["Proxy B"]
+  P2 -->|"records span"| CHAIN["chain: order -> customer"]`,
+      code: `// MESH SIDE — one unique id travels with the request across services so a call chain can be traced
+// PARTIES: U1 = a user request · PROXY = sidecar of Order Service · SVCB = Customer Service
+// DEF: trace — the whole chain of spans that share one trace_id for a single request; here trace_id "trc-9f2a" = the order-service -> customer-service chain
+// STATE (before):
+//    trace_id : "trc-9f2a"              // id assigned at the first proxy
+//    hops : []                          // services the request has passed through
+// DEF: propagate id trc-9f2a to next hop · CALLED BY: Order Service calling Customer Service
+// -> next : "customer-service"
+//    step 1 · carry the id   // hops : [] -> ["order-service"]   BECAUSE the proxy passes the SAME unique id between services
+//    step 2 · forward   // hops : ["order-service"] -> ["order-service","customer-service"]   // the id rides to the next service
+//    step 3 · record a span   // spans : 0 -> 1   // each hop records a span against the shared id
+// <- trace_id : "trc-9f2a" · spans : 1 · the whole chain is reconstructable from one id
+//    alt untraced call : trace_id : "trc-9f2a" -> null   BECAUSE a call that bypasses the mesh carries no id`,
+      tieback: 'This is the tracing stage — assigning one id, passing it between services, and recording a span per hop.',
+      refs: ['Distributed tracing across services'],
+      problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
+    },
+    {
+      scenario: 'Your operators need to know whether the order service is up and how it is performing, but you cannot change the service to add monitoring code.',
+      q: 'How does the mesh expose health and metrics without changing the service?',
+      solution: 'The proxy exposes a health URL a monitoring service can ping to determine the health of the application, and it records metrics about what the application is doing and reports them.',
+      components: ['Health URL — exposed by the proxy', 'Monitoring service — pings it', 'Metrics — recorded by the proxy', 'Report — emitted to the monitor'],
+      diagram: `flowchart LR
+  MON["Monitoring service"] -->|"GET /health every 10 s"| PROXY["Sidecar proxy"]
+  PROXY -->|"status UP"| MON
+  PROXY -->|"metric 1"| MON
+  SVC["Order Service"] --- PROXY`,
+      code: `// MESH SIDE — a health URL and per-request metrics, both handled at the proxy without touching service code
+// PARTIES: MON = monitoring service · PROXY = the sidecar proxy · SVC = Order Service
+// STATE (before):
+//    health : {}                        // health endpoint state, unknown
+//    metric : 0                         // measured counter, zero
+// DEF: ping health URL every 10 s · CALLED BY: MON
+// -> health_url : "/health"
+//    step 1 · answer the ping   // health : {} -> {"status":"UP"}   BECAUSE the proxy exposes a URL the monitor can ping
+//    step 2 · measure   // metric : 0 -> 1   // the proxy counts one successful request
+//    step 3 · report   // samples : 0 -> 1   // the measurement is emitted to the monitor
+// <- health : "UP" · metric : 1 · insight into what the service is doing, with no code change
+//    alt DOWN : health : {"status":"UP"} -> {"status":"DOWN"}   BECAUSE the service process failed, so the ping reports DOWN`,
+      tieback: 'This is the observability stage — a health URL and metrics emitted by the proxy with no service change.',
+      refs: ['Health checks and metrics'],
+      problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
+    },
+    {
+      scenario: 'Credentials, database locations, and logging setup are cross-cutting too, and today each service hardcodes them. You want them externalized once, and you want to know how the mesh relates to two other patterns.',
+      q: 'What does the mesh externalize, and which two patterns does the reference relate it to?',
+      solution: 'The mesh supplies credentials and network locations of external services outside the service and configures a logging framework such as log4j or logback once; it relates to the microservice chassis and is often implemented with the sidecar pattern.',
+      components: ['Externalized configuration — credentials and locations', 'Logging framework — configured once', 'Microservice chassis — an alternative', 'Sidecar — the usual implementation'],
+      diagram: `flowchart LR
+  PROXY["Sidecar proxy"] -->|"injects"| CFG["db:5432, brk:9092, secret"]
+  PROXY -->|"configures once"| LOG["logback"]
+  CFG -->|"supplied"| SVC["Order Service"]
+  LOG -->|"overlaps"| CH["Chassis + Sidecar"]`,
+      code: `// MESH SIDE — credentials and network locations are injected by the mesh, and logging is configured once
+// PARTIES: PROXY = sidecar proxy · SVC = Order Service · BRK = message broker
+// STATE (before):
+//    config : {}                        // externalized config, not yet loaded
+//    logger : null                      // logging framework, not yet configured
+// DEF: inject config with 3 entries · CALLED BY: PROXY at startup
+// -> env : "prod"
+//    step 1 · load the config   // config : {} -> {"db":"db:5432","broker":"brk:9092","secret":"s3cr3t"}   BECAUSE credentials and external locations are externalized
+//    step 2 · configure logging   // logger : null -> "logback"   // the proxy configures the logging framework once
+//    step 3 · hand to the service   // injected : 0 -> 1   // the service reads config from the proxy, not from code
+// <- config : 3 entries · logger : "logback" · cross-cutting concerns live outside the service
+//    alt no mesh : injected : 1 -> 0   BECAUSE without a mesh each service must implement these concerns itself`,
+      tieback: 'This is the configuration stage — externalizing credentials and locations, configuring logging once, and linking to the chassis and sidecar.',
+      refs: ['Configuration and logging, plus the chassis link'],
+      problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
+    }
+  ],
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Five cross-cutting concerns per service', content: '<p><strong>Why.</strong> In a set of microservices, every service must implement the same non-business concerns over and over.</p><p><strong>Claim.</strong> The pattern lists them: externalized configuration (credentials and network locations of databases and message brokers), logging, health checks, metrics, and distributed tracing.</p><p><strong>Grounding.</strong> The problem statement enumerates these concerns, including instrumenting services with a unique identifier passed between services for distributed tracing.</p><p><strong>In the wild.</strong> Implementing each concern in every service leads to duplicated, drifting code across the system.</p>' },

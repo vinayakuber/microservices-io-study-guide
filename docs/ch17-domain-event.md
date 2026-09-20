@@ -153,6 +153,188 @@ flowchart TD
 ```
 
 
+## Interview Questions
+
+### Q1
+
+Your order service updates an order, but the CQRS read model still shows the old count and a choreography-based saga never advances. The update is invisible outside the service.
+
+**Interviewer's question:** When does a service need to publish events, and what breaks if it does not?
+
+**Solution:** A service needs to publish events when it updates its data — to keep a CQRS view fresh or to advance a choreography-based saga; without the publish step, consumers stay stale.
+
+**System-design components:**
+- Order write — local only
+- CQRS view — needs the event to update
+- Choreography saga — needs the event to advance
+- Publish step — missing without the pattern
+
+```mermaid
+flowchart LR
+  SVC["Order Service"] -->|state NEW to PLACED| DB[("Own data")]
+  DB -.->|no event| VIEW["CQRS view stays stale"]
+  DB -.->|no event| SAGA["Saga never advances"]
+```
+
+```java
+// ORDER SERVICE SIDE — the problem the pattern solves: data changes, but the consumers that need to know are never told
+// PARTIES: SVC = Order Service (writes) · VIEW = a CQRS read model · SAGA = a choreography-based saga coordinated via events
+// STATE (before):
+//    order : { id:"PO-77", state:"NEW" }
+//    view : { placed_count : 0 }
+//    saga : { next_step : "none" }
+// DEF: place_order_without_publish · CALLED BY: SVC
+// -> command : "place_order"
+//    step 1 · SVC writes its own data locally : order.state : "NEW" -> "PLACED"
+//    step 2 · the CQRS view is not notified and stays stale : view.placed_count : 0 -> 0
+//    step 3 · the saga is not triggered and never advances : saga.next_step : "none" -> "none"
+// <- outcome : order.state : "PLACED" · but every consumer still sees the old state, so the service needs a way to publish events when it updates data
+```
+
+_This is the Domain Event's motivation — an update without a publish step leaves CQRS views and sagas stale._
+
+_Covers:_ The need: publish when data changes
+
+_From the 28 problems:_ 19-distributed-message-queue · 26-payment-system
+
+### Q2
+
+You want a read model to count placed orders and a saga to react, and you want the event to come from the very object that changed.
+
+**Interviewer's question:** What emits a domain event, and how does a consumer react to it?
+
+**Solution:** A DDD aggregate emits a domain event when it is created or updated; the service publishes it, and a subscribing consumer handles it to update its own state.
+
+**System-design components:**
+- Order aggregate — emits OrderPlaced
+- Service — publishes the event
+- Broker — carries the event
+- Consumer handler — updates the read model
+
+```mermaid
+flowchart LR
+  AG["Order aggregate"] -->|state NEW to PLACED| EVT["OrderPlaced"]
+  EVT -->|publish| BRK[("Broker")]
+  BRK -->|deliver| CNS["Consumer handler"]
+  CNS -->|order_count 0 to 1| VIEW[("Read model")]
+```
+
+```java
+// ORDER SERVICE SIDE — an aggregate emits a domain event when it changes, and a consumer reacts to it
+// PARTIES: AG = Order aggregate (in Order Service) · BRK = message broker · CSVC = the consuming service (a CQRS view updater)
+// STATE (before):
+//    order : { id:"PO-77", state:"NEW" }
+//    events : []
+//    view : { order_count : 0 }
+// DEF: place_order · CALLED BY: the service on the aggregate
+// -> command : "place_order"
+//    step 1 · aggregate changes state : order.state : "NEW" -> "PLACED"
+//    step 2 · aggregate emits an event : events : [] -> [{type:"OrderPlaced", order_id:"PO-77"}]
+//    step 3 · service publishes "OrderPlaced" to BRK (via transactional outbox, same database transaction)
+// <- output : event "OrderPlaced" { order_id:"PO-77" } published
+// DEF: consume · CALLED BY: the consumer's event handler when BRK delivers "OrderPlaced"
+// -> event : { type:"OrderPlaced", order_id:"PO-77" }
+//    step 1 · handler updates the read model : view : { order_count : 0 } -> { order_count : 1 }   BECAUSE one more order was placed
+// <- outcome : view.order_count : 1 · the CQRS view now reflects the aggregate's change, without the consumer calling the aggregate
+```
+
+_This is the Domain Event — aggregates emit events on create or update, and consumers react to them._
+
+_Covers:_ Aggregates emit domain events
+
+_From the 28 problems:_ 19-distributed-message-queue · 26-payment-system
+
+### Q3
+
+Your service updates an order and publishes OrderPlaced, but you are worried the event could be lost if the service crashes after the write, or emitted for a change that rolled back.
+
+**Interviewer's question:** How does the Domain Event pattern publish the event atomically with the data change?
+
+**Solution:** The service writes the event to an outbox in the same local transaction as the data update, so commit makes both durable; a relay publishes the outbox rows afterward.
+
+**System-design components:**
+- Local transaction — one commit for data and event
+- Outbox row — the event stored in-transaction
+- Relay — publishes after commit
+- Broker — receives the event
+
+```mermaid
+flowchart LR
+  SVC["Order Service"] -->|UPDATE order| DB[("Database")]
+  SVC -->|INSERT outbox row| DB
+  DB -->|COMMIT both| OK["Event durable with data"]
+  OK -->|relay| BRK[("Broker")]
+```
+
+```java
+// ORDER SERVICE SIDE — publishing reliably: the event is written to the outbox in the SAME transaction as the data change
+// PARTIES: SVC = Order Service · DB = its database · BRK = the message broker
+// STATE (before):
+//    order : { id:"PO-77", state:"NEW" }
+//    outbox : []
+// DEF: place_order_and_publish · CALLED BY: SVC
+// -> command : "place_order"
+//    step 1 · begin one local transaction on DB (the broker is NOT enlisted — no distributed transaction)
+//    step 2 · update the data : order.state : "NEW" -> "PLACED"
+//    step 3 · write the event to the outbox in the same transaction : outbox : [] -> [{event:"OrderPlaced", order_id:"PO-77"}]
+//    step 4 · COMMIT -> both rows durable or neither, so the event cannot be lost or published for a rolled-back change
+//    step 5 · a relay later polls the outbox and marks the row sent : outbox : [{event:"OrderPlaced",sent:false}] -> [{event:"OrderPlaced",sent:true}]
+// <- outcome : event "OrderPlaced" published to BRK, atomically coupled to the data update
+```
+
+_This is the Domain Event's atomicity — the Transactional Outbox couples the event to the data change._
+
+_Covers:_ Publish atomically with the data change
+
+_From the 28 problems:_ 19-distributed-message-queue · 26-payment-system
+
+### Q4
+
+A user places an order and immediately reloads the order-count page, but the count still shows the old number for a moment before jumping.
+
+**Interviewer's question:** Why are domain-event-driven consumers eventually consistent, and what does the read side see in the window?
+
+**Solution:** The consumer reacts asynchronously after the event is delivered, so a CQRS view is briefly stale until the handler updates it.
+
+**System-design components:**
+- OrderPlaced event — published at commit
+- Broker delivery — asynchronous
+- Consumer handler — updates the view later
+- Read side — briefly stale
+
+```mermaid
+flowchart LR
+  WRITE["Order placed"] -->|OrderPlaced| BRK[("Broker")]
+  BRK -->|delayed delivery| CNS["Consumer"]
+  CNS -->|count 0 to 1| VIEW[("Read model")]
+  VIEW -.->|stale until delivered| READER["Reader sees old count"]
+```
+
+```java
+// CONSUMER SIDE — the read model catches up asynchronously, so it is briefly stale after the event is emitted
+// PARTIES: SVC = Order Service · BRK = message broker · CNS = view-updating consumer
+// STATE (before):
+//    order : { id:"PO-77", state:"NEW" }
+//    view : { order_count : 0 }
+//    delivered : false
+// DEF: place_order · CALLED BY: SVC at t=0ms
+// -> command : "place_order"
+//    step 1 · write commits and the event is published : order.state : "NEW" -> "PLACED" · event "OrderPlaced" queued
+//    step 2 · the event has not reached CNS yet : delivered : false -> false   BECAUSE delivery is asynchronous, not inside the write
+// <- state : view.order_count still 0 · a reader querying now sees the old count
+// DEF: handle_event · CALLED BY: CNS when BRK delivers "OrderPlaced" at t=120ms
+// -> event : { type:"OrderPlaced", order_id:"PO-77" }
+//    step 1 · the handler updates the view : view : { order_count : 0 } -> { order_count : 1 }
+//    step 2 · the view catches up : delivered : false -> true
+// <- outcome : view.order_count : 1 · the read side was 120ms behind the write side
+```
+
+_This is the Domain Event's eventual-consistency tradeoff — consumers update their state after the event arrives, not during the write._
+
+_Covers:_ The need: publish when data changes
+
+_From the 28 problems:_ 19-distributed-message-queue · 26-payment-system
+
 ## Key Concepts
 
 ### The Problem
@@ -163,6 +345,13 @@ flowchart TD
 ### The Solution
 
 Organize the business logic of a service as a collection of DDD aggregates that emit domain events when they are created or updated.
+
+```mermaid
+flowchart LR
+  SVC["Order Service"] -->|state NEW to PLACED| DB[("Own data")]
+  DB -.->|no event| VIEW["CQRS view stays stale"]
+  DB -.->|no event| SAGA["Saga never advances"]
+```
 
 
 ### Key Facts

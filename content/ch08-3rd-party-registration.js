@@ -83,6 +83,115 @@ registerChapter({
 //    alt shallow registrar : RGR sees only "RUNNING" -> the broken 10.0.1.7 stays registered (superficial state risk)`
     }
   ],
+  interview: [
+    {
+      scenario: "A second order-service instance boots at 10.0.2.6, then gets hard-killed with no clean shutdown. A client resolves order-service and may be routed to a dead host.",
+      q: "Why does registration need a full lifecycle — register, unregister, evict crashed and broken instances?",
+      solution: "An instance must be registered on startup, unregistered on shutdown, and evicted if it crashes or runs but cannot handle requests, or the registry drifts from reality.",
+      components: ["Register on startup", "Unregister on shutdown", "Evict crashed instances", "Evict broken instances"],
+      diagram: `flowchart LR
+  B["boot 10.0.2.6"] --> R["register"]
+  K["hard kill"] --> S["stale entry"]
+  S --> D["client routed to dead host"]`,
+      code: `// REGISTRY SIDE — why the registration lifecycle exists: stale entries route requests to dead endpoints
+// PARTIES: SVC = order-service instance · REG = service registry · CLI = a client resolving order-service
+// STATE (before):
+//    registry : {"order-service" -> [{"host":"10.0.2.5","port":8080}]}
+//    live_count : 1
+// DEF: a second instance boots · CALLED BY: the autoscaler adding capacity
+// -> boot : {"host":"10.0.2.6","port":8080}
+//    step 1 · register on startup : registry["order-service"] : [{"host":"10.0.2.5","port":8080}] -> [{"host":"10.0.2.5","port":8080},{"host":"10.0.2.6","port":8080}]
+//    step 2 · live_count : 1 -> 2   BECAUSE the new instance registered itself on startup
+// DEF: the 10.0.2.6 instance crashes · CALLED BY: a hard kill with no clean shutdown
+// -> crash : "10.0.2.6"
+//    step 1 · process dies : live_count : 2 -> 1   BECAUSE 10.0.2.6 is now a dead process
+//    step 2 · stale entry persists : registry["order-service"] : [2 entries] -> [2 entries, one dead]   BECAUSE no unregister ran
+// <- discovery result : ["10.0.2.5:8080","10.0.2.6:8080"]   (CLI can be routed to the dead host)
+//    alt clean shutdown : SVC sends unregister -> registry["order-service"] : [{"host":"10.0.2.5","port":8080},{"host":"10.0.2.6","port":8080}] -> [{"host":"10.0.2.5","port":8080}]`,
+      tieback: "This is exactly the registration lifecycle and the stale-entry danger in this chapter.",
+      refs: ["The registration lifecycle"],
+      problems: ["01-scale-from-zero-to-millions"]
+    },
+    {
+      scenario: "A non-JVM service must appear in the registry, but the team does not want to embed registry calls inside it.",
+      q: "How does a third-party registrar own register/unregister while keeping the service oblivious?",
+      solution: "A separate registrar — a sidecar like Prana, a parent process, or a Docker helper — registers the instance on startup and unregisters it on shutdown, acting on the service's behalf.",
+      components: ["Co-located registrar (sidecar/parent/helper)", "Register on startup", "Unregister on shutdown", "Service stays oblivious"],
+      diagram: `flowchart LR
+  SVC["order-service (non-JVM)"] --> RGR["registrar sidecar"]
+  RGR -->|"register"| REG["registry"]
+  RGR -->|"unregister"| REG`,
+      code: `// REGISTRAR SIDE — a separate process registers and unregisters the instance on its behalf
+// PARTIES: SVC = order-service instance · RGR = third-party registrar (sidecar) · REG = service registry
+// DEF: proc — the service's OS process whose lifecycle the registrar watches; here svc_proc = "STOPPED" -> "STARTED" on host "10.0.2.5"
+// STATE (before):
+//    registry : {"order-service" -> []}
+//    svc_proc : "STOPPED"
+//    discoverable : "false"
+// DEF: registrar watches the service process · CALLED BY: RGR polling the local process every 5s
+// -> observed : "STARTED"   (SVC process on host 10.0.2.5 came up)
+//    step 1 · RGR sees START : svc_proc : "STOPPED" -> "STARTED"
+//    step 2 · RGR registers SVC : registry["order-service"] : [] -> [{"host":"10.0.2.5","port":8080}]
+//    step 3 · discoverable : "false" -> "true"   BECAUSE the registry now holds the entry
+// <- registry row : "order-service" -> [{"host":"10.0.2.5","port":8080}]
+//    alt process stops : RGR sees STOP -> registry["order-service"] : [{"host":"10.0.2.5","port":8080}] -> []`,
+      tieback: "This is exactly the third-party registrar owning register/unregister in this chapter.",
+      refs: ["A third party owns register/unregister"],
+      problems: ["01-scale-from-zero-to-millions"]
+    },
+    {
+      scenario: "A registrar health-checks its instance: the first probe passes, but the second returns 503 because the instance is now broken.",
+      q: "How does health-check gating decide registration, and what is its blind spot?",
+      solution: "The registrar registers the instance while the health check passes and unregisters it on failure; a shallow registrar that only knows RUNNING vs NOT RUNNING cannot see a running-but-broken instance.",
+      components: ["Health probe", "Register when healthy", "Unregister on failure", "Superficial RUNNING/NOT RUNNING view"],
+      diagram: `flowchart LR
+  RGR["registrar"] -->|"GET /health -> 200"| SVC["instance"]
+  RGR -->|"GET /health -> 503"| SVC
+  SVC -->|"503"| U["unregister"]`,
+      code: `// REGISTRAR SIDE — health-check gating decides whether an instance stays registered
+// PARTIES: SVC = order-service instance · RGR = registrar with a health check · REG = registry
+// STATE (before):
+//    registry : {"order-service" -> [{"host":"10.0.2.5","port":8080}]}
+//    health : "PASS"
+//    pass_count : 0
+// DEF: registrar health-checks SVC · CALLED BY: RGR every 10s
+// -> probe_1 : "GET /health" -> "200 OK"   (healthy)
+//    step 1 · probe passes : pass_count : 0 -> 1   BECAUSE probe_1 answered 200, SVC stays registered
+// -> probe_2 : "GET /health" -> "503 Service Unavailable"   (the instance is now broken)
+//    step 2 · health : "PASS" -> "FAIL"   BECAUSE probe_2 answered 503
+//    step 3 · RGR unregisters SVC : registry["order-service"] : [{"host":"10.0.2.5","port":8080}] -> []
+// <- registry row : "order-service" -> []   (broken instance removed)
+//    alt shallow registrar : RGR sees only "RUNNING" -> the broken 10.0.2.5 stays registered (superficial state risk)`,
+      tieback: "This is exactly the health-check gating and its superficial-state blind spot in this chapter.",
+      refs: ["Health-check gating and its blind spot"],
+      problems: ["01-scale-from-zero-to-millions"]
+    },
+    {
+      scenario: "The team runs the registrar themselves rather than relying on Kubernetes or Marathon to fold it into the infrastructure.",
+      q: "What does the registrar add to the system, and why must it be highly available?",
+      solution: "Unless it is part of the infrastructure, the registrar is another component to install, configure, and maintain, and because it sits on the path to discovery it must be highly available.",
+      components: ["Registrar on the discovery path", "Install/configure/maintain burden", "High availability requirement"],
+      diagram: `flowchart LR
+  RGR["registrar (down)"] -. "no register/unregister" .-> REG["registry"]
+  REG --> S["stale registry entries"]`,
+      code: `// REGISTRAR SIDE — the registrar is a critical component: if it dies, register/unregister stops and the registry drifts
+// PARTIES: RGR = registrar · REG = registry · SVC = order-service instance
+// STATE (before):
+//    registrar : "UP"
+//    registry : {"order-service" -> [{"host":"10.0.2.5","port":8080}]}
+//    pending_registration : "none"
+// DEF: the registrar fails · CALLED BY: the registrar process crashing
+// -> crash : "registrar"
+//    step 1 · registrar goes down : registrar : "UP" -> "DOWN"
+//    step 2 · a new instance boots but nothing registers it : pending_registration : "none" -> "10.0.2.6"   BECAUSE the registrar is not there to register it
+//    step 3 · the registry stays stale : registry["order-service"] : [{"host":"10.0.2.5","port":8080}] -> [{"host":"10.0.2.5","port":8080}]   BECAUSE no unregister/register can run
+// <- registry state : the new 10.0.2.6 stays invisible · discovery returns only 10.0.2.5
+//    alt infrastructure-owned : Kubernetes folds the registrar into built-in infrastructure, so there is no extra process to keep alive`,
+      tieback: "This is exactly the another-critical-component drawback of third-party registration in this chapter.",
+      refs: ["A third party owns register/unregister", "Health-check gating and its blind spot"],
+      problems: ["01-scale-from-zero-to-millions"]
+    }
+  ],
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Registration is a lifecycle duty', content: '<p><strong>Why.</strong> A service instance is only reachable through discovery if the registry knows where it lives, so every start and stop must be reflected in the registry.</p><p><strong>Claim.</strong> An instance must be registered on startup, unregistered on shutdown, and evicted if it crashes or runs but cannot handle requests.</p><p><strong>Grounding.</strong> Richardson\'s three forces: register on startup and unregister on shutdown; unregister crashed instances; unregister running-but-incapable instances.</p><p><strong>In the wild.</strong> Leaving a dead endpoint registered means a client-side or server-side discovery lookup can still route a request to a host that will never answer.</p>' },

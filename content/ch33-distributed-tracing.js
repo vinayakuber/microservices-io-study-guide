@@ -107,6 +107,52 @@ registerChapter({
 //    alt infra cost : at scale N requests x M spans = N x M records -> needs real storage infrastructure`
     }
   ],
+  interview: [
+    {
+      scenario: "External monitoring reports only overall response time and invocation counts, so a slow request looks fine in aggregate. The team instruments the gateway to label each external request before it enters the services.",
+      q: "What is the first thing distributed tracing instrumentation does for each external request, and what is the id's relationship to the first span?",
+      solution: "It assigns each external request a unique external request id, attaches it to the request, and opens the root span — the first span of the trace, with no parent.",
+      components: ["API gateway", "trace_id", "root span", "trace registry"],
+      diagram: "flowchart LR\n  C[\"Client\"] -->|\"GET /orders/PO-2001\"| G[\"API gateway\"]\n  G -->|\"assign trace_id\"| T[\"4bf92f3577...\"]\n  G -->|\"open root span\"| S[\"6f9a3c1b8e2d4001 (parent empty)\"]\n  T --> R[\"trace_registry\"]\n  S --> R",
+      code: "// API GATEWAY SIDE — each external request is assigned a unique id before entering the services\n// PARTIES: GW = API gateway · SVC = first service\n// DEF: trace_id — the id shared by every span of one trace, attached to the request header; here \"4bf92f3577b34da6a3ce90d0e2b88a4d\"\n// DEF: root_span — the FIRST span of a trace, with parent=\"\" (no parent); here \"6f9a3c1b8e2d4001\"\n// STATE (before):\n//    trace_registry : {}                  // trace_id -> spans\n//    spans : []                           // spans recorded so far for this request\n// DEF: receive_request · CALLED BY: a client HTTP request arriving at GW\n// -> request : \"GET /orders/PO-2001\"\n//    step 1 · generate the external request id   trace_id = \"4bf92f3577b34da6a3ce90d0e2b88a4d\"\n//    step 2 · attach it to the outbound header   header.trace_id : \"\" -> \"4bf92f3577b34da6a3ce90d0e2b88a4d\"\n//    step 3 · open the root span                 spans : [] -> [(\"6f9a3c1b8e2d4001\", parent=\"\", start=100)]\n//    step 4 · index the trace by its id          trace_registry : {} -> {\"4bf92f3577b34da6a3ce90d0e2b88a4d\": spans}\n// <- outcome : the request carries trace_id \"4bf92f3577b34da6a3ce90d0e2b88a4d\" into SVC · root span \"6f9a3c1b8e2d4001\" opened",
+      tieback: "This is the chapter's assign-the-request-id step: a unique id plus the root span begin the trace.",
+      refs: ["Assigning the request id"],
+      problems: ["20-metrics-monitoring"]
+    },
+    {
+      scenario: "One request travels GW to Order Service to Kitchen Service to Payment Service. Each hop must keep the trace intact so the whole journey can be reconstructed.",
+      q: "How does the request id propagate through services, and how do the spans relate to one another?",
+      solution: "Each service passes the id onward, and each hop opens a child span whose parent is the previous hop's span, chaining one request into a sequence of spans.",
+      components: ["API gateway", "Order Service", "Kitchen Service", "Payment Service"],
+      diagram: "flowchart LR\n  G[\"GW\"] -->|\"span 6f9a...001\"| O[\"Order Service\"]\n  O -->|\"child 6f9a...002\"| K[\"Kitchen Service\"]\n  K -->|\"child 6f9a...003\"| P[\"Payment Service\"]\n  P -->|\"child 6f9a...004\"| E[\"replies\"]",
+      code: "// SERVICE SIDE — one request traverses 3 services, each opening a child span of the previous hop\n// PARTIES: GW = API gateway · ORD = Order Service · KIT = Kitchen Service · PAY = Payment Service\n// DEF: parent — a span's parent span_id (which span invoked it); here parent=\"6f9a3c1b8e2d4001\" for a child, \"\" for the root_span\n// STATE (before):\n//    spans : [(\"6f9a3c1b8e2d4001\", parent=\"\", svc=\"GW\", start=100, end=104)]\n//    header : { trace_id: \"4bf92f3577b34da6a3ce90d0e2b88a4d\", span_id: \"\" }\n// DEF: handle_request · CALLED BY: the request moving GW -> ORD -> KIT -> PAY\n// -> trace_id : \"4bf92f3577b34da6a3ce90d0e2b88a4d\"\n//    step 1 · GW forwards to ORD, header carries the parent span   header.span_id : \"\" -> \"6f9a3c1b8e2d4001\"\n//    step 2 · ORD opens child span, forwards to KIT    spans : [1 span] -> [1 span, (\"6f9a3c1b8e2d4002\", parent=\"6f9a3c1b8e2d4001\", svc=\"ORD\", start=105, end=120)]\n//    step 3 · KIT opens child span, calls PAY          spans : [2 spans] -> [2 spans, (\"6f9a3c1b8e2d4003\", parent=\"6f9a3c1b8e2d4002\", svc=\"KIT\", start=121, end=135)]\n//    step 4 · PAY opens child span, replies            spans : [3 spans] -> [3 spans, (\"6f9a3c1b8e2d4004\", parent=\"6f9a3c1b8e2d4003\", svc=\"PAY\", start=136, end=150)]\n// <- outcome : 4 spans chained by parent/child span ids, all carrying trace_id \"4bf92f3577b34da6a3ce90d0e2b88a4d\"",
+      tieback: "This is the chapter's propagate-through-services step: each hop opens a child span of the previous one, forming the trace chain.",
+      refs: ["Propagating through services"],
+      problems: ["20-metrics-monitoring"]
+    },
+    {
+      scenario: "The four spans from GW, Order, Kitchen, and Payment must land in one place where the whole request can be reconstructed with per-operation timing.",
+      q: "How are spans recorded centrally, and how is per-operation latency derived?",
+      solution: "Spans are recorded in a centralized trace store — Spring Cloud Sleuth delivers them to a Zipkin server, via RabbitMQ — and Zipkin derives each operation's latency as end minus start.",
+      components: ["Gateway/Order/Kitchen/Payment spans", "RabbitMQ broker", "Zipkin server", "latency derivation"],
+      diagram: "flowchart LR\n  S[\"Services\"] -->|\"spans\"| B[\"RabbitMQ\"]\n  B -->|\"deliver\"| Z[\"Zipkin server\"]\n  Z -->|\"end - start\"| L[\"per-span latency\"]\n  L -->|\"4 spans\"| T[\"one trace\"]",
+      code: "// TRACE STORE SIDE — the spans from all 4 hops land in one centralized trace server (Zipkin)\n// PARTIES: GW = gateway · ORD = Order Service · ZIP = Zipkin server · BRK = RabbitMQ broker\n// DEF: latency — how long one span took = end - start; here 104-100 = 4 ms\n// STATE (before):\n//    trace_store : {}                        // trace_id -> spans, as ZIP holds them\n// DEF: collect_spans · CALLED BY: each service finishing its operation\n// -> trace_id : \"4bf92f3577b34da6a3ce90d0e2b88a4d\" · -> span1 : (\"6f9a3c1b8e2d4001\", parent=\"\", start=100, end=104)\n//    step 1 · GW span arrives via BRK    trace_store : {} -> {\"4bf92f3577b34da6a3ce90d0e2b88a4d\":[(\"6f9a3c1b8e2d4001\",parent=\"\",start=100,end=104)]}\n//    step 2 · ORD span arrives via BRK   trace_store : {\"4bf9...\":[1 span]} -> {\"4bf9...\":[(\"6f9a3c1b8e2d4001\",start=100,end=104),(\"6f9a3c1b8e2d4002\",parent=\"6f9a3c1b8e2d4001\",start=105,end=120)]}\n//    step 3 · KIT span arrives via BRK   trace_store : {\"4bf9...\":[2 spans]} -> {\"4bf9...\":[2 spans, (\"6f9a3c1b8e2d4003\",parent=\"6f9a3c1b8e2d4002\",start=121,end=135)]}\n//    step 4 · PAY span arrives via BRK   trace_store : {\"4bf9...\":[3 spans]} -> {\"4bf9...\":[3 spans, (\"6f9a3c1b8e2d4004\",parent=\"6f9a3c1b8e2d4003\",start=136,end=150)]}\n// <- outcome : trace_store : 4 spans for trace \"4bf92f3577b34da6a3ce90d0e2b88a4d\" · ZIP derives latency = end - start: 104-100=4, 120-105=15, 135-121=14, 150-136=14",
+      tieback: "This is the chapter's collect-spans-in-the-trace-store step: Zipkin gathers spans via RabbitMQ and derives per-operation latency.",
+      refs: ["Collecting spans in the trace store"],
+      problems: ["20-metrics-monitoring"]
+    },
+    {
+      scenario: "An operator debugging one slow order needs to see every log line for it across three machines, ordered by time, to find the slow hop.",
+      q: "What benefit does distributed tracing provide for debugging, and how does the request id enable it?",
+      solution: "Because the request id is included in every log message, a developer can search aggregated logs for the id to see how one request was handled — ordering the matched lines by time exposes the sources of latency.",
+      components: ["operator", "log-aggregation index", "trace_id", "ordered matches"],
+      diagram: "flowchart LR\n  O[\"Operator\"] -->|\"search trace_id\"| I[\"log index\"]\n  I -->|\"3 lines\"| M[\"ORD@105, KIT@121, PAY@136\"]\n  M -->|\"order by time\"| S[\"slow hop: KIT 14 ms\"]",
+      code: "// OPERATOR SIDE — the request id links a request's scattered log lines so one search reassembles it\n// PARTIES: OP = operator · LOGS = log-aggregation index · ZIP = Zipkin trace server\n// DEF: match — one stored log line that satisfies the search; here 3 lines for one trace_id\n// STATE (before):\n//    log_index : []                       // every stored log line, tagged with its trace id\n//    matches : []                         // what a search returns\n// DEF: search · CALLED BY: OP debugging one slow request\n// -> trace_id : \"4bf92f3577b34da6a3ce90d0e2b88a4d\"\n//    step 1 · each service logs with the trace id inline   log_index : [] -> [3 lines tagged \"4bf92f3577b34da6a3ce90d0e2b88a4d\"]\n//    step 2 · OP queries the index for the id               matches : [] -> [ORD line, KIT line, PAY line]\n//    step 3 · OP orders the 3 lines by timestamp            matches : [3 lines] -> [ORD@105, KIT@121, PAY@136]\n// <- outcome : matches : 3 lines for one id · the slow hop is KIT (135-121=14 ms)   BECAUSE the id links logs on 3 different machines\n//    alt infra cost : at scale N requests x M spans = N x M records -> needs real storage infrastructure",
+      tieback: "This is the chapter's search-logs-by-request-id benefit, paired with its infrastructure-cost issue.",
+      refs: ["Searching logs by request id"],
+      problems: ["20-metrics-monitoring"]
+    }
+  ],
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Totals hide operations', content: '<p><strong>Why.</strong> A request spans multiple services, each performing one or more operations such as database queries or publishing messages.</p><p><strong>Claim.</strong> External monitoring only reports overall response time and number of invocations, with no insight into individual operations, and log entries for a request are scattered across numerous logs.</p><p><strong>Grounding.</strong> These are the reference forces, along with minimal runtime overhead.</p><p><strong>In the wild.</strong> A slow request looks fine in aggregate until its individual operations are traced.</p>' },

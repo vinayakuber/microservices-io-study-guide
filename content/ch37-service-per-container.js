@@ -95,6 +95,111 @@ registerChapter({
 //    alt package step : image : 0 -> 1 in ~seconds · AMI : 0 -> 1 in ~minutes  BECAUSE the reference notes ~100x faster packaging`
     }
   ],
+  interview: [
+    {
+      scenario: 'Your team ships three services in three languages, and each one currently needs its own build and start procedure. You want every service to deploy through one uniform shape regardless of stack.',
+      q: 'How does the Service per Container pattern turn source code into a deployable image?',
+      solution: 'A Dockerfile wraps the service code plus its runtime into a self-contained image; docker build produces the image, a version tag is pinned, and the image is pushed to a registry the cluster pulls from.',
+      components: ['Dockerfile — wraps code plus runtime', 'docker build — produces the image', 'Version tag — pins a release', 'Registry — holds the image for the cluster'],
+      diagram: `flowchart LR
+  BLD["Build pipeline"] -->|"docker build"| IMG["inv:2.0.1 image"]
+  IMG -->|"docker tag"| TAG["tag 2.0.1"]
+  TAG -->|"docker push"| REG["Registry"]
+  REG -->|"cluster pulls"| CL["Cluster"]`,
+      code: `// BUILD SIDE — one inventory service is packaged into a container image so any language deploys the same way
+// PARTIES: BLD = build pipeline · REG = container registry
+// STATE (before):
+//    image : null                       // nothing built yet
+//    tag : "latest"                     // default tag before versioning
+// DEF: package version 2.0.1 · CALLED BY: BLD on the release commit
+// -> service : "inventory-service" · -> version : "2.0.1"
+//    step 1 · docker build wraps the code plus its runtime   // image : null -> "inv:2.0.1"   BECAUSE the Dockerfile makes the image self-contained
+//    step 2 · pin the version tag   // tag : "latest" -> "2.0.1"   // the cluster can now select this exact release
+//    step 3 · push to the registry   // copies : 0 -> 1   BECAUSE REG holds one copy the cluster can pull
+// <- image : "inv:2.0.1" in REG · one image, ready to run as N containers
+//    alt next commit : version : "2.0.1" -> "2.0.2"   BECAUSE a new commit builds a fresh image tag`,
+      tieback: 'This is the image stage — wrapping the service in a Dockerfile, building, tagging, and pushing to the registry.',
+      refs: ['Package the service as an image'],
+      problems: ["01-scale-from-zero-to-millions"]
+    },
+    {
+      scenario: 'Load on your inventory service just spiked and you need double the capacity in the next minute. Rebuilding anything would be far too slow.',
+      q: 'How do you scale a containerized service, and why is no rebuild required?',
+      solution: 'A host pulls the shared image once and the replica count is changed; Kubernetes launches more containers from the same image, and a load balancer spreads traffic across the replicas.',
+      components: ['Shared image — pulled once', 'Replica count — the scaling knob', 'Kubernetes — schedules the containers', 'Load balancer — spreads traffic'],
+      diagram: `flowchart LR
+  CL["Cluster"] -->|"replicas 3 -> 7"| SCH["Scheduler"]
+  SCH -->|"launch 4 more"| IMG["inv:2.0.1 image"]
+  IMG -->|"same image"| R["7 replicas"]
+  LB["Load balancer"] -->|"spread"| R`,
+      code: `// RUNTIME SIDE — scale the inventory service from 3 to 7 replicas using the same image, no rebuild
+// PARTIES: SVC = inventory-service · CL = the Kubernetes cluster
+// STATE (before):
+//    replicas : 3                       // three containers serving traffic
+//    image : "inv:2.0.1"                // the single image every replica runs
+// DEF: scale to 7 · CALLED BY: CL when measured load spikes
+// -> desired_replicas : 7
+//    step 1 · set the replica count   // replicas : 3 -> 7   BECAUSE scaling is just changing the container count
+//    step 2 · schedule the new containers   // unplaced : 4 -> 0   // 4 more containers start from the same image
+//    step 3 · spread traffic   // endpoints : 3 -> 7   // the load balancer now routes over 7
+// <- instances : 7 · same image "inv:2.0.1", zero rebuilds
+//    alt load drops : replicas : 7 -> 2   BECAUSE Kubernetes terminates 5 containers to save resources`,
+      tieback: 'This is the scaling stage — pulling the image once, changing the replica count, and spreading traffic with no rebuild.',
+      refs: ['Run each instance as a container'],
+      problems: ["01-scale-from-zero-to-millions"]
+    },
+    {
+      scenario: 'One noisy container is eating 90% of a shared host\'s CPU and starving its neighbors. You need each instance bounded so no single service can monopolize the machine.',
+      q: 'How does the container enforce CPU and memory limits, and what keeps one container from starving the others?',
+      solution: 'The pod spec declares a CPU and memory cap before the container runs; the runtime throttles consumption above the cap, and each container keeps its own separate cap so neighbors are isolated.',
+      components: ['Pod spec — declares the cap', 'Container runtime — enforces it', 'Throttle — blocks excess', 'Per-container cap — isolates neighbors'],
+      diagram: `flowchart LR
+  SPEC["Pod spec"] -->|"cpu 0.4, mem 512"| RT["Runtime"]
+  RT -->|"usage 0.9 -> 0.4"| SVC1["SVC1 capped"]
+  RT -->|"own separate cap"| SVC2["SVC2 capped"]
+  SVC1 -->|"cannot starve"| SVC2`,
+      code: `// RUNTIME SIDE — cap one container's CPU and memory so a noisy neighbor cannot starve the others
+// PARTIES: SVC1 = inventory-service · SVC2 = payment-service · HOST = the machine running both
+// STATE (before):
+//    caps : {}                           // per-container limits, none set yet
+//    usage : 0.9                         // SVC1's current CPU, in fraction of a core
+// DEF: set caps cpu 0.4 mem 512 · CALLED BY: SVC1's pod spec at deploy time
+// -> cpu_limit : 0.4 · -> mem_limit : 512
+//    step 1 · apply the declared caps   // caps : {} -> {"cpu":0.4,"mem":512}   BECAUSE the runtime records the limit before the container runs
+//    step 2 · throttle the excess   // usage : 0.9 -> 0.4   // the extra 0.5 of a core is blocked
+//    step 3 · isolate the neighbor   // neighbors : 0 -> 1   // SVC2 keeps its own separate cap, so SVC1 cannot touch it
+// <- cpu_cap : 0.4, mem_cap : 512 · one container cannot consume another's share
+//    alt no cap declared : usage : 0.4 -> 0.9   BECAUSE without a limit the container grabs the idle CPU`,
+      tieback: 'This is the constraint stage — declaring CPU and memory limits and isolating each container behind its own cap.',
+      refs: ['Constrain CPU and memory per container'],
+      problems: ["01-scale-from-zero-to-millions"]
+    },
+    {
+      scenario: 'You are choosing between packaging your service as a container and as a VM image. The decision comes down to how fast each builds and starts against how mature each toolchain is.',
+      q: 'How fast do containers build and start compared to VMs, and what is the tradeoff?',
+      solution: 'A container starts only the application process, so it boots much faster than a VM, and packaging is about 100x faster than an AMI; the tradeoff is that container deployment infrastructure is not as rich as the mature VM-based IaaS ecosystem.',
+      components: ['Container — starts only the app process', 'VM — boots an entire OS', '~100x packaging — container vs AMI', 'Tradeoff — thinner infrastructure'],
+      diagram: `flowchart LR
+  CNT["Container start"] -->|"2 s"| CMP["Compare"]
+  VM["VM start"] -->|"25 s"| CMP
+  CMP -->|"12.5x faster"| WIN["Container wins speed"]
+  CMP -->|"loses"| MAT["Infra maturity: VM richer"]`,
+      code: `// TRADEOFF SIDE — one payment service, two packaging choices, measured start times
+// PARTIES: CNT = container path · VMACH = virtual-machine path
+// STATE (before):
+//    boot : {"container":0, "vm":0}      // measured start times in seconds
+// DEF: time start of service 2.0.1 · CALLED BY: a deploy test on the same service
+// -> service : "payment-service"
+//    step 1 · start the container   // boot.container : 0 -> 2   BECAUSE only the application process starts
+//    step 2 · start the VM   // boot.vm : 0 -> 25   BECAUSE an entire OS must boot first
+//    step 3 · compare   // ratio : 0 -> 12.5   // 25 s / 2 s = 12.5x faster container start
+// <- container : 2 s · VM : 25 s · container wins speed, loses on infrastructure maturity
+//    alt package step : image : 0 -> 1 in ~seconds · AMI : 0 -> 1 in ~minutes   BECAUSE the reference notes ~100x faster packaging`,
+      tieback: 'This is the tradeoff stage — the container wins on build and start speed, but the VM ecosystem is the more mature infrastructure.',
+      refs: ['Fast to build and start, thinner infrastructure'],
+      problems: ["01-scale-from-zero-to-millions"]
+    }
+  ],
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Many languages, one deployment path', content: '<p><strong>Why.</strong> A microservice system is built from services written in a variety of languages, frameworks, and framework versions, and each service runs as multiple instances for throughput and availability.</p><p><strong>Claim.</strong> Without a uniform packaging unit, every service needs its own build and start procedure, so deployment cannot be reliable or fast.</p><p><strong>Grounding.</strong> The pattern forces list the variety of technologies, the need for independent deployability and scalability, and the need to build and deploy quickly.</p><p><strong>In the wild.</strong> Docker became an extremely popular way to package and deploy services because it gives every service one uniform shape.</p>' },

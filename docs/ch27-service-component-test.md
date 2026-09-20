@@ -212,6 +212,189 @@ flowchart TD
 ```
 
 
+## Interview Questions
+
+### Q1
+
+Order Service places an order by invoking Kitchen Service to create a ticket. The team needs an automated test that verifies the order behaves correctly, including the outbound call it makes.
+
+**Interviewer's question:** What does a service component test define, and why must it cover the calls the service makes to other services?
+
+**Solution:** A test suite that tests a service in isolation using test doubles for any services it invokes — because verifying the service means observing the calls it makes to its dependencies.
+
+**System-design components:**
+- Order Service (under test)
+- Kitchen Service (dependency)
+- test double
+- outbound-call capture
+
+```mermaid
+flowchart LR
+  T["Component test"] -->|"drives"| O["Order Service"]
+  O -->|"createTicket"| D["Kitchen Service double"]
+  D -->|"canned ticket"| O
+  T -->|"asserts"| A["order + call"]
+```
+
+```java
+// SERVICE SIDE — a service invokes other services, so automated tests must verify it behaves correctly
+// PARTIES: OSVC = Order Service · KSVC = Kitchen Service (dependency)
+// STATE (before):
+//    order : { id:"", state:"PENDING", ticket:"" }
+//    calls : []
+// DEF: place_order · CALLED BY: a client of Order Service
+// -> order_id : "ORD-4007"
+//    step 1 · create the order : order.id : "" -> "ORD-4007"  BECAUSE the service records the incoming order
+//    step 2 · start cooking : order.ticket : "" -> "T-88"  BECAUSE Order Service invokes Kitchen Service to create a ticket
+//    step 3 · record the call : calls : [] -> ["KitchenService.createTicket"]  BECAUSE the outbound call must be tracked for the test
+// <- order : {"id":"ORD-4007","state":"PENDING","ticket":"T-88"} · calls.length : 1
+//    alt another order : order.id : "ORD-4007" -> "ORD-4008"  BECAUSE a second scenario starts a fresh order
+```
+
+_This is the chapter's context: a service is never alone, so its test must cover the outbound calls it makes._
+
+_Covers:_ A service among many services
+
+_From the 28 problems:_ 03-framework-for-system-design-interviews
+
+### Q2
+
+The team's end-to-end test launches Order, Kitchen, and Delivery services at once to exercise a full order flow. One flaky Delivery Service takes down the entire run.
+
+**Interviewer's question:** Why does the pattern reject end-to-end testing, and what is the concrete failure mode?
+
+**Solution:** End-to-end tests launch multiple services, each adding setup, config, and a failure surface; one flaky service fails the whole run — difficult, slow, brittle, and expensive.
+
+**System-design components:**
+- Order Service
+- Kitchen Service
+- Delivery Service
+- end-to-end test
+
+```mermaid
+flowchart LR
+  T["E2E test"] -->|"launches"| O["Order Service"]
+  T -->|"launches"| K["Kitchen Service"]
+  T -->|"launches"| D["Delivery Service"]
+  D -->|"flakes"| F["whole run fails"]
+```
+
+```java
+// E2E SIDE — an end-to-end test launches multiple services, which makes it slow and brittle
+// PARTIES: TST = end-to-end test · OSVC = Order Service · KSVC = Kitchen Service · DSVC = Delivery Service
+// STATE (before):
+//    launched : []
+//    checks : 0
+// DEF: run_e2e · CALLED BY: TST to verify an order flows through the system
+// -> order_id : "ORD-4007"
+//    step 1 · launch all : launched : [] -> ["OrderService","KitchenService","DeliveryService"]  BECAUSE the test must start every service the flow touches
+//    step 2 · configure : checks : 0 -> 1  BECAUSE the test wires each service's data and config before running
+//    step 3 · one flake fails all : launched : ["OrderService","KitchenService","DeliveryService"] -> ["OrderService","KitchenService","DeliveryService","FAILED:DeliveryService"]  BECAUSE one flaky service fails the whole run
+// <- launched.length : 4 · result : "brittle"  BECAUSE the test depends on every service being up
+//    alt isolated test : launched : ["OrderService","KitchenService","DeliveryService","FAILED:DeliveryService"] -> ["OrderService"]  BECAUSE a component test starts only the service under test
+```
+
+_This is the chapter's warning against end-to-end testing: launching every service is difficult, slow, brittle, and expensive._
+
+_Covers:_ Why end-to-end tests fail you
+
+_From the 28 problems:_ 03-framework-for-system-design-interviews
+
+### Q3
+
+Instead of launching Kitchen Service, the team stubs it with a test double that returns a fixed ticket, and drives Order Service in-process.
+
+**Interviewer's question:** How does testing in isolation work, and what does the test actually assert?
+
+**Solution:** Replace each invoked service with a test double returning canned replies, call the service directly in-process, and assert the service's response against the double's reply.
+
+**System-design components:**
+- Order Service (under test)
+- Kitchen Service double
+- in-process call
+- assertion
+
+```mermaid
+flowchart LR
+  T["Component test"] -->|"in-process call"| O["Order Service"]
+  O -->|"stubbed call"| D["Kitchen Service double"]
+  D -->|"returns T-88"| O
+  T -->|"asserts ticket seen"| V["T-88"]
+```
+
+```java
+// SERVICE SIDE — test the service in isolation using test doubles for the services it invokes
+// PARTIES: OSVC = Order Service (under test) · DBLE = test double for Kitchen Service
+// DEF: dep — a dependency the service under test invokes; here "KitchenService", stubbed by DBLE in isolation
+// DEF: real — the actual production service, NOT launched here; here "KitchenService", the real_dep value
+// DEF: ticket — the Kitchen ticket id the double returns; here "T-88"
+// STATE (before):
+//    real_dep : "KitchenService"        // the real dependency, not launched
+//    double : { createTicket:"" }
+//    order : { id:"", state:"PENDING" }
+//    ticket_seen : ""
+// DEF: test_in_isolation · CALLED BY: the service component test
+// -> order_id : "ORD-4007"
+//    step 1 · stub the dependency : double.createTicket : "" -> "T-88"  BECAUSE the test double returns a fixed ticket instead of a real Kitchen Service
+//    step 2 · drive the service : order.id : "" -> "ORD-4007"  BECAUSE the test calls Order Service directly, not over the network
+//    step 3 · assert : ticket_seen : "" -> "T-88"  BECAUSE the service read the double's reply
+// <- order : {"id":"ORD-4007","state":"PENDING"} · double.createTicket : "T-88" · real_dep not launched
+//    alt double drifts : double.createTicket : "T-88" -> "T-99"  BECAUSE the double now returns a shape the real service no longer returns
+//       ticket_seen : "T-88" -> "T-99"  BECAUSE the test now trusts a stale reply, hiding a production mismatch
+```
+
+_This is the chapter's solution: swap the real dependencies for test doubles and test the service in isolation._
+
+_Covers:_ Test the service in isolation
+
+_From the 28 problems:_ 03-framework-for-system-design-interviews
+
+### Q4
+
+The isolated suite is green, but after deploy the real Kitchen Service rejects the ticket shape the double still returns. Production is red while the test says green.
+
+**Interviewer's question:** What is the resulting context of a service component test, and what open issue does it leave?
+
+**Solution:** Testing in isolation is easier, faster, more reliable, and cheap — but tests might pass while the application fails in production; the open issue is ensuring the doubles always correctly emulate the invoked services.
+
+**System-design components:**
+- Order Service
+- test double
+- production Kitchen Service
+- drift detector
+
+```mermaid
+flowchart LR
+  T["Isolated suite"] -->|"green"| V["test_result"]
+  D["stale double"] -->|"drifts from"| P["real Kitchen Service"]
+  P -->|"rejects ticket"| R["prod_result red"]
+  V -.->|"green while"| R
+```
+
+```java
+// SERVICE SIDE — resulting context: isolation is cheap, but doubles can drift from the real service
+// PARTIES: OSVC = Order Service · DBLE = test double · PROD = production
+// DEF: result — the verdict of one run; here "green" (passing) or "red" (failing)
+// STATE (before):
+//    test_result : ""
+//    prod_result : ""
+//    drift : false
+// DEF: run_suite · CALLED BY: the pipeline, then compared against production
+// -> suite : "order-service-component"
+//    step 1 · run in isolation : test_result : "" -> "green"  BECAUSE testing one service is fast, reliable, and cheap
+//    step 2 · the double is stale : drift : false -> true  BECAUSE the double still returns an old Kitchen Service reply shape
+//    step 3 · deploy : prod_result : "" -> "red"  BECAUSE the real Kitchen Service changed and the test never caught it
+// <- test_result : "green" · prod_result : "red"  BECAUSE tests can pass while the application fails in production
+//    alt doubles stay faithful : drift : true -> false  BECAUSE the doubles are kept in sync with the invoked services' contracts
+//       prod_result : "red" -> "green"  BECAUSE the test now mirrors the real behavior
+```
+
+_This is the chapter's resulting context: isolation buys speed and reliability, but a stale double can keep a suite green while production is red._
+
+_Covers:_ The resulting context
+
+_From the 28 problems:_ 03-framework-for-system-design-interviews
+
 ## Key Concepts
 
 ### The Problem
@@ -222,6 +405,14 @@ flowchart TD
 ### The Solution
 
 Test a service in isolation using test doubles for any services that it invokes.
+
+```mermaid
+flowchart LR
+  T["Component test"] -->|"drives"| O["Order Service"]
+  O -->|"createTicket"| D["Kitchen Service double"]
+  D -->|"canned ticket"| O
+  T -->|"asserts"| A["order + call"]
+```
 
 
 ### Key Facts

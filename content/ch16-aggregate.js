@@ -88,6 +88,139 @@ registerChapter({
 // <- outcome : events : [{type:"OrderPlaced", order_id:"PO-2001"}] · the service publishes these events for other services`
     }
   ],
+  interview: [
+    {
+      scenario: "Your Order and its line items live as separate objects, and every time a line changes some other code must remember to recompute the total. You want to treat Order plus its line items as one thing.",
+      q: "What is an aggregate, and how does a root turn a graph of objects into a unit?",
+      solution: "An aggregate is a graph of objects treated as a unit, reached through one root that owns the others; all reads and writes go through the root.",
+      components: [
+        "Order — the aggregate root",
+        "Line items — child objects owned by the root",
+        "Total — recomputed from the lines",
+        "Root — the single entry point"
+      ],
+      diagram: `flowchart LR
+  SVC["Order Service"] --> ROOT["Order root"]
+  ROOT -->|owns| A["Line item BOOK-1"]
+  ROOT -->|owns| B["Line item BOOK-2"]
+  ROOT -->|recomputes| TOT["total 35.00"]`,
+      code: `// ORDER AGGREGATE SIDE — from DDD: a graph of objects can be treated as a unit, reached by one root
+// PARTIES: SVC = Order Service · AG = the Order aggregate (root Order entity + its line-item value objects)
+// DEF: item — a line-item object the aggregate root owns and sums into the total = { product:"BOOK-1", price:30.00 }
+// STATE (before) — two floating objects with no owning root:
+//    order : { id:"PO-77", total:0.00 }
+//    item_a : { product:"BOOK-1", price:30.00 }
+//    item_b : { product:"BOOK-2", price:5.00 }
+// DEF: treat_as_unit · CALLED BY: SVC when it makes the objects one aggregate
+// -> aggregate_root : "PO-77"
+//    step 1 · item_a hangs off the root : item_a : {product:"BOOK-1"} -> order.items[0]   BECAUSE the root now owns it
+//    step 2 · item_b hangs off the root : item_b : {product:"BOOK-2"} -> order.items[1]   BECAUSE both children are reached through the one root
+//    step 3 · the root recomputes the total : order.total : 0.00 -> 35.00   BECAUSE 30.00 + 5.00 = 35.00
+// <- outcome : order : { id:"PO-77", items:[{BOOK-1},{BOOK-2}], total:35.00 } · a graph treated as a unit`,
+      tieback: "This is the Aggregate — a graph of objects treated as a unit through a single root.",
+      refs: ["A graph of objects treated as a unit"],
+      problems: ["26-payment-system", "22-hotel-reservation"]
+    },
+    {
+      scenario: "Your order must never exceed a maximum total, and the cap must hold after every edit. You want every rule checked in one place so a bad change is refused.",
+      q: "How does the aggregate root enforce business rules and invariants on every change?",
+      solution: "Every mutation goes through the root, which recomputes dependent state and checks invariants, refusing any change that would break them.",
+      components: [
+        "Root — the only path for mutations",
+        "Invariant — e.g. total <= cap",
+        "Recompute — total from line items",
+        "Refusal — rejecting a violating change"
+      ],
+      diagram: `flowchart LR
+  SVC["Order Service"] -->|add_line_item| ROOT["Order root"]
+  ROOT -->|recompute total| TOT["total 60.00 then 110.00"]
+  TOT -->|check total <= 100.00| CHK["second add violates"]
+  CHK -->|refuse| NO["no change, total back to 60.00"]`,
+      code: `// ORDER AGGREGATE SIDE — the root re-checks invariants after each mutation and refuses a violating change
+// PARTIES: SVC = Order Service (sole owner) · AG = Order aggregate
+// DEF: cap — the maximum order total the root enforces = 100.00
+// STATE (before):
+//    order : { id:"PO-77", state:"NEW", items:[], total:0.00 }
+// DEF: add_line_item · CALLED BY: SVC on the root
+// -> item : { product:"CHAIR-1", price:60.00, quantity:1 }
+//    step 1 · root appends the item : order.items : [] -> [{product:"CHAIR-1",price:60.00,quantity:1}]
+//    step 2 · root recomputes total : order.total : 0.00 -> 60.00   BECAUSE 60.00 x 1 = 60.00
+//    step 3 · check total <= cap : 60.00 <= 100.00 -> holds
+// <- outcome : order.total : 60.00
+// DEF: add_line_item (second call) · CALLED BY: SVC on the root
+// -> item : { product:"DESK-2", price:50.00, quantity:1 }
+//    step 1 · root appends the item : order.items : [{CHAIR-1}] -> [{CHAIR-1},{DESK-2}]
+//    step 2 · root recomputes total : order.total : 60.00 -> 110.00   BECAUSE 60.00 + 50.00 = 110.00
+//    step 3 · check total <= cap : 110.00 <= 100.00 -> VIOLATED
+//    step 4 · root refuses the change : order.items : [{CHAIR-1},{DESK-2}] -> [{CHAIR-1}] · order.total : 110.00 -> 60.00   BECAUSE the mutation that broke the cap is rejected
+// <- outcome : order.total : 60.00 · the root refused a change that would exceed the 100.00 cap`,
+      tieback: "This is the Aggregate enforcing invariants at the root — a violating mutation is refused with no state change.",
+      refs: ["Business rules and invariants at the root"],
+      problems: ["26-payment-system", "22-hotel-reservation"]
+    },
+    {
+      scenario: "Your service holds two aggregates — Order and Customer — and you want a downstream service to react every time an order is placed, without touching the Customer aggregate.",
+      q: "How do aggregates structure a service's business logic, and what happens when one is created or updated?",
+      solution: "The service is a collection of aggregates; each business operation changes exactly one aggregate, and that aggregate emits a domain event when created or updated.",
+      components: [
+        "Order aggregate — changes on place",
+        "Customer aggregate — untouched by the order write",
+        "Domain event — emitted on update",
+        "One transaction — one aggregate"
+      ],
+      diagram: `flowchart LR
+  SVC["Order Service"] -->|place_order| AG["Order aggregate"]
+  AG -->|emit OrderPlaced| EVT["Domain event"]
+  SVC -.->|untouched| CUST["Customer aggregate"]`,
+      code: `// ORDER SERVICE SIDE — the business logic is a collection of aggregates, and an aggregate emits a domain event when it changes
+// PARTIES: SVC = Order Service · AG = Order aggregate · EVT = the domain event the aggregate emits
+// STATE (before):
+//    aggregates : { "PO-77" : { state:"NEW", total:40.00 }, "CUST-7" : { credit:500.00 } }   // two aggregates, each with its own root
+//    events : []
+// DEF: place_order · CALLED BY: SVC on the Order aggregate root
+// -> aggregate_id : "PO-77"
+//    step 1 · the change is routed through the root : aggregates["PO-77"].state : "NEW" -> "PLACED"
+//    step 2 · the aggregate emits an event on update : events : [] -> [{type:"OrderPlaced", order_id:"PO-77"}]
+//    step 3 · other aggregates are untouched by this transaction : aggregates["CUST-7"].credit : 500.00 -> 500.00 (one transaction = one aggregate)
+// <- outcome : events : [{type:"OrderPlaced", order_id:"PO-77"}] · the service publishes these events for other services`,
+      tieback: "This is the Aggregate structuring a service — one transaction per aggregate, emitting a domain event on change.",
+      refs: ["Aggregates structure the business logic of a service"],
+      problems: ["26-payment-system", "22-hotel-reservation"]
+    },
+    {
+      scenario: "A developer wants to bump a line item's quantity directly, bypassing the Order root, because it is just one field. You want to explain why that path must not exist.",
+      q: "Why must every change to an aggregate go through its root, and what does that say about how to size an aggregate?",
+      solution: "Routing every change through the root is what keeps invariants enforced and children consistent; the aggregate is sized so each business operation changes exactly one aggregate, never a child directly.",
+      components: [
+        "Root — the only mutation path",
+        "Child objects — not addressable from outside",
+        "Invariant — enforced only at the root",
+        "Sizing — one operation, one aggregate"
+      ],
+      diagram: `flowchart LR
+  OUT["External code"] -->|OK| ROOT["Order root"]
+  OUT -.->|blocked| CHILD["Line item child"]
+  ROOT -->|enforces invariants| CHILD`,
+      code: `// ORDER AGGREGATE SIDE — every mutation must go through the root; reaching a child directly is refused
+// PARTIES: SVC = Order Service · AG = Order aggregate
+// DEF: child — a line item owned by the root = order.items[0] = { product:"BOOK-1", qty:2, unit:25.00 }
+// STATE (before):
+//    order : { id:"PO-77", state:"NEW", items:[{product:"BOOK-1",qty:2,unit:25.00}], total:50.00 }
+// DEF: change_qty_via_root · CALLED BY: SVC calling order.revise("BOOK-1", 5)
+// -> newQty : 5
+//    step 1 · root validates and mutates its own child : order.items[0].qty : 2 -> 5
+//    step 2 · root recomputes the total : order.total : 50.00 -> 125.00   BECAUSE 5 x 25.00 = 125.00
+// <- outcome : order.total : 125.00 · the invariant stayed enforced because the root did the change
+// DEF: change_qty_direct · CALLED BY: SVC trying order.items[0].qty = 9 directly (bypassing the root)
+// -> newQty : 9
+//    step 1 · the child is mutated behind the root : order.items[0].qty : 5 -> 9
+//    step 2 · no root call runs, so the total is not recomputed : order.total : 125.00 -> 125.00   BECAUSE the root never saw the change
+// <- outcome : order.total : 125.00 but the lines now sum to 225.00 — the graph is inconsistent BECAUSE the mutation skipped the root`,
+      tieback: "This is the Aggregate's single-path rule — the root is the only entry point, which is why direct child edits break consistency.",
+      refs: ["Business rules and invariants at the root"],
+      problems: ["26-payment-system", "22-hotel-reservation"]
+    }
+  ],
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'A graph of objects is hard to keep consistent', content: '<p><strong>Why.</strong> Business objects come in clusters, like an Order with its line items, whose values must stay in sync.</p><p><strong>Claim.</strong> Related objects need one boundary so that every change keeps them consistent with each other.</p><p><strong>Grounding.</strong> The pattern comes from Domain-Driven Design and models a graph of objects that can be treated as a unit.</p><p><strong>In the wild.</strong> An Order and its line items, where the total must equal the sum of the lines.</p>' },

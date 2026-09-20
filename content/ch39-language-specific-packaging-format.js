@@ -95,6 +95,113 @@ registerChapter({
 //    alt VM packaging : setup : ["install jdk","install tomcat"] -> []  BECAUSE a VM image encapsulates the whole technology stack`
     }
   ],
+  interview: [
+    {
+      scenario: 'Your team wants the simplest possible deployment: build the service in its own language and ship that artifact directly, without a VM or container image in the middle.',
+      q: 'What is the language-specific package for a Java service, and how does the pipeline ship it?',
+      solution: 'A Spring Boot Java service builds to an executable JAR file or a WAR file; the deployment pipeline builds the JAR or WAR and invokes the production environment\'s service management interface.',
+      components: ['Executable JAR — the Java artifact', 'WAR — the web-container variant', 'Deployment pipeline — builds it', 'Service management interface — the handoff'],
+      diagram: `flowchart LR
+  SRC["Spring Boot source"] -->|"compile"| JAR["restaurant-service-3.1.0.jar"]
+  JAR -->|"hand off"| PIPE["Pipeline"]
+  PIPE -->|"invokes"| SMI["Service management interface"]`,
+      code: `// BUILD SIDE — package the service in its language's native format so the pipeline can ship one artifact
+// PARTIES: BLD = deployment pipeline · SVC = Restaurant Service
+// STATE (before):
+//    artifact : null                    // nothing built yet
+//    src : "restaurant-service"         // Spring Boot Java source
+// DEF: build version 3.1.0 · CALLED BY: BLD on commit
+// -> service : "restaurant-service" · -> version : "3.1.0"
+//    step 1 · compile the source   // artifact : null -> "restaurant-service-3.1.0.jar"   BECAUSE a Spring Boot app packages as an executable JAR
+//    step 2 · choose the format   // format : "unknown" -> "jar"   // a JAR or WAR; a WAR would add a web container
+//    step 3 · hand off   // pipeline : 0 -> 1   BECAUSE the pipeline invokes the service management interface
+// <- artifact : "restaurant-service-3.1.0.jar" · one executable JAR to deploy
+//    alt WAR packaging : artifact : null -> "restaurant-service-3.1.0.war"   BECAUSE a WAR also needs a web container installed`,
+      tieback: 'This is the packaging stage — building the language\'s native JAR or WAR and handing it to the service management interface.',
+      refs: ['Package the service in its own language'],
+      problems: ["01-scale-from-zero-to-millions"]
+    },
+    {
+      scenario: 'The JAR you shipped will not start on a bare machine, because it does not carry its own runtime. Someone must configure the machine first.',
+      q: 'What must be installed and done before a Java package runs, and how does the service start?',
+      solution: 'For a Java service you install the JDK first, and a WAR additionally needs Apache Tomcat; then you copy the package to the machine and start it, so each service instance runs as a JVM process.',
+      components: ['JDK — the required runtime', 'Apache Tomcat — for a WAR', 'Package copy — onto the machine', 'JVM process — the running instance'],
+      diagram: `flowchart LR
+  MACH["Production machine"] -->|"install"| JDK["JDK 17"]
+  MACH -->|"install"| TC["Tomcat 10"]
+  MACH -->|"copy"| JAR["restaurant-service-3.1.0.jar"]
+  JAR -->|"start"| JVM["jvm-8121"]`,
+      code: `// RUNTIME SIDE — configure a machine, copy the package, and start it as a JVM process
+// PARTIES: MACH = the production machine · SVC = Restaurant Service
+// STATE (before):
+//    runtime : {}                       // software installed on the machine, none yet
+//    process : null                     // no service process running yet
+// DEF: deploy JAR 3.1.0 · CALLED BY: the service management interface
+// -> artifact : "restaurant-service-3.1.0.jar"
+//    step 1 · install the JDK   // runtime : {} -> {"jdk":"17"}   BECAUSE a Java service needs the JDK installed first
+//    step 2 · copy the package   // process : null -> "pending"   // the JAR is copied onto the machine
+//    step 3 · start   // process : "pending" -> "jvm-8121"   // the service starts as a JVM process
+// <- process : "jvm-8121" · one JVM running one service instance
+//    alt WAR path : runtime : {"jdk":"17"} -> {"jdk":"17","tomcat":"10"}   BECAUSE a WAR also needs Apache Tomcat installed`,
+      tieback: 'This is the start stage — installing the runtime, copying the package, and running each instance as a JVM process.',
+      refs: ['Install the runtime and start the service'],
+      problems: ["01-scale-from-zero-to-millions"]
+    },
+    {
+      scenario: 'You are not forced to dedicate a whole machine to one instance. You want three instances of the restaurant service running on a single box to save hardware.',
+      q: 'How do several instances of a Java service run on one machine, and what does each bind?',
+      solution: 'Each JVM runs a single service instance and a machine can host several JVMs; each instance binds its own port on the shared machine, and a Node.js service may spawn multiple worker processes instead.',
+      components: ['Multiple JVMs — one per instance', 'One machine — the shared host', 'Separate ports — per instance', 'Node.js workers — the process alternative'],
+      diagram: `flowchart LR
+  MACH["Production machine"] -->|"launch"| J1["jvm-1 :8081"]
+  MACH -->|"launch"| J2["jvm-2 :8082"]
+  MACH -->|"launch"| J3["jvm-3 :8083"]
+  J1 -->|"own port"| P["ports 3"]
+  J2 --> P
+  J3 --> P`,
+      code: `// RUNTIME SIDE — run three service instances on one machine, one JVM per instance, each on its own port
+// PARTIES: MACH = the production machine · SVC = Restaurant Service
+// STATE (before):
+//    jvms : {}                          // JVM processes on this machine, none yet
+//    jar : "restaurant-service-3.1.0.jar"
+// DEF: start 3 instances · CALLED BY: a scale-up on one machine
+// -> instance_count : 3
+//    step 1 · launch the JVMs   // jvms : {} -> {"jvm-1","jvm-2","jvm-3"}   BECAUSE each JVM runs a single service instance
+//    step 2 · bind the ports   // ports : 0 -> 3   // each instance binds its own port on the machine
+//    step 3 · serve   // serving : 0 -> 3   // 3 instances share the same machine and JDK
+// <- instances : 3 · multiple JVMs share one machine
+//    alt single instance : instance_count : 3 -> 1   BECAUSE some deployments keep one instance per machine`,
+      tieback: 'This is the multi-instance stage — several JVMs on one machine, each binding its own port.',
+      refs: ['Run several instances on one machine'],
+      problems: ["01-scale-from-zero-to-millions"]
+    },
+    {
+      scenario: 'Your JAR works, but the machine setup was manual and fragile: the JDK and Tomcat were hand-pinned, and no two machines are guaranteed to match.',
+      q: 'Why does this pattern\'s drawback motivate the VM and container options?',
+      solution: 'The package does not carry its technology stack, so the machine must be configured with the JDK and Tomcat by hand; the VM and container patterns fix this by encapsulating the stack in the image.',
+      components: ['Hand-configured machine — the manual step', 'No encapsulated stack — the gap', 'VM image — encapsulates the stack', 'Container image — the lighter alternative'],
+      diagram: `flowchart LR
+  PKG["JAR package"] -->|"no runtime inside"| HAND["install JDK + Tomcat by hand"]
+  HAND -->|"fragile"| GAP["stack not encapsulated"]
+  GAP -->|"motivates"| VM["VM image"]
+  GAP -->|"motivates"| CNT["Container image"]`,
+      code: `// TRADEOFF SIDE — the package runs on a shared, hand-configured runtime, which motivates VM and container packaging
+// PARTIES: MACH = the machine · SVC = Restaurant Service
+// STATE (before):
+//    setup : []                         // manual steps required before the service can run
+//    jdk : null                         // the runtime, not yet installed
+// DEF: prepare machine for 3.1.0 · CALLED BY: an operator
+// -> service : "restaurant-service"
+//    step 1 · install the runtime   // setup : [] -> ["install jdk","install tomcat"]   BECAUSE the package does not carry its own runtime
+//    step 2 · pin the JDK by hand   // jdk : null -> "17"   // the operator configures the version manually
+//    step 3 · contrast with the alternatives   // stack_encapsulated : 0 -> 1   BECAUSE a VM or container image WOULD encapsulate the stack
+// <- setup : 2 manual steps · this unmanaged runtime is the drawback that motivates the other options
+//    alt VM packaging : setup : ["install jdk","install tomcat"] -> []   BECAUSE a VM image encapsulates the whole technology stack`,
+      tieback: 'This is the motivation stage — the unencapsulated runtime is the drawback that pushes teams to VM and container images.',
+      refs: ['Why this option motivates the others'],
+      problems: ["01-scale-from-zero-to-millions"]
+    }
+  ],
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'A package that needs a pre-installed runtime', content: '<p><strong>Why.</strong> A production environment must let developers create, update, and configure services, keep the desired number of instances running, monitor them, and route requests to them.</p><p><strong>Claim.</strong> With a language-specific package, what is deployed is the package itself, and the machine must be configured with the runtime before the service can run.</p><p><strong>Grounding.</strong> The book walks through deploying the Spring Boot Restaurant Service: install the JDK, and for a WAR install Apache Tomcat, then copy the package and start the service.</p><p><strong>In the wild.</strong> Each service instance then runs as a JVM process on the configured machine.</p>' },

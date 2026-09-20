@@ -79,6 +79,110 @@ registerChapter({
 //    alt no self-awareness : SVC runs but cannot handle requests -> it never unregisters itself, the stale entry stays`
     }
   ],
+  interview: [
+    {
+      scenario: "An order-service instance boots at 10.0.3.7 and must become discoverable without any external process acting for it.",
+      q: "Who registers the instance in self-registration, and what does the instance record?",
+      solution: "The service instance registers itself on startup, recording its own host and IP, and unregisters itself on shutdown — typically handled by a microservice chassis.",
+      components: ["Instance self-registration", "Host and IP address", "Microservice chassis"],
+      diagram: `flowchart LR
+  SVC["order-service 10.0.3.7"] -->|"register self"| REG["service registry"]
+  SVC -->|"unregister on shutdown"| REG`,
+      code: `// SERVICE SIDE — the instance registers its own host and IP on startup and unregisters on shutdown
+// PARTIES: SVC = order-service instance · REG = service registry
+// DEF: self — the instance's own registration state = self_state "DOWN", flipped to "AVAILABLE" after it registers
+// STATE (before):
+//    registry : {"order-service" -> []}
+//    self_state : "DOWN"
+// DEF: the service boots · CALLED BY: SVC startup on host 10.0.3.7
+// -> boot : {"host":"10.0.3.7","ip":"10.0.3.7","port":8080}
+//    step 1 · SVC registers itself : registry["order-service"] : [] -> [{"host":"10.0.3.7","ip":"10.0.3.7","port":8080}]
+//    step 2 · SVC marks itself available : self_state : "DOWN" -> "AVAILABLE"
+// <- registry row : "order-service" -> [{"host":"10.0.3.7","ip":"10.0.3.7","port":8080}]   (now discoverable)
+//    alt shutdown : SVC unregisters itself -> registry["order-service"] : [{"host":"10.0.3.7","ip":"10.0.3.7","port":8080}] -> []`,
+      tieback: "This is exactly the instance-registers-itself mechanism in this chapter.",
+      refs: ["The instance registers itself"],
+      problems: ["01-scale-from-zero-to-millions"]
+    },
+    {
+      scenario: "An order-service instance has a lease on its registry entry, and its heartbeat timer must keep it alive before the lease lapses.",
+      q: "Why does self-registration require periodic renewal, and what happens when renewals stop?",
+      solution: "The instance renews its registration so the registry knows it is still alive; if renewals stop, the registry drops the entry and stops routing to the dead instance.",
+      components: ["Heartbeat timer", "Lease (ttl)", "Registry eviction on missed renewal"],
+      diagram: `flowchart LR
+  SVC["order-service"] -->|"heartbeat"| REG["registry"]
+  REG -->|"ttl extended"| SVC
+  SVC -. "missed renewal -> evict" .-> REG`,
+      code: `// SERVICE SIDE — the instance periodically renews its registration so the registry knows it is still alive
+// PARTIES: SVC = order-service instance · REG = service registry
+// STATE (before):
+//    registry : {"order-service" -> [{"host":"10.0.3.7","port":8080,"ttl":45}]}
+//    renew_count : 0
+// DEF: the lease approaches expiry · CALLED BY: SVC heartbeat timer every 45s
+// -> renew : "heartbeat"   (sent before the ttl lapses)
+//    step 1 · SVC renews : renew_count : 0 -> 1   BECAUSE the timer fired
+//    step 2 · REG extends the entry : registry["order-service"] : [{"host":"10.0.3.7","port":8080,"ttl":45}] -> [{"host":"10.0.3.7","port":8080,"ttl":90}]
+// <- registry row : "order-service" -> [{"host":"10.0.3.7","port":8080,"ttl":90}]   (the lease was pushed out)
+//    alt missed renewal : no heartbeat arrives -> REG evicts the entry when ttl : 90 -> 0`,
+      tieback: "This is exactly the renewal-keeps-the-entry-alive mechanism in this chapter.",
+      refs: ["Renewal keeps the entry alive"],
+      problems: ["01-scale-from-zero-to-millions"]
+    },
+    {
+      scenario: "An instance is starting up and wants to keep traffic away until it is truly ready — something a bare UP/DOWN flag cannot express.",
+      q: "What richer state model does self-registration enable, and how does it steer traffic?",
+      solution: "Because the instance knows its own state, it can model more than UP/DOWN — such as STARTING or AVAILABLE — and rewrite its registry entry to steer traffic away.",
+      components: ["Richer state model (STARTING/AVAILABLE)", "Self-state rewrite", "Traffic steering"],
+      diagram: `flowchart LR
+  SVC["instance"] -->|"state STARTING"| REG["registry"]
+  REG -->|"skip STARTING"| T["traffic steered away"]
+  SVC -->|"state AVAILABLE"| REG`,
+      code: `// SERVICE SIDE — self-registration knows its own state: the instance walks STARTING to AVAILABLE, richer than UP/DOWN
+// PARTIES: SVC = order-service instance · REG = service registry
+// DEF: self — the instance's own modeled state = self_state "STARTING", becoming "AVAILABLE" once it is ready
+// DEF: traffic — the requests callers send to the instance = "none" while STARTING, "all" once AVAILABLE
+// STATE (before):
+//    registry : {"order-service" -> [{"host":"10.0.3.7","port":8080,"state":"STARTING"}]}
+//    self_state : "STARTING"
+//    traffic_routed : "none"
+// DEF: the instance finishes warming up · CALLED BY: SVC completing its startup sequence
+// -> ready : "true"
+//    step 1 · SVC models its own state : self_state : "STARTING" -> "AVAILABLE"   BECAUSE the instance knows a state model richer than UP/DOWN
+//    step 2 · SVC rewrites its entry : registry["order-service"] : [{"host":"10.0.3.7","port":8080,"state":"STARTING"}] -> [{"host":"10.0.3.7","port":8080,"state":"AVAILABLE"}]
+//    step 3 · traffic steered back : traffic_routed : "none" -> "all"   BECAUSE callers now accept AVAILABLE instances
+// <- registry row : "order-service" -> [{"host":"10.0.3.7","port":8080,"state":"AVAILABLE"}]
+//    alt degraded : SVC marks itself STARTING again -> traffic_routed : "all" -> "none" (steers traffic away)`,
+      tieback: "This is exactly the richer-state-model benefit of self-registration in this chapter.",
+      refs: ["A richer state model, with a blind spot"],
+      problems: ["01-scale-from-zero-to-millions"]
+    },
+    {
+      scenario: "The team's services are written in Java and Go, and both must register themselves with the same registry.",
+      q: "What is the blind spot of self-registration, and what does its coupling cost in a polyglot system?",
+      solution: "A running-but-broken instance often lacks the self-awareness to unregister itself, and self-registration couples the service to the registry and must be re-implemented per language.",
+      components: ["Lack of self-awareness", "Coupling to the registry", "Per-language registration logic"],
+      diagram: `flowchart LR
+  J["Java service"] -->|"register logic"| REG["registry"]
+  G["Go service"] -->|"register logic (re-implemented)"| REG
+  BROKEN["broken instance"] -. "cannot unregister itself" .-> REG`,
+      code: `// SERVICE SIDE — self-registration couples the service to the registry and is re-implemented per language
+// PARTIES: SVC = order-service instance · REG = service registry
+// STATE (before):
+//    registry : {"order-service" -> []}
+//    languages : {"java":false, "go":false}
+//    coupled : "false"
+// DEF: the second service in Go must register too · CALLED BY: the Go order-service starting up
+// -> language : "go"
+//    step 1 · register in Java : languages["java"] : false -> true   BECAUSE the Java instance already implemented registration against REG
+//    step 2 · re-implement in Go : languages["go"] : false -> true   BECAUSE discovery logic must be written per language/framework
+//    step 3 · the service is coupled to the registry : coupled : "false" -> "true"   BECAUSE each service now calls REG directly
+// <- cost : registration logic exists in 2 languages · both services coupled to the registry
+//    alt broken instance : SVC runs but cannot handle requests -> it never unregisters itself, the stale entry stays`,
+      tieback: "This is exactly the lack-of-self-awareness and coupling drawbacks in this chapter.",
+      refs: ["A richer state model, with a blind spot"],
+      problems: ["01-scale-from-zero-to-millions"]
+    }
+  ],
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'The registry must know who is alive', content: '<p><strong>Why.</strong> Discovery only works if the registry has an accurate, current list of instances, and that list changes every time an instance starts, stops, crashes, or degrades.</p><p><strong>Claim.</strong> Instances must be registered on startup, unregistered on shutdown, and removed when they crash or can no longer handle requests.</p><p><strong>Grounding.</strong> Richardson\'s three forces for registration apply to self-registration too: startup, shutdown, crash, and running-but-incapable instances.</p><p><strong>In the wild.</strong> A stale entry means a client-side or server-side lookup can route a request to an instance that will never answer.</p>' },

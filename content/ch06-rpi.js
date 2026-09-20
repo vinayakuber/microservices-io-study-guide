@@ -109,6 +109,121 @@ registerChapter({
 //    alt breaker open : the call fails fast without touching SVC  BECAUSE a client typically uses a Circuit Breaker`
     }
   ],
+  interview: [
+    {
+      scenario: "A new user signs up through the registration service, which calls the user-registration service over HTTP and needs the new user id before it can proceed.",
+      q: "How does RPI invoke a remote service with a request/reply protocol, and what does a 200 OK produce?",
+      solution: "The client sends a request using a request/reply protocol such as REST, blocks until the reply arrives, and maps a 200 OK to the new id as Right(id).",
+      components: ["Client (proxy)", "Request/reply protocol (REST)", "Remote service", "Right(id) result"],
+      diagram: `flowchart LR
+  C["Registration Service"] -->|"POST /register"| SVC["User Registration service"]
+  SVC -->|"200 OK"| C
+  C --> R["Right(user-14)"]`,
+      code: `// CLIENT SIDE — RPI: the client POSTs a request and waits for a reply, with no broker in between
+// PARTIES: CLIENT = Registration Service · SVC = User Registration service (remote)
+// STATE (before):
+//    request : null
+//    status : "PENDING"
+//    verdict : "UNSET"
+//    result : null
+//    url : "http://user-reg:8080/register"
+// DEF: registerUser · CALLED BY: a new user signing up (RestTemplate.postForEntity)
+// -> email : "bob@example.com" · -> password : "hunter2"
+//    step 1 · CLIENT POSTs the request to SVC : request : null -> { email: "bob@example.com", password: "hunter2" }
+//    step 2 · SVC creates the user and answers : status : "PENDING" -> 200
+//    step 3 · CLIENT reads the status code : verdict : "UNSET" -> "OK"
+//    step 4 · CLIENT returns the new id : result : null -> "user-14"
+// <- reply : "user-14" (Right) · one request, one prompt reply over HTTP`,
+      tieback: "This is exactly the RPI request/reply call and the Right(id) success mapping in this chapter.",
+      refs: ["Invoke over request/reply"],
+      problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
+    },
+    {
+      scenario: "The same email tries to sign up a second time, and the user-registration service rejects it with a CONFLICT status.",
+      q: "How does RPI map a failed or duplicate call to a typed result instead of an unhandled exception?",
+      solution: "The proxy inspects the HTTP status code: a 200 OK becomes Right(id), and an HttpClientErrorException with CONFLICT becomes Left(DuplicateRegistrationError).",
+      components: ["Status-code inspection", "200 -> Right(id)", "409 CONFLICT -> Left(DuplicateRegistrationError)"],
+      diagram: `flowchart LR
+  C["Registration Service"] -->|"POST /register"| SVC["User Registration service"]
+  SVC -->|"409 CONFLICT"| C
+  C --> L["Left(DuplicateRegistrationError)"]`,
+      code: `// CLIENT SIDE — RPI error path: a duplicate sign-up maps a 409 CONFLICT to a typed error
+// PARTIES: CLIENT = Registration Service · SVC = User Registration service (remote)
+// STATE (before):
+//    request : null
+//    status : "PENDING"
+//    verdict : "UNSET"
+//    result : null
+//    url : "http://user-reg:8080/register"
+// DEF: registerUser_duplicate · CALLED BY: the same email signing up twice
+// -> email : "bob@example.com" · -> password : "hunter2"
+//    step 1 · CLIENT POSTs the request again : request : null -> { email: "bob@example.com" }
+//    step 2 · SVC finds the email already taken : status : "PENDING" -> 409
+//    step 3 · CLIENT matches the 409 : verdict : "UNSET" -> "CONFLICT"
+//    step 4 · CLIENT returns the typed error : result : null -> "DuplicateRegistrationError"
+// <- reply : "DuplicateRegistrationError" (Left) · the 409 becomes a domain error
+//    alt SVC down : no reply at all  BECAUSE client and service must both be available for the whole call`,
+      tieback: "This is exactly the status-to-typed-result mapping in this chapter.",
+      refs: ["Map errors to typed results"],
+      problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
+    },
+    {
+      scenario: "The user-registration service has gone unresponsive, and the registration service keeps calling it during a sign-up.",
+      q: "Why does RPI reduce availability, and what happens to the caller thread while it waits?",
+      solution: "Client and service must both be available for the whole interaction; the caller thread is held while it waits, so an unresponsive callee burns the caller's capacity.",
+      components: ["Both sides available", "Blocked caller thread", "Timeout expiry", "No broker to buffer"],
+      diagram: `flowchart LR
+  C["Registration Service"] -->|"POST /register"| SVC["User Registration (down)"]
+  C --> T["thread WAITING -> timeout"]`,
+      code: `// CLIENT SIDE — RPI availability: client and service must both be available for the whole call
+// PARTIES: CLIENT = Registration Service · SVC = User Registration service (unresponsive)
+// STATE (before):
+//    thread : "FREE"
+//    elapsed_ms : 0
+//    timeout_ms : 800
+//    verdict : "UNSET"
+// DEF: registerUser_unavailable · CALLED BY: a sign-up while SVC is unresponsive
+// -> request : { email: "bob@example.com" }
+//    step 1 · CLIENT blocks its thread on the call : thread : "FREE" -> "WAITING"
+//    step 2 · SVC is down, so no reply arrives : elapsed_ms : 0 -> 800
+//    step 3 · the timer expires and the call fails : verdict : "UNSET" -> "TIMEOUT"
+//    step 4 · the thread is released : thread : "WAITING" -> "FREE"
+// <- reply : "TIMEOUT" after 800 ms · 800 ms of the caller thread spent waiting
+//    alt SVC slow but alive : the reply arrives late  BECAUSE there is no broker to buffer the work`,
+      tieback: "This is exactly the availability price — both sides available and threads held — in this chapter.",
+      refs: ["The availability price"],
+      problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
+    },
+    {
+      scenario: "Before its first call, the registration service must find a user-registration instance and guard the call against failure.",
+      q: "What discovery and resilience wiring does an RPI client need to reach an instance safely?",
+      solution: "The client discovers the instance's location via client-side or server-side discovery, resolves its URL from externalized configuration, and invokes behind a circuit breaker.",
+      components: ["Service discovery", "Externalized config URL", "Circuit breaker wrapper"],
+      diagram: `flowchart LR
+  C["Registration Service"] --> DISC["service registry"]
+  DISC -->|"10.0.2.9:8080"| C
+  C -->|"behind breaker"| SVC["User Registration instance"]`,
+      code: `// CLIENT SIDE — RPI wiring: discover an instance, resolve its URL, then invoke behind a breaker
+// PARTIES: CLIENT = Registration Service · DISC = service registry · SVC = User Registration instance
+// STATE (before):
+//    registry : { "user-registration": "10.0.2.9:8080" }
+//    lookup : null
+//    location : null
+//    url : null
+//    request : null
+// DEF: resolve_and_call · CALLED BY: CLIENT before its first call
+// -> service_name : "user-registration"
+//    step 1 · CLIENT asks DISC for an instance : lookup : null -> "user-registration"
+//    step 2 · DISC returns a network location : location : null -> "10.0.2.9:8080"
+//    step 3 · CLIENT builds the URL : url : null -> "http://10.0.2.9:8080/register"
+//    step 4 · CLIENT invokes SVC behind a breaker : request : null -> { email: "bob@example.com" }
+// <- reply : "user-14" · the URL came from discovery, the call rides behind a circuit breaker
+//    alt breaker open : the call fails fast without touching SVC  BECAUSE a client typically uses a Circuit Breaker`,
+      tieback: "This is exactly the discovery-plus-circuit-breaker wiring in this chapter.",
+      refs: ["Discovery and resilience wiring"],
+      problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
+    }
+  ],
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Synchronous coupling', content: '<p><strong>Why.</strong> When a call is synchronous, both ends must be alive for the whole interaction, so a slow or dead callee stalls the caller.</p><p><strong>Claim.</strong> Synchronous communication results in tight runtime coupling between client and service.</p><p><strong>Grounding.</strong> The reference lists it as a force: both the client and service must be available for the duration of the request.</p><p><strong>In the wild.</strong> A registration call that blocks until the user service answers, holding the caller thread the entire time.</p>' },

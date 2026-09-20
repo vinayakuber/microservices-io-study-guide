@@ -74,6 +74,106 @@ registerChapter({
 `
     }
   ],
+  interview: [
+    {
+      scenario: 'Your new Customer service reads a row straight from the legacy monolith. The record arrives with legacy names and a raw one-letter code, and your service starts storing those names as its own.',
+      q: 'What happens when a new service copies the legacy model directly, with no boundary?',
+      solution: 'The raw legacy record is copied into the new service\'s domain model, and the service\'s code comes to depend on legacy names and codes, so the legacy model pollutes the new service.',
+      components: ['Legacy record — with legacy names', 'Direct copy — no translation', 'Legacy codes — adopted verbatim', 'Pollution — the new model leaks in'],
+      diagram: `flowchart LR
+  LEG["Legacy monolith"] -->|"cust_dob, status_cd"| NEW["New Customer service"]
+  NEW -->|"stores raw"| M["new_customer"]
+  M -->|"polluted"| P["legacy names leak in"]`,
+      code: `// NEW SERVICE SIDE — a new Customer service reads a record straight from the legacy monolith, with no boundary
+// PARTIES: NEW = new Customer service · LEG = legacy monolith customer table
+// STATE (before):
+//    leg_customer : { "cust_id": "C-3157", "cust_dob": "1999-06-14", "status_cd": "A" }
+//    new_customer : {}
+// DEF: fetch_customer · CALLED BY: NEW when it needs customer 3157
+// -> customer_id : "C-3157"
+//    step 1 · SELECT the legacy row by cust_id   // leg_customer : {} -> { "cust_id": "C-3157", "cust_dob": "1999-06-14", "status_cd": "A" }
+//    step 2 · copy the raw legacy row into the new model   // new_customer : {} -> { "cust_id": "C-3157", "cust_dob": "1999-06-14", "status_cd": "A" }
+//    step 3 · adopt the 1-letter code as its own status   // new_customer.status : "" -> "A"   BECAUSE the code is copied over verbatim
+// <- output : new_customer now holds legacy names "cust_dob" and "status_cd" plus the raw code "A" — the legacy model polluted the new service`,
+      tieback: 'This is the pollution problem — copying the legacy record verbatim so its names and codes leak into the new model.',
+      refs: ['The pollution problem'],
+      problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
+    },
+    {
+      scenario: 'You decide the new Customer service must only ever see its own vocabulary: id, dateOfBirth, and a readable status. Someone has to convert the legacy record before the service sees it.',
+      q: 'What does the anti-corruption layer do to a legacy record?',
+      solution: 'A layer sits between the new service and the legacy monolith and translates the legacy model into the new service\'s model field by field, renaming fields and translating values where the two models disagree.',
+      components: ['Anti-corruption layer — the boundary', 'Field rename — cust_dob to dateOfBirth', 'Value translation — code to word', 'Clean model — only the new vocabulary'],
+      diagram: `flowchart LR
+  LEG["Legacy monolith"] -->|"cust_id, cust_dob, status_cd"| ACL["Anti-corruption layer"]
+  ACL -->|"id, dateOfBirth, status"| NEW["New Customer service"]
+  ACL -->|"A -> ACTIVE"| MAP["translation"]`,
+      code: `// ACL SIDE — the anti-corruption layer translates a legacy record into the new service's own model
+// PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = legacy monolith
+// STATE (before):
+//    legacy : { "cust_id": "C-3157", "cust_dob": "1999-06-14", "status_cd": "A" }
+//    domain : {}                              // the new service's model, empty before translation
+// DEF: translate · CALLED BY: NEW when it needs a customer in its own vocabulary
+// -> legacy : { "cust_id": "C-3157", "cust_dob": "1999-06-14", "status_cd": "A" }
+//    step 1 · map cust_id to id unchanged   // domain.id : "" -> "C-3157"   BECAUSE the identifier is already clean
+//    step 2 · rename cust_dob to dateOfBirth   // domain.dateOfBirth : "" -> "1999-06-14"
+//    step 3 · translate the 1-letter code to a word   // domain.status : "" -> "ACTIVE"   BECAUSE legacy code "A" means active
+// <- output : domain = { "id": "C-3157", "dateOfBirth": "1999-06-14", "status": "ACTIVE" } — the service sees only its own model`,
+      tieback: 'This is the translation stage — renaming fields and translating values so each side keeps its own language.',
+      refs: ['The translation boundary'],
+      problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
+    },
+    {
+      scenario: 'The monolith team announces they are renaming status_cd and switching its value from "A" to "1". Without a boundary, that change would ripple into your new service.',
+      q: 'Why does a change to the legacy model stop inside the anti-corruption layer?',
+      solution: 'Because the translation lives in one place, the legacy vocabulary stays inside the layer; when the monolith changes a code, only the layer\'s mapping is updated, and the new service keeps seeing its own unchanged model.',
+      components: ['One translation point — the ACL', 'Legacy change — a rename plus a new code', 'Mapping update — only in the layer', 'Unchanged domain — the service is untouched'],
+      diagram: `flowchart LR
+  LEG["Legacy monolith"] -->|"stat_code '1'"| ACL["Anti-corruption layer"]
+  ACL -->|"mapping updated"| MAP["status_cd -> stat_code, A -> 1"]
+  MAP -->|"still yields"| NEW["New service status ACTIVE"]`,
+      code: `// ACL SIDE — the legacy monolith renames its status field and changes its code; the change stops inside the ACL
+// PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = legacy monolith
+// STATE (before):
+//    mapping : { "status_cd": "A" }           // the ACL's translation table: legacy field -> code
+//    domain  : { "id": "C-3157", "status": "ACTIVE" }
+// DEF: absorb_change · CALLED BY: ACL when LEG renames its status field and value
+// -> legacy_field : "stat_code" · -> legacy_code : "1"
+//    step 1 · LEG starts writing "stat_code" with value "1" for active   // mapping.status_cd : "A" -> "1"   // the table keys the NEW field name to the NEW code
+//    step 2 · the ACL retranslates through the updated table   // translated : "" -> "ACTIVE"   BECAUSE the mapping table owns the code, not the service
+//    step 3 · the service reads its own model and sees the word   // read_status : "" -> "ACTIVE"
+// <- output : domain.status stays "ACTIVE" while the legacy field is now "stat_code" = "1" — the rename is confined to the ACL`,
+      tieback: 'This is the containment stage — the legacy vocabulary and its changes are absorbed at the single translation point.',
+      refs: ['Containing the legacy model'],
+      problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
+    },
+    {
+      scenario: 'The anti-corruption layer works only if every interaction with the legacy system goes through it. A shortcut — reading the legacy database directly — would undo the whole boundary.',
+      q: 'What happens when a call bypasses the anti-corruption layer?',
+      solution: 'Any call that bypasses the layer reintroduces the pollution it was meant to stop, because the legacy model reaches the new service again; the layer only works if every interaction goes through it.',
+      components: ['The layer — the only sanctioned path', 'A bypass — a direct legacy read', 'Pollution — the legacy model returns', 'Discipline — every call through the layer'],
+      diagram: `flowchart LR
+  DEV["Developer"] -->|"bypasses"| DB["Legacy DB direct"]
+  DB -->|"raw row"| NEW["New service"]
+  NEW -->|"polluted again"| P["legacy names leak in"]
+  DEV -->|"should use"| ACL["Anti-corruption layer"]`,
+      code: `// BOUNDARY SIDE — one direct read that skips the layer reintroduces the exact pollution the layer stops
+// PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = legacy monolith
+// STATE (before):
+//    domain : { "id": "C-3157", "dateOfBirth": "1999-06-14", "status": "ACTIVE" }
+//    bypass_count : 0                      // how many reads skipped the layer
+// DEF: read_direct · CALLED BY: NEW reading the legacy table without the ACL
+// -> customer_id : "C-3157"
+//    step 1 · query the legacy table directly   // raw : {} -> { "cust_dob": "1999-06-14", "status_cd": "A" }   BECAUSE the read skipped the translation layer
+//    step 2 · the raw names land in the new model   // domain : { "id": "C-3157", ... } -> { "cust_dob": "1999-06-14", "status_cd": "A" }   // pollution returns
+//    step 3 · count the bypass   // bypass_count : 0 -> 1   // one more call that reintroduced the legacy model
+// <- output : domain holds "cust_dob" and "status_cd" again · the layer solved nothing because it was bypassed
+//    alt through the layer : raw : {"cust_dob":"1999-06-14","status_cd":"A"} -> {"dateOfBirth":"1999-06-14","status":"ACTIVE"}   BECAUSE the ACL translates before the service sees it`,
+      tieback: 'This is the discipline stage — the layer only prevents pollution when every interaction with the legacy system goes through it.',
+      refs: ['Boundary discipline'],
+      problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
+    }
+  ],
   concepts: {
     cards: [
       {

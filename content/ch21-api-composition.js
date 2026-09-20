@@ -102,6 +102,131 @@ registerChapter({
 //    alt the query targets one order : ORD.fetch_all returns 1 row -> CMP joins 1 row -> the in-memory cost is negligible`
     }
   ],
+  interview: [
+    {
+      scenario: "Your client needs an order with its customer name, but the order lives in Order Service and the customer in Customer Service. A single SQL join can no longer fetch both.",
+      q: "Why do queries break when data is split across services, and what does API Composition do about it?",
+      solution: "Database-per-service makes cross-service joins impossible; an API composer queries each service and joins the results in memory.",
+      components: [
+        "Order Service — owns the order",
+        "Customer Service — owns the customer",
+        "API Composer — orchestrates the query",
+        "In-memory join — done by the composer"
+      ],
+      diagram: `flowchart LR
+  CLIENT["Client"] -->|get order PO-77| AC["API Composer"]
+  AC -->|fetch order| ORD["Order Service"]
+  AC -->|fetch customer| CUST["Customer Service"]
+  AC -->|join in memory| OUT["Order + customer name"]`,
+      code: `// API COMPOSER SIDE — the problem: a query spans two services, so the composer joins their results in memory
+// PARTIES: CLIENT = the caller · AC = the API Composer · ORD = Order Service · CUST = Customer Service
+// STATE (before):
+//    order : { id:"PO-77", customer_id:"CUST-7", total:45.00 }
+//    customer : { id:"CUST-7", name:"Ada" }
+//    joined : {}
+// DEF: get_order_details · CALLED BY: CLIENT on AC
+// -> order_id : "PO-77"
+//    step 1 · AC queries ORD : order : "none" -> { id:"PO-77", customer_id:"CUST-7", total:45.00 }
+//    step 2 · AC queries CUST using the foreign key : customer : "none" -> { id:"CUST-7", name:"Ada" }
+//    step 3 · AC joins the two in memory : joined : {} -> { id:"PO-77", customer_id:"CUST-7", total:45.00, customer_name:"Ada" }
+// <- outcome : joined : { id:"PO-77", customer_name:"Ada", total:45.00 } · the client got a joined view without a SQL join`,
+      tieback: "This is API Composition — the composer queries each service and joins results in memory because SQL joins no longer span services.",
+      refs: ["Why queries break across services"],
+      problems: ["01-scale-from-zero-to-millions"]
+    },
+    {
+      scenario: "A client asks for an order plus its customer and payment status, and you want a single component to fan the request out to three services and combine the answers.",
+      q: "How does the API Composer fan a request out to multiple services and return one response?",
+      solution: "The composer receives the query, calls each provider service that owns part of the answer, and assembles a single response from the results.",
+      components: [
+        "API Composer — the coordinator",
+        "Order Service — provider 1",
+        "Customer Service — provider 2",
+        "Payment Service — provider 3"
+      ],
+      diagram: `flowchart LR
+  CLIENT["Client"] -->|get order PO-77| AC["API Composer"]
+  AC -->|call 1| ORD["Order Service"]
+  AC -->|call 2| CUST["Customer Service"]
+  AC -->|call 3| PAY["Payment Service"]
+  AC -->|combine| OUT["one response"]`,
+      code: `// API COMPOSER SIDE — fan out to three providers and combine their results into one response
+// PARTIES: CLIENT = the caller · AC = the API Composer · ORD = Order Service · CUST = Customer Service · PAY = Payment Service
+// STATE (before):
+//    parts : {}
+//    calls : 0
+// DEF: get_order_details · CALLED BY: CLIENT on AC
+// -> order_id : "PO-77"
+//    step 1 · call Order Service : calls : 0 -> 1 · parts : {} -> { order:{ id:"PO-77", total:45.00 } }
+//    step 2 · call Customer Service : calls : 1 -> 2 · parts : { order } -> { order, customer:{ id:"CUST-7", name:"Ada" } }
+//    step 3 · call Payment Service : calls : 2 -> 3 · parts : { order, customer } -> { order, customer, payment:{ status:"PAID" } }
+//    step 4 · combine into one response : combined : "none" -> { id:"PO-77", total:45.00, customer_name:"Ada", status:"PAID" }
+// <- outcome : combined : { id:"PO-77", customer_name:"Ada", status:"PAID" } · three calls, one response`,
+      tieback: "This is API Composition fanning out — the composer calls each provider and returns a single combined response.",
+      refs: ["Define the API Composer"],
+      problems: ["01-scale-from-zero-to-millions"]
+    },
+    {
+      scenario: "You are joining the order with its customer, and the composer must match the order's customer_id to the customer's id without a database join.",
+      q: "How does the API Composer perform the in-memory join, and what key does it use?",
+      solution: "The composer uses the order's customer_id to look up the customer in the second service's response, matching rows on that shared key.",
+      components: [
+        "order.customer_id — the join key",
+        "customer.id — the matching key",
+        "Composer — does the lookup",
+        "Result — merged on the key"
+      ],
+      diagram: `flowchart LR
+  AC["API Composer"] -->|fetch| ORD["Order PO-77 customer_id CUST-7"]
+  AC -->|fetch| CUST["Customer list"]
+  AC -->|match CUST-7 == id| OUT["Order + customer name"]`,
+      code: `// API COMPOSER SIDE — the in-memory join matches rows on a shared key instead of a SQL join
+// PARTIES: AC = the API Composer · ORD = Order Service · CUST = Customer Service
+// STATE (before):
+//    order : { id:"PO-77", customer_id:"CUST-7" }
+//    customers : [ { id:"CUST-7", name:"Ada" }, { id:"CUST-9", name:"Bo" } ]
+//    joined : {}
+// DEF: join_in_memory · CALLED BY: AC after fetching both
+// -> order : { id:"PO-77", customer_id:"CUST-7" } · -> customers : [ { id:"CUST-7", name:"Ada" }, { id:"CUST-9", name:"Bo" } ]
+//    step 1 · take the join key from the order : key : "none" -> "CUST-7"
+//    step 2 · find the matching customer by id : match : "none" -> { id:"CUST-7", name:"Ada" }
+//    step 3 · merge on the key : joined : {} -> { id:"PO-77", customer_id:"CUST-7", customer_name:"Ada" }
+// <- outcome : joined : { id:"PO-77", customer_name:"Ada" } · the composer matched CUST-7 to the customer id without a database join`,
+      tieback: "This is the in-memory join — the composer matches results on a shared key (customer_id to id) instead of SQL.",
+      refs: ["The in-memory join"],
+      problems: ["01-scale-from-zero-to-millions"]
+    },
+    {
+      scenario: "Your composer now joins two large result sets on the same node, and each request pulls hundreds of thousands of rows just to keep a few.",
+      q: "When does API Composition stop being efficient, and what alternative should you consider?",
+      solution: "It becomes inefficient for large in-memory joins and heavy fan-out; when the query-side needs differ from the write model, switch to CQRS with materialized views.",
+      components: [
+        "Composer — does the join in memory",
+        "Large result sets — the source of the cost",
+        "In-memory join — the bottleneck",
+        "CQRS — the alternative at scale"
+      ],
+      diagram: `flowchart LR
+  AC["API Composer"] -->|pull 900000 orders| DB1[("Order DB")]
+  AC -->|pull 120000 customers| DB2[("Customer DB")]
+  AC -->|join in memory| SLOW["inefficient"]
+  SLOW -->|switch| CQRS["CQRS materialized view"]`,
+      code: `// API COMPOSER SIDE — the pattern degrades at scale: joining huge result sets in memory, where CQRS is the better fit
+// PARTIES: AC = the API Composer · DB1 = Order database · DB2 = Customer database
+// STATE (before):
+//    memory_used : 0
+//    kept : 0
+// DEF: get_order_report · CALLED BY: a reporting client on AC
+// -> report : "orders by customer"
+//    step 1 · AC pulls all orders : rows_fetched : 0 -> 900000 · memory_used : 0 -> 900000 rows in memory
+//    step 2 · AC pulls all customers : rows_fetched : 900000 -> 1020000   BECAUSE 120000 more rows are fetched
+//    step 3 · AC joins in memory and keeps few : kept : 0 -> 45   BECAUSE only 45 rows survive the report
+// <- outcome : kept 45 rows but the composer held 1020000 rows in memory — an inefficient join that a CQRS materialized view would precompute`,
+      tieback: "This is when API Composition stops being simple — large in-memory joins point to CQRS with precomputed views.",
+      refs: ["When it stops being simple"],
+      problems: ["01-scale-from-zero-to-millions"]
+    }
+  ],
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Cross-service joins break', content: '<p><strong>Why.</strong> The Database per Service pattern gives each service its own private data, so there is no single database left to query.</p><p><strong>Claim.</strong> Any query that needs data from several services is no longer straightforward to implement.</p><p><strong>Grounding.</strong> The reference context: after applying the Microservices architecture and Database per Service, it is no longer straightforward to implement queries that join data from multiple services.</p><p><strong>In the wild.</strong> A product or order detail page whose columns are split across Product, Pricing, Inventory, and Review services.</p>' },

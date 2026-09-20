@@ -211,6 +211,186 @@ flowchart TD
 ```
 
 
+## Interview Questions
+
+### Q1
+
+The team is standing up three new services, and each one needs the same six cross-cutting concerns wired before any business logic can start. Doing it by hand costs one to two days per service.
+
+**Interviewer's question:** What is the per-service setup tax, and how does a chassis change the arithmetic?
+
+**Solution:** Every service needs build logic and cross-cutting concerns (security, config, logging, health check, metrics, tracing) plus registration/discovery and circuit breakers; wiring them once in a chassis turns N services times 6 concerns into 6 wirings, not 6N.
+
+**System-design components:**
+- Order Service
+- Customer Service
+- Kitchen Service
+- shared chassis
+
+```mermaid
+flowchart LR
+  C["Chassis"] -->|"wires 6 concerns once"| W["concern wiring"]
+  W --> O["Order Service"]
+  W --> U["Customer Service"]
+  W --> K["Kitchen Service"]
+  M["Manual: 3 x 6 = 18 wirings"] -.->|"vs"| W
+```
+
+```java
+// TEAM SIDE — wiring six cross-cutting concerns once per service versus once in a chassis
+// PARTIES: SVC1 = Order Service · SVC2 = Customer Service · SVC3 = Kitchen Service
+// DEF: wiring — the act of connecting a cross-cutting concern to a service; here 3 services x 6 concerns = 18 wirings
+// STATE (before):
+//    manual_wiring : { SVC1: 0, SVC2: 0, SVC3: 0 }       // concerns wired by hand, per service
+//    chassis_wiring : { chassis: 0 }                     // concerns wired once, inside the chassis
+// DEF: setup · CALLED BY: a team standing up 3 new services
+// -> concern_count : 6   // = security + config + logging + health + metrics + tracing
+// -> service_count : 3
+//    step 1 · wire SVC1 by hand    manual_wiring.SVC1 : 0 -> 6   BECAUSE each service re-implements the 6 concerns
+//    step 2 · wire SVC2 by hand    manual_wiring.SVC2 : 0 -> 6
+//    step 3 · wire SVC3 by hand    manual_wiring.SVC3 : 0 -> 6
+//    step 4 · total by hand = 3 services x 6 concerns = 18 wirings
+// <- outcome : manual_wiring : { SVC1: 6, SVC2: 6, SVC3: 6 } = 18 wirings total
+//    alt chassis : wire once -> chassis_wiring.chassis : 0 -> 6, then SVC1/SVC2/SVC3 inherit = 6 wirings, not 18
+```
+
+_This is the chapter's setup-tax problem: one or two days per service is unaffordable across many services, and the chassis centralizes the wiring._
+
+_Covers:_ The setup tax
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions
+
+### Q2
+
+A developer scaffolds a new Order Service and wants it production-ready in minutes, not days — with build logic, security, metrics, and tracing already in place.
+
+**Interviewer's question:** What does the chassis implement, and what happens when a new service adopts it?
+
+**Solution:** The chassis provides reusable build logic (e.g. Gradle plugins) and mechanisms for cross-cutting concerns; adopting it lets the service inherit the wiring instead of re-implementing it.
+
+**System-design components:**
+- Order Service
+- chassis framework 2.4.0
+- Gradle plugin
+- service registry
+
+```mermaid
+flowchart LR
+  D["Developer"] -->|"scaffolds"| S["Order Service"]
+  S -->|"adopts"| C["chassis 2.4.0"]
+  C -->|"wires"| B["build"]
+  C -->|"wires"| T["security / metrics / tracing"]
+  C -->|"registers"| R["service registry"]
+```
+
+```java
+// ORDER SERVICE SIDE — a new service adopts the chassis and inherits the cross-cutting wiring
+// PARTIES: SVC = Order Service · CHS = chassis framework 2.4.0 · REG = service registry
+// STATE (before):
+//    svc : { build: "none", security: "none", metrics: "none", tracing: "none", registered: false }
+// DEF: adopt_chassis · CALLED BY: a developer scaffolding SVC
+// -> chassis_version : "2.4.0"
+//    step 1 · add the chassis Gradle plugin          svc.build : "none" -> "gradle-plugin:2.4.0"
+//    step 2 · chassis wires access-token security    svc.security : "none" -> "access-token-check"
+//    step 3 · chassis wires metrics                  svc.metrics : "none" -> "counter:orders_created"
+//    step 4 · chassis wires tracing                  svc.tracing : "none" -> "trace-id-filter"
+//    step 5 · chassis self-registers SVC with REG    svc.registered : false -> true
+// <- outcome : svc : { build:"gradle-plugin:2.4.0", security:"access-token-check", metrics:"counter:orders_created", tracing:"trace-id-filter", registered:true }
+```
+
+_This is the chapter's what-the-chassis-implements step: reusable build logic plus cross-cutting mechanisms, inherited on adoption._
+
+_Covers:_ What the chassis implements
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions
+
+### Q3
+
+A logging vulnerability is fixed in the shared library. The team must push the fix to Order, Customer, and Kitchen services without editing each codebase by hand.
+
+**Interviewer's question:** How do services receive updates to build logic and cross-cutting concerns under the chassis pattern?
+
+**Solution:** The team releases one new chassis version and bumps each service to it — the fix reaches every service through a version bump, versus copy/paste programming where a Service Template must be edited per service.
+
+**System-design components:**
+- Order Service
+- Customer Service
+- Kitchen Service
+- chassis release
+
+```mermaid
+flowchart LR
+  R["Release chassis 2.4.0"] -->|"bump"| O["Order Service"]
+  R -->|"bump"| U["Customer Service"]
+  R -->|"bump"| K["Kitchen Service"]
+  O -->|"2.3.0 -> 2.4.0"| V["fix delivered"]
+```
+
+```java
+// TEAM SIDE — a chassis upgrade delivers one fix to every service via a version bump
+// PARTIES: SVC1 = Order Service · SVC2 = Customer Service · SVC3 = Kitchen Service
+// STATE (before):
+//    deps : { SVC1: "chassis:2.3.0", SVC2: "chassis:2.3.0", SVC3: "chassis:2.3.0" }
+// DEF: upgrade · CALLED BY: the team releasing chassis 2.4.0 (a logging fix)
+// -> new_version : "2.4.0"
+//    step 1 · release the chassis once at "2.4.0"
+//    step 2 · SVC1 bumps its dependency     deps.SVC1 : "chassis:2.3.0" -> "chassis:2.4.0"
+//    step 3 · SVC2 bumps its dependency     deps.SVC2 : "chassis:2.3.0" -> "chassis:2.4.0"
+//    step 4 · SVC3 bumps its dependency     deps.SVC3 : "chassis:2.3.0" -> "chassis:2.4.0"
+// <- outcome : deps : { SVC1: "chassis:2.4.0", SVC2: "chassis:2.4.0", SVC3: "chassis:2.4.0" } · the fix reaches all 3 services
+//    alt service template : the fix is copied-and-pasted into 3 separate codebases, one edit per service
+```
+
+_This is the chapter's version-bump benefit: release once, bump each service, versus copy/paste per codebase._
+
+_Covers:_ Updating via version bumps
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions
+
+### Q4
+
+The team adds its first Go service, but the chassis is a Java framework built on Spring Boot. The Go service cannot inherit it.
+
+**Interviewer's question:** What is the main issue of the Microservice Chassis pattern when a new language enters the picture?
+
+**Solution:** A chassis is tied to a programming language and framework, so each new language needs its own chassis — building a second chassis re-implements the same concerns and can be an obstacle to adopting the new language.
+
+**System-design components:**
+- Java chassis
+- Go chassis
+- Gizmo/Micro/Go kit
+- second chassis
+
+```mermaid
+flowchart LR
+  J["Java services"] -->|"use"| JC["chassis-java:2.4.0"]
+  G["Go service"] -.->|"cannot use"| JC
+  G -->|"builds"| GC["chassis-go:1.0.0"]
+  GC -->|"re-wires 6 concerns"| X["duplicated work"]
+```
+
+```java
+// TEAM SIDE — a second language forces a second chassis, so upkeep doubles
+// PARTIES: JVM = Java services · GO = Go services
+// STATE (before):
+//    chassis : { JVM: "chassis-java:2.4.0", GO: "none" }
+//    chassis_count : 1
+//    concerns_in_go : 0
+// DEF: adopt_go · CALLED BY: the team adding its first Go service
+// -> new_language : "Go"
+//    step 1 · the JVM chassis cannot run Go, build a second one   chassis_count : 1 -> 2
+//    step 2 · build chassis-go on a Go framework base               chassis.GO : "none" -> "chassis-go:1.0.0"   BECAUSE Gizmo/Micro/Go kit serve Go, not Java
+//    step 3 · re-implement the same concerns in Go                  concerns_in_go : 0 -> 6   BECAUSE security+config+logging+health+metrics+tracing all repeat
+// <- outcome : chassis : { JVM: "chassis-java:2.4.0", GO: "chassis-go:1.0.0" } · concerns_in_go : 6 · 2 chassis to keep current
+//    alt single-language : only 1 chassis to maintain, but Go adoption stays blocked
+```
+
+_This is the chapter's one-chassis-per-language issue: adopting a new language means rebuilding the chassis and its concerns._
+
+_Covers:_ One chassis per language
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions
+
 ## Key Concepts
 
 ### The Problem
@@ -221,6 +401,15 @@ flowchart TD
 ### The Solution
 
 A microservice chassis provides reusable build logic and mechanisms for cross-cutting concerns as one framework; the Service Template is a sample service built on it.
+
+```mermaid
+flowchart LR
+  C["Chassis"] -->|"wires 6 concerns once"| W["concern wiring"]
+  W --> O["Order Service"]
+  W --> U["Customer Service"]
+  W --> K["Kitchen Service"]
+  M["Manual: 3 x 6 = 18 wirings"] -.->|"vs"| W
+```
 
 
 ### Key Facts

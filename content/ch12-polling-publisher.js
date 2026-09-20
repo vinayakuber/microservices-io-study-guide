@@ -82,6 +82,147 @@ registerChapter({
 // <- output : BRK receives 0 messages · NOSQL cannot poll, so the relay uses transaction log tailing instead`
     }
   ],
+  interview: [
+    {
+      scenario: "You have applied the Transactional Outbox pattern and your order service now stores events in a database table, but nothing moves them to the message broker yet. The downstream consumers are starved because the events never leave the database.",
+      q: "What is the Polling Publisher, and how does one poll cycle move unsent outbox rows to the broker?",
+      solution: "A relay process repeatedly queries the outbox table for unsent rows, publishes each row to the broker, then marks the row sent so the next poll skips it.",
+      components: [
+        "Outbox table — events awaiting publication",
+        "Relay process — runs the poll on an interval",
+        "Unsent-row query — SELECT ... WHERE sent=false",
+        "Mark-sent update — sets sent=true per published row",
+        "Message broker — receives the published events"
+      ],
+      diagram: `flowchart LR
+  T["Timer 250ms tick"] -->|poll| DB[("Outbox table")]
+  DB -->|2 unsent rows| RLY["Relay"]
+  RLY -->|publish each| BRK[("Message broker")]
+  RLY -->|mark sent=true| DB`,
+      code: `// RELAY SIDE — one poll cycle drains two unsent outbox rows into the broker
+// PARTIES: RLY = relay process · DB = PostgreSQL outbox table · BRK = message broker
+// DEF: outbox — the table of stored events awaiting publication = [ (10, "OrderCreated", sent=false), (11, "PaymentAuthorized", sent=false) ]
+// STATE (before):
+//    outbox : [ (10, "OrderCreated", sent=false), (11, "PaymentAuthorized", sent=false) ]
+//    published : [ ]
+// DEF: poll_once · CALLED BY: a scheduler tick every 250 ms
+// -> query : SELECT * FROM outbox WHERE sent=false   // returns 2 unsent rows
+//    step 1 · fetch rows    : rows : [ ] -> [ (10, "OrderCreated", sent=false), (11, "PaymentAuthorized", sent=false) ]
+//    step 2 · publish row 10 : published : [ ] -> [ "OrderCreated" ]
+//    step 3 · mark row 10    : outbox : [(10,"OrderCreated",sent=false),(11,"PaymentAuthorized",sent=false)] -> [(10,"OrderCreated",sent=true),(11,"PaymentAuthorized",sent=false)]
+//    step 4 · publish row 11 : published : [ "OrderCreated" ] -> [ "OrderCreated", "PaymentAuthorized" ]
+//    step 5 · mark row 11    : outbox : [(10,"OrderCreated",sent=true),(11,"PaymentAuthorized",sent=false)] -> [(10,"OrderCreated",sent=true),(11,"PaymentAuthorized",sent=true)]
+// <- output : BRK received [ "OrderCreated", "PaymentAuthorized" ] · outbox now fully sent`,
+      tieback: "This is the Polling Publisher: select unsent outbox rows, publish each to the broker, then mark each row sent.",
+      refs: ["Poll the outbox table"],
+      problems: ["19-distributed-message-queue"]
+    },
+    {
+      scenario: "Your order aggregate wrote two events in one transaction — OrderCreated then OrderApproved — and a downstream consumer must apply them in that exact order. Your relay just ran a query with no ORDER BY, and the consumer saw OrderApproved arrive before OrderCreated.",
+      q: "Why is publishing events in order tricky for a polling relay, and how do you fix it?",
+      solution: "Add an explicit ORDER BY on the outbox row id so the poll reads rows in insertion order and publishes the earlier event first.",
+      components: [
+        "Outbox row id — the insertion sequence",
+        "Unordered query — SELECT without ORDER BY",
+        "Ordered query — SELECT ... ORDER BY id ASC",
+        "Message broker — receives events in publish order"
+      ],
+      diagram: `flowchart LR
+  DB[("Outbox table")] -->|unordered query| BAD["Publishes id 21 first"]
+  BAD --> BRK[("Broker: OrderApproved then OrderCreated")]
+  DB -->|ORDER BY id ASC| GOOD["Publishes id 20 first"]
+  GOOD --> BRK2[("Broker: OrderCreated then OrderApproved")]`,
+      code: `// RELAY SIDE — ordering: the same order's two events must reach the broker in commit order
+// PARTIES: RLY = relay · DB = MySQL outbox table · BRK = message broker
+// DEF: outbox — the table of stored events = [ (20, "OrderCreated", sent=false), (21, "OrderApproved", sent=false) ]
+// STATE (before):
+//    outbox : [ (20, "OrderCreated", sent=false), (21, "OrderApproved", sent=false) ]
+//    published : [ ]
+// DEF: poll_without_order · CALLED BY: the relay running a query with no ORDER BY
+// -> query : SELECT * FROM outbox WHERE sent=false   // DB returns id 21 first
+//    step 1 · publish id 21 : published : [ ] -> [ "OrderApproved" ]   BECAUSE the query returned id 21 before id 20
+//    step 2 · publish id 20 : published : [ "OrderApproved" ] -> [ "OrderApproved", "OrderCreated" ]
+// <- output : BRK receives [ "OrderApproved", "OrderCreated" ] · order WRONG (OrderCreated must precede OrderApproved)
+// DEF: poll_with_order · CALLED BY: the relay adding ORDER BY id to the query
+// -> query : SELECT * FROM outbox WHERE sent=false ORDER BY id ASC   // returns id 20 then id 21
+//    step 1 · publish id 20 : published : [ ] -> [ "OrderCreated" ]   BECAUSE ORDER BY id returns the committed-first row first
+//    step 2 · publish id 21 : published : [ "OrderCreated" ] -> [ "OrderCreated", "OrderApproved" ]
+// <- output : BRK receives [ "OrderCreated", "OrderApproved" ] · order CORRECT`,
+      tieback: "This is the Polling Publisher's ordering tradeoff — a poll must reproduce insertion order with an explicit ORDER BY id.",
+      refs: ["Publishing events in order is tricky"],
+      problems: ["19-distributed-message-queue"]
+    },
+    {
+      scenario: "Your team stores domain events in a NoSQL document store where each document has its own sent flag, but there is no query that can find all unsent documents across the store. Your relay cannot find anything to publish.",
+      q: "Why does the Polling Publisher work with any SQL database but not every NoSQL store, and what is the fallback?",
+      solution: "Polling needs a queryable outbox table with an unsent-row query; a NoSQL store where the outbox is a per-record property with no global unsent query cannot be polled, so you use transaction log tailing instead.",
+      components: [
+        "SQL database — exposes the outbox as a queryable table",
+        "NoSQL store — outbox is a per-record property",
+        "Unsent-row query — cannot be expressed in the NoSQL store",
+        "Transaction log tailing — the alternative relay"
+      ],
+      diagram: `flowchart LR
+  SQL[("MySQL outbox table")] -->|SELECT sent=false| RLY["Relay publishes the row"]
+  NOSQL[("NoSQL doc store")] -->|no unsent-row query| NONE["Relay finds 0 rows"]
+  NONE --> TLT["Use transaction log tailing instead"]`,
+      code: `// RELAY SIDE — polling needs a queryable outbox: any SQL database has it, some NoSQL stores do not
+// PARTIES: RLY = relay · SQLDB = MySQL database · NOSQL = NoSQL document store · BRK = message broker
+// DEF: outbox_sql — the queryable table = [ (30, "OrderCreated", sent=false) ]
+// DEF: outbox_nosql — a per-record property with no global sent index = { "rec-9" : { "event" : "OrderCreated", "sent" : false } }
+// STATE (before):
+//    outbox_sql : [ (30, "OrderCreated", sent=false) ]
+//    outbox_nosql : { "rec-9" : { "event" : "OrderCreated", "sent" : false } }
+//    published : [ ]
+// DEF: poll_sql · CALLED BY: the relay against MySQL
+// -> query : SELECT * FROM outbox WHERE sent=false   // matches : 1 unsent row
+//    step 1 · publish OrderCreated : published : [ ] -> [ "OrderCreated" ]   BECAUSE MySQL returns the one unsent row
+//    step 2 · mark row 30 : outbox_sql : [(30,"OrderCreated",sent=false)] -> [(30,"OrderCreated",sent=true)]
+// <- output : BRK receives [ "OrderCreated" ] · SQLDB supports polling
+// DEF: poll_nosql · CALLED BY: the relay against the NoSQL store
+// -> query : SELECT * FROM outbox WHERE sent=false   // matches : 0 rows (query cannot be expressed)
+//    step 1 · publish nothing : published : [ ] -> [ ]   BECAUSE the outbox is a per-record property with no global sent index
+// <- output : BRK receives 0 messages · NOSQL cannot be polled, so the relay uses transaction log tailing`,
+      tieback: "This is the Polling Publisher's portability tradeoff — it needs a queryable outbox, which SQL gives and some NoSQL stores do not.",
+      refs: ["Any SQL database, not every NoSQL store"],
+      problems: ["19-distributed-message-queue"]
+    },
+    {
+      scenario: "Your relay runs every 250 ms. After one poll publishes a row and marks it sent, you want to be sure the next poll does not republish the same event and spam the broker.",
+      q: "How does marking a row sent change what the next poll selects, and why is the sent flag essential?",
+      solution: "Marking a row sent means the next poll's WHERE sent=false query no longer returns it, so each event is published once per successful mark.",
+      components: [
+        "Sent flag — sent=false vs sent=true per row",
+        "Poll 1 — publishes and marks the row",
+        "Poll 2 — selects only sent=false rows",
+        "Broker — receives no duplicate from the relay"
+      ],
+      diagram: `flowchart LR
+  P1["Poll 1"] -->|SELECT sent=false| DB[("Outbox table")]
+  P1 -->|publish OrderCreated| BRK[("Broker")]
+  P1 -->|UPDATE sent=true| DB
+  P2["Poll 2"] -->|SELECT sent=false| DB
+  P2 -->|0 rows match| BRK`,
+      code: `// RELAY SIDE — two consecutive polls: after a row is marked sent, the next poll skips it
+// PARTIES: RLY = relay · DB = MySQL outbox table · BRK = message broker
+// DEF: outbox — the table of stored events = [ (40, "OrderCreated", sent=false) ]
+// STATE (before):
+//    outbox : [ (40, "OrderCreated", sent=false) ]
+//    published : [ ]
+// DEF: poll_1 · CALLED BY: a timer tick at t=0ms
+// -> query : SELECT * FROM outbox WHERE sent=false   // returns row 40
+//    step 1 · publish row 40 : published : [ ] -> [ "OrderCreated" ]
+//    step 2 · mark row 40 : outbox : [(40,"OrderCreated",sent=false)] -> [(40,"OrderCreated",sent=true)]
+// <- output : BRK received [ "OrderCreated" ] · outbox row 40 is now sent=true
+// DEF: poll_2 · CALLED BY: the next timer tick at t=250ms
+// -> query : SELECT * FROM outbox WHERE sent=false   // returns 0 rows
+//    step 1 · publish nothing : published : [ "OrderCreated" ] -> [ "OrderCreated" ]   BECAUSE row 40 no longer matches sent=false
+// <- output : BRK receives 0 new messages · the sent flag prevented a duplicate publish`,
+      tieback: "This is the Polling Publisher's mark-sent step — the sent flag is what lets the next poll skip already-published rows.",
+      refs: ["Poll the outbox table"],
+      problems: ["19-distributed-message-queue"]
+    }
+  ],
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'The outbox has events but no way out', content: '<p><strong>Why.</strong> The Transactional Outbox pattern leaves messages sitting in a database table, and they only matter once they reach the message broker.</p><p><strong>Claim.</strong> Something must discover the unsent outbox rows and hand each one to the broker.</p><p><strong>Grounding.</strong> The reference problem statement: how to publish messages and events in the outbox in the database to the message broker.</p><p><strong>In the wild.</strong> This is the relay half of transactional messaging; the outbox pattern creates the need for it.</p>' },

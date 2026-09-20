@@ -70,6 +70,125 @@ registerChapter({
 //    alt complex rules : each extra rule adds another if-block to the SAME method, so the script grows with the logic`
     }
   ],
+  interview: [
+    {
+      scenario: "Your business logic is simple, and you want each HTTP request handled by one procedural method that does the work directly against the database.",
+      q: "How does the transaction-script pattern organize business logic, and what does one method do?",
+      solution: "The pattern uses one procedural method per request type; the method runs the whole transaction and uses a DAO to access the database.",
+      components: [
+        "TransactionScript — one method per request",
+        "createOrder — the method",
+        "OrderDao — data access object",
+        "Database — rows the DAO writes"
+      ],
+      diagram: `flowchart LR
+  WEB["create_order request"] -->|createOrder()| TS["TransactionScript"]
+  TS -->|save| DAO["OrderDao"]
+  DAO -->|INSERT| DB[("Database")]`,
+      code: `// ORDER SERVICE SIDE — the transaction-script pattern: one procedural method per request type, using a DAO for the database
+// PARTIES: WEB = the request handler · TS = the transaction script · DAO = the data access object
+// STATE (before):
+//    orders : {}
+// DEF: createOrder · CALLED BY: WEB on a create_order request
+// -> order_id : "PO-77" · -> total : 45.00
+//    step 1 · script builds the row : row : "none" -> { id:"PO-77", total:45.00, state:"CREATED" }
+//    step 2 · script calls the DAO : dao.save(row) -> orders : {} -> { "PO-77" : { total:45.00, state:"CREATED" } }
+//    step 3 · script returns : created : "none" -> "PO-77"
+// <- outcome : orders : { "PO-77" : { total:45.00, state:"CREATED" } } · one method did the whole request`,
+      tieback: "This is the Transaction Script — one procedural method per request type, accessing data via a DAO.",
+      refs: ["One procedural method per request type"],
+      problems: ["03-framework-for-system-design-interviews"]
+    },
+    {
+      scenario: "Your scripts hold no data themselves — a script mutates an order's quantity and total, which live in separate DAO-loaded objects.",
+      q: "How does the transaction-script pattern separate behavior and state?",
+      solution: "The behavior lives in the script (procedures), while the state lives in separate DAO-accessed data objects that the script loads, mutates, and saves.",
+      components: [
+        "Script — holds the behavior",
+        "Order row — holds the state",
+        "OrderDao — loads and saves the row",
+        "Mutate — the script changes the row"
+      ],
+      diagram: `flowchart LR
+  TS["Script reviseOrder"] -->|load| DAO["OrderDao"]
+  DAO -->|returns| ROW["Order row qty 3"]
+  TS -->|qty 3 to 5| ROW
+  ROW -->|save| DAO`,
+      code: `// ORDER SERVICE SIDE — behavior and state are in separate classes: the script mutates a DAO-loaded data object
+// PARTIES: TS = the transaction script · DAO = the data access object · ROW = the state object
+// STATE (before):
+//    order_row : { id:"PO-77", qty:3, total:120.00 }
+// DEF: reviseOrder · CALLED BY: TS on a revise_order request
+// -> order_id : "PO-77" · -> new_qty : 5
+//    step 1 · script loads the state via the DAO : row : "none" -> { id:"PO-77", qty:3, total:120.00 }
+//    step 2 · script mutates the loaded object : row.qty : 3 -> 5
+//    step 3 · script recomputes the total : row.total : 120.00 -> 200.00   BECAUSE 5 x 40.00 = 200.00
+//    step 4 · script saves the row back : dao.save(row) -> persisted : { qty:3, total:120.00 } -> { qty:5, total:200.00 }
+// <- outcome : order_row : { id:"PO-77", qty:5, total:200.00 } · the behavior stayed in the script, the state in the row`,
+      tieback: "This is the Transaction Script keeping behavior and state separate — the script mutates a DAO-loaded data object.",
+      refs: ["Keep behavior and state in separate classes"],
+      problems: ["03-framework-for-system-design-interviews"]
+    },
+    {
+      scenario: "Your service needs to cancel an order, and the only rule is that the order must still be in the CREATED state. The logic is short enough for a script.",
+      q: "When is the transaction-script pattern the right choice, and what does a simple cancel script do?",
+      solution: "The pattern fits simple, low-complexity logic; a cancel script loads the order, checks one guard, flips the state, and saves it.",
+      components: [
+        "cancelOrder — the script",
+        "State check — CREATED allowed",
+        "Flip — CREATED to CANCELLED",
+        "Save — the row persists the change"
+      ],
+      diagram: `flowchart LR
+  TS["Script cancelOrder"] -->|load| DAO["OrderDao"]
+  DAO -->|state CREATED| TS
+  TS -->|flip to CANCELLED| ROW["Order row"]
+  ROW -->|save| DAO`,
+      code: `// ORDER SERVICE SIDE — simple logic is the pattern's sweet spot: a cancel script with one guard
+// PARTIES: TS = the transaction script · DAO = the data access object
+// STATE (before):
+//    order_row : { id:"PO-77", state:"CREATED" }
+// DEF: cancelOrder · CALLED BY: TS on a cancel_order request
+// -> order_id : "PO-77"
+//    step 1 · script loads the order : row : "none" -> { id:"PO-77", state:"CREATED" }
+//    step 2 · script checks the guard : row.state : "CREATED" == "CREATED" -> allowed
+//    step 3 · script flips the state : row.state : "CREATED" -> "CANCELLED"
+//    step 4 · script saves : dao.save(row) -> persisted : { state:"CREATED" } -> { state:"CANCELLED" }
+// <- outcome : order_row : { id:"PO-77", state:"CANCELLED" } · a short script with one rule — exactly what the pattern is for`,
+      tieback: "This is the Transaction Script at its best — simple logic handled by a short procedural method.",
+      refs: ["Use scripts for simple logic only"],
+      problems: ["03-framework-for-system-design-interviews"]
+    },
+    {
+      scenario: "The business keeps adding rules — discounts, then approvals, then split shipments — and your once-simple script now has a long chain of branches.",
+      q: "What happens to a transaction script as business logic grows, and what is the fix?",
+      solution: "The script accumulates branches and duplicated rules until it is hard to change, at which point you should refactor into a richer domain model.",
+      components: [
+        "One script — grows with each rule",
+        "Branches — a chain of ifs",
+        "Duplication — rules repeated across scripts",
+        "Domain model — the refactor target"
+      ],
+      diagram: `flowchart LR
+  A["createOrder + discount"] --> B["+ approval rule"]
+  B --> C["+ split shipment rule"]
+  C -->|too many branches| FIX["refactor to domain model"]`,
+      code: `// ORDER SERVICE SIDE — the pattern sprawls as rules multiply: a script that grows a branch per new business rule
+// PARTIES: TS = the transaction script · DAO = the data access object
+// STATE (before):
+//    order_row : { id:"PO-77", total:100.00, state:"CREATED" }
+//    branch_count : 1
+// DEF: createOrder · CALLED BY: TS on a create_order request
+// -> order_id : "PO-77"
+//    step 1 · rule 1, discount : branch_count : 1 -> 1 · order.total : 100.00 -> 90.00   BECAUSE a 10% discount applies
+//    step 2 · rule 2, approval : branch_count : 1 -> 2 · order.state : "CREATED" -> "PENDING_APPROVAL"   BECAUSE orders over 50.00 need approval
+//    step 3 · rule 3, split shipment : branch_count : 2 -> 3 · order.shipment : "none" -> "SPLIT"   BECAUSE the order has multiple lines
+// <- outcome : order : { total:90.00, state:"PENDING_APPROVAL", shipment:"SPLIT" } · branch_count : 3 · each new rule adds a branch and repeated checks`,
+      tieback: "This is the Transaction Script's weakness — it sprawls as logic grows, so complex domains should move to a domain model.",
+      refs: ["Use scripts for simple logic only"],
+      problems: ["03-framework-for-system-design-interviews"]
+    }
+  ],
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Complex logic sprawls when behavior and state are split', content: '<p><strong>Why.</strong> Separating the classes that implement behavior from those that store state means every rule lives in a script far from the data it changes.</p><p><strong>Claim.</strong> The procedural Transaction script style tends not to be a good way to implement complex business logic — scripts grow continually, just as a monolith keeps growing.</p><p><strong>Grounding.</strong> The book lists this as the pattern\'s central drawback after noting the approach uses few of the capabilities of an OOP language.</p><p><strong>In the wild.</strong> An OrderService holding create, revise and cancel scripts absorbs every edge case, so each new rule means editing a shared method.</p>' },

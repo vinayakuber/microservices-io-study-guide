@@ -202,6 +202,185 @@ flowchart TD
 ```
 
 
+## Interview Questions
+
+### Q1
+
+A food-delivery startup is one codebase. The architect wants service boundaries that match how the business actually thinks about itself, not technical layers.
+
+**Interviewer's question:** In DDD terms, what is the domain, how do its subdomains relate to the business, and how do they become service boundaries?
+
+**Solution:** The domain is the problem space — the business itself; a domain consists of multiple subdomains, each a different part of the business, and each subdomain becomes one service.
+
+**System-design components:**
+- Domain — the problem space
+- Subdomain — a distinct part of the business
+- One service per subdomain
+
+```mermaid
+flowchart LR
+  D["food delivery domain"] --> S1["catalog subdomain"]
+  D --> S2["orders subdomain"]
+  S1 --> V1["catalog service"]
+  S2 --> V2["orders service"]
+```
+
+```java
+// DECOMPOSITION SIDE — the DDD domain (the business) splits into subdomains, each becoming a service
+// PARTIES: ARC = architect · DOM = the domain (the application's problem space)
+// STATE (before):
+//    domain : { parts: [] }
+//    subdomains : []
+//    services : []
+// DEF: split · CALLED BY: ARC modeling the domain of a food-delivery business
+// -> domain : "food delivery"
+//    step 1 · split the problem space into parts : domain.parts : [] -> ["catalog","kitchen","orders","riders"]
+//    step 2 · each part becomes a subdomain : subdomains : [] -> ["restaurant catalog","kitchen operations","order management","rider dispatch"]
+//    step 3 · each subdomain becomes a service : services : [] -> ["catalog","kitchen","order","dispatch"]
+//    step 4 · count the distinct parts : distinct_areas : 0 -> 4   BECAUSE each subdomain corresponds to a different part of the business
+// <- service_count : 4 · the domain holds multiple subdomains, one service each
+//    alt a part is really two subdomains : service_count : 4 -> 5 (a subdomain is found by iteration)
+```
+
+_This is exactly the domain/subdomain definition and the one-service-per-subdomain mapping in this chapter._
+
+_Covers:_ The domain and its subdomains
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-system-design-interviews
+
+### Q2
+
+The delivery team must decide where to pour in-house effort. It lists three candidates: the search-ranking engine, the customer-support tools, and the email delivery pipeline.
+
+**Interviewer's question:** How do the core, supporting, and generic classifications tell the team where to concentrate effort versus outsource or buy?
+
+**Solution:** Core subdomains are the key differentiator and most valuable; supporting relate to the business but are not differentiators; generic are not business-specific and are ideally bought off the shelf.
+
+**System-design components:**
+- Core — key differentiator
+- Supporting — related but not differentiating
+- Generic — off-the-shelf software
+
+```mermaid
+flowchart LR
+  R["search ranking"] --> CORE["core · invest in-house"]
+  S["customer support"] --> SUP["supporting · in-house or outsource"]
+  E["email delivery"] --> GEN["generic · buy off the shelf"]
+```
+
+```java
+// CLASSIFICATION SIDE — each subdomain is core, supporting, or generic, deciding the investment
+// PARTIES: ARC = architect · BIZ = the business
+// STATE (before):
+//    subdomains : { "search ranking":{class:"unset"}, "customer support":{class:"unset"}, "email delivery":{class:"unset"} }
+//    investment : {}
+// DEF: classify · CALLED BY: ARC rating each subdomain's value to the business
+// -> subdomain : "search ranking"
+//    step 1 · a differentiator is CORE : subdomains["search ranking"].class : "unset" -> "core"   BECAUSE it is the key differentiator and most valuable part
+//    step 2 · related-but-not-differentiating is SUPPORTING : subdomains["customer support"].class : "unset" -> "supporting"
+//    step 3 · not business-specific is GENERIC : subdomains["email delivery"].class : "unset" -> "generic"   BECAUSE it is ideally bought off the shelf
+//    step 4 · route the effort : investment : {} -> {"search ranking":"in-house","customer support":"in-house or outsource","email delivery":"buy"}
+// <- classes : "core","supporting","generic" · investment priority: core first
+//    alt every subdomain marked core : investment : 1 -> 3 core entries (no differentiator is wrong — value decides)
+```
+
+_This is exactly the three-way DDD classification and its investment consequence in this chapter._
+
+_Covers:_ Classify each subdomain
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-system-design-interviews
+
+### Q3
+
+With subdomains identified, the architect maps each to a service and insists the result stay cohesive, loosely coupled, and owned by teams organized around business value.
+
+**Interviewer's question:** When mapping subdomains to services, what properties must the resulting services have, and how are teams organized?
+
+**Solution:** Each subdomain becomes one service; services stay cohesive and loosely coupled behind an API, and teams are cross-functional and organized around delivering business value.
+
+**System-design components:**
+- One service per subdomain
+- Cohesive services
+- Loosely coupled services behind an API
+- Cross-functional teams around business value
+
+```mermaid
+flowchart LR
+  SUB["subdomains"] --> SVC["one service per subdomain"]
+  SVC --> COH["cohesive"]
+  SVC --> LC["loosely coupled behind an API"]
+  SVC --> TM["cross-functional team"]
+```
+
+```java
+// MAPPING SIDE — each subdomain of the food-delivery business becomes one cohesive, loosely coupled service
+// PARTIES: ARC = architect
+// STATE (before):
+//    subdomains : ["restaurant catalog","kitchen operations","order management","rider dispatch"]
+//    services : []
+//    coupling : "unset"
+// DEF: map · CALLED BY: ARC turning subdomains into services
+// -> subdomain_list : ["restaurant catalog","kitchen operations","order management","rider dispatch"]
+//    step 1 · one service per subdomain : services : [] -> ["catalog","kitchen","order","dispatch"]
+//    step 2 · keep each service cohesive : cohesion : "unknown" -> "strong"   BECAUSE each service is one subdomain with one set of functions
+//    step 3 · keep services loosely coupled : coupling : "unset" -> "loose"   BECAUSE each service encapsulates its implementation behind an API
+//    step 4 · organize teams around value : team_focus : "technical layer" -> "business value"
+// <- service_count : 4 · services correspond to subdomains, not to technical layers
+//    alt merge two subdomains : services : 4 -> 3  (a service may contain more than one subdomain)
+```
+
+_This is exactly the one-service-per-subdomain mapping and its cohesion, coupling, and team forces in this chapter._
+
+_Covers:_ Map subdomains to services
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-system-design-interviews
+
+### Q4
+
+The architect has no written list of subdomains. She starts from the company's org groups and the high-level domain model to find them.
+
+**Interviewer's question:** What are the two starting points for identifying subdomains, and why is the process iterative?
+
+**Solution:** Start from the organization structure and the high-level domain model — subdomains often have a key domain object — then refine the boundaries iteratively.
+
+**System-design components:**
+- Organization structure
+- High-level domain model
+- Areas of expertise
+- Iterative refinement
+
+```mermaid
+flowchart LR
+  ORG["org groups"] --> SUB1["subdomain"]
+  DM["domain model"] --> SUB2["subdomain"]
+  SUB1 --> IT["iterate"]
+  SUB2 --> IT
+```
+
+```java
+// IDENTIFICATION SIDE — find subdomains from the org structure and the domain model
+// PARTIES: ARC = architect analyzing the business
+// DEF: domain — the business problem space DDD decomposes into subdomains; here food delivery, whose key domain objects are "Menu" and "Delivery"
+// DEF: org — the organization structure whose groups may correspond to subdomains; here { "Kitchen Ops":{}, "Dispatch Team":{} } = 2 groups
+// STATE (before):
+//    org_groups : { "Kitchen Ops":{}, "Dispatch Team":{} }
+//    domain_model : { "Menu":{}, "Delivery":{} }
+//    subdomains : []
+// DEF: identify · CALLED BY: ARC deriving subdomains from two starting points
+// -> group : "Dispatch Team"
+//    step 1 · an org group suggests a subdomain : subdomains : [] -> ["rider dispatch"]
+//    step 2 · a key domain object suggests another : domain_model["Menu"].subdomain : "none" -> "restaurant catalog"   BECAUSE subdomains often have a key domain object
+//    step 3 · confirm the area of expertise : expertise : "none" -> "dispatching operations"   BECAUSE areas of expertise mark distinct subdomains
+// <- subdomains : ["rider dispatch","restaurant catalog"] · found from org structure + domain model
+//    alt a subdomain is missed : subdomains : 2 -> 3 on a later pass (identification is iterative)
+```
+
+_This is exactly the two starting points and the iterative identification process in this chapter._
+
+_Covers:_ Identifying the subdomains
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-system-design-interviews
+
 ## Key Concepts
 
 ### The Problem
@@ -212,6 +391,14 @@ flowchart TD
 ### The Solution
 
 Define services corresponding to DDD subdomains; a domain consists of multiple subdomains, each corresponding to a different part of the business.
+
+```mermaid
+flowchart LR
+  D["food delivery domain"] --> S1["catalog subdomain"]
+  D --> S2["orders subdomain"]
+  S1 --> V1["catalog service"]
+  S2 --> V2["orders service"]
+```
 
 
 ### Key Facts

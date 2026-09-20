@@ -199,6 +199,172 @@ flowchart TD
 ```
 
 
+## Interview Questions
+
+### Q1
+
+Your order state is stored as the current row only, so you cannot answer how the order got to APPROVED or rebuild it later. You want the full history persisted.
+
+**Interviewer's question:** How does event sourcing persist state, and what does an event record look like?
+
+**Solution:** Instead of storing current state, the service stores the sequence of events that changed it; each event is a record of a state change.
+
+**System-design components:**
+- Event store — holds events
+- Event record — one state change
+- OrderCreated — first event
+- OrderApproved — a later event
+
+```mermaid
+flowchart LR
+  SVC["Order Service"] -->|append events| EVT[("Event store")]
+  EVT -->|E1| A["OrderCreated PO-77 125.00"]
+  EVT -->|E2| B["OrderApproved PO-77"]
+```
+
+```java
+// ORDER SERVICE SIDE — persist state as a sequence of events instead of the current row
+// PARTIES: SVC = Order Service · STORE = the event store
+// STATE (before):
+//    events : []
+//    current_state : {}   // nothing stored as a row
+// DEF: append_event · CALLED BY: SVC on each state change
+// -> event : { order_id:"C-55", type:"OrderCreated", total:125.00 }
+//    step 1 · append the first event : events : [] -> [{ seq:1, order_id:"C-55", type:"OrderCreated", total:125.00 }]
+//    step 2 · append the next event after approval : events : [{seq:1}] -> [{seq:1},{ seq:2, order_id:"C-55", type:"OrderApproved" }]
+//    step 3 · state is derived by replaying events : current_state : {} -> { status:"APPROVED", total:125.00 }   BECAUSE E1 then E2 rebuild it
+// <- outcome : events : [E1 OrderCreated(125.00), E2 OrderApproved] · the full history is stored, not just the current APPROVED state
+```
+
+_This is Event Sourcing — persist the state-changing events themselves as the source of truth._
+
+_Covers:_ Persist state as a sequence of events
+
+_From the 28 problems:_ 26-payment-system · 28-stock-exchange
+
+### Q2
+
+You have an event store full of order events, and you need the current state of order C-55 to serve a read request.
+
+**Interviewer's question:** How does replaying events rebuild the current state of an aggregate?
+
+**Solution:** The service reads the aggregate's events in order and applies each one, accumulating the current state as it goes.
+
+**System-design components:**
+- Event store — the source of events
+- Order aggregate — the object being rebuilt
+- apply — folds each event into state
+- Replay — reads events in order
+
+```mermaid
+flowchart LR
+  STORE[("Event store")] -->|E1 OrderCreated| AGG["Order aggregate"]
+  STORE -->|E2 OrderApproved| AGG
+  AGG -->|apply E1 then E2| NOW["state APPROVED"]
+```
+
+```java
+// ORDER SERVICE SIDE — rebuild current state by replaying the aggregate's events in order
+// PARTIES: SVC = Order Service · STORE = the event store · AGG = the Order aggregate being rebuilt
+// STATE (before):
+//    events : [{ seq:1, order_id:"C-55", type:"OrderCreated", total:125.00 }, { seq:2, order_id:"C-55", type:"OrderApproved" }]
+//    order : { state:"none" }
+// DEF: replay · CALLED BY: SVC to load order "C-55"
+// -> order_id : "C-55"
+//    step 1 · read the events in sequence : loaded : "none" -> [E1, E2]
+//    step 2 · apply E1 : order : { state:"none" } -> { state:"CREATED", total:125.00 }
+//    step 3 · apply E2 : order : { state:"CREATED" } -> { state:"APPROVED", total:125.00 }
+// <- outcome : order : { state:"APPROVED", total:125.00 } · current state rebuilt from E1 then E2
+```
+
+_This is Event Sourcing replay — apply each event in order to rebuild the aggregate's current state._
+
+_Covers:_ Rebuild current state by replaying events
+
+_From the 28 problems:_ 26-payment-system · 28-stock-exchange
+
+### Q3
+
+Replaying a million events to load an account balance is too slow. You want to load most of the state and replay only the tail.
+
+**Interviewer's question:** How does a snapshot shorten replay, and how is the balance rebuilt from it?
+
+**Solution:** The service stores a snapshot of the aggregate's state up to a sequence number, then replays only the events after that snapshot.
+
+**System-design components:**
+- Snapshot — state at sequence 3
+- Events after the snapshot — the tail
+- Replay — only the tail
+- Current state — snapshot plus tail
+
+```mermaid
+flowchart LR
+  SNAP["Snapshot balance 100.00 seq 3"] -->|replay E4| BAL["balance 75.00"]
+  E4["E4 Debit -25.00"] -->|apply| BAL
+```
+
+```java
+// ACCOUNT SERVICE SIDE — shorten replay with a snapshot: load the snapshot, replay only the events after it
+// PARTIES: SVC = Account Service · STORE = the event store · ACC = the Account aggregate
+// STATE (before):
+//    snapshot : { seq:3, balance:100.00 }
+//    events_after : [{ seq:4, type:"Debit", amount:25.00 }]
+//    account : { balance:"none" }
+// DEF: load · CALLED BY: SVC to read the balance
+// -> account_id : "ACC-9"
+//    step 1 · load the snapshot : account : { balance:"none" } -> { balance:100.00, seq:3 }
+//    step 2 · replay only the tail : replayed : 0 -> 1   BECAUSE only E4 is after the snapshot
+//    step 3 · apply E4 : account.balance : 100.00 -> 75.00   BECAUSE 100.00 - 25.00 = 75.00
+// <- outcome : account : { balance:75.00, seq:4 } · rebuilt by replaying 1 event instead of 4
+```
+
+_This is Event Sourcing with snapshots — the snapshot avoids replaying the full history, leaving only the tail._
+
+_Covers:_ Shorten replay with snapshots
+
+_From the 28 problems:_ 26-payment-system · 28-stock-exchange
+
+### Q4
+
+A customer service wants to track reservations the moment an order reserves credit, without rebuilding any order from its events. You want the event store to push new events out.
+
+**Interviewer's question:** How does an event store deliver events to subscribers, and what does the subscriber build?
+
+**Solution:** The event store publishes each new event as it is persisted, and subscribers react to build their own state or trigger workflows.
+
+**System-design components:**
+- Event store — persists and publishes
+- Subscriber — reacts to new events
+- OrderPlaced event — a change to deliver
+- reserved map — built by the subscriber
+
+```mermaid
+flowchart LR
+  STORE[("Event store")] -->|publish OrderPlaced| SUB["Subscriber"]
+  SUB -->|reserveCredit 125.00| RES[("reserved map")]
+```
+
+```java
+// ACCOUNT SERVICE SIDE — the event store delivers new events to subscribers, who build their own state
+// PARTIES: STORE = the event store · SUB = the subscriber in Account Service · BAL = the account balance
+// STATE (before):
+//    balance : 200.00
+//    reserved : {}
+// DEF: persist_and_publish · CALLED BY: STORE when the order aggregate appends an event
+// -> event : { type:"OrderPlaced", order_id:"PO-77", total:125.00 }
+//    step 1 · the store persists the event : persisted : "none" -> { seq:7, type:"OrderPlaced", order_id:"PO-77" }
+//    step 2 · the store delivers it to SUB : delivered : "none" -> "OrderPlaced"
+//    step 3 · SUB reserves credit from the balance : balance : 200.00 -> 75.00   BECAUSE 200.00 - 125.00 = 75.00
+//    step 4 · SUB records the reservation : reserved : {} -> { "PO-77" : 125.00 }
+// <- outcome : balance : 75.00 · reserved : { "PO-77" : 125.00 } · the subscriber reacted without replaying the order
+```
+
+_This is Event Sourcing letting the store deliver to subscribers — new events are pushed so subscribers build their own state._
+
+_Covers:_ Let the event store deliver to subscribers
+
+_From the 28 problems:_ 26-payment-system · 28-stock-exchange
+
 ## Key Concepts
 
 ### The Problem
@@ -209,6 +375,13 @@ flowchart TD
 ### The Solution
 
 Event sourcing persists a business entity (an Order or a Customer) as a sequence of state-changing events; whenever state changes a new event is appended, and current state is rebuilt by replaying them.
+
+```mermaid
+flowchart LR
+  SVC["Order Service"] -->|append events| EVT[("Event store")]
+  EVT -->|E1| A["OrderCreated PO-77 125.00"]
+  EVT -->|E2| B["OrderApproved PO-77"]
+```
 
 
 ### Key Facts

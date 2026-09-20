@@ -264,6 +264,190 @@ flowchart TD
 ```
 
 
+## Interview Questions
+
+### Q1
+
+You run an online store as a single Rails app backed by one Postgres database. A 'place order' operation must reserve stock, reserve credit, and mark the order — and if any one step fails, nothing may be left half-applied.
+
+**Interviewer's question:** How does the monolithic architecture keep a multi-subdomain operation atomic, and why is no distributed transaction or saga needed?
+
+**Solution:** Because every subdomain lives in one component and one database, the whole operation runs as a single local ACID transaction — no network hops, no saga.
+
+**System-design components:**
+- Single deployable component — every subdomain in one process
+- Single database — one transaction spans all subdomains
+- Local operation — no network round trips
+- ACID commit — all writes durable together, or none
+
+```mermaid
+flowchart LR
+  P["placeOrder(PO-5002)"] --> T1["BEGIN T1"]
+  T1 --> O["write order row"]
+  T1 --> C["reserve credit"]
+  O --> CM["COMMIT T1"]
+  C --> CM
+```
+
+```java
+// DATABASE SIDE — one operation spanning Orders + Credit stays a single ACID transaction in one database
+// PARTIES: APP = the monolith · DB = its single Postgres database
+// DEF: credit — the Credit subdomain's ledger, keyed by customer id; here credit entity "CUST-9" = {used:100}
+// DEF: order — the Order subdomain's row, keyed by purchase-order id; here order "PO-5002" = {status:"DRAFT", total:0}
+// STATE (before):
+//    order_entities : { "PO-5002": {status:"DRAFT", total:0} }
+//    credit_entities : { "CUST-9": {used:100} }
+// DEF: placeOrder · CALLED BY: APP handling a synchronous client request
+// -> order_id : "PO-5002" · -> customer : "CUST-9" · -> amount : 60
+//    step 1 · BEGIN local transaction T1 on DB   (a single transaction, not a saga)
+//    step 2 · write the order : order_entities["PO-5002"].status : "DRAFT" -> "PLACED"
+//    step 3 · record the total : order_entities["PO-5002"].total : 0 -> 60
+//    step 4 · consume credit : credit_entities["CUST-9"].used : 100 -> 160   BECAUSE both subdomains' rows live in the one database
+//    step 5 · COMMIT T1   -> both writes durable together (atomic)
+// <- result : "COMMITTED" · 0 network hops, no eventual consistency
+//    alt credit limit exceeded : ROLLBACK T1 -> total back to 0, used back to 100 (all-or-nothing)
+```
+
+_This is exactly the single-component, single-database solution and its all-local, ACID operations in this chapter._
+
+_Covers:_ Subdomains and operations · The monolith solution and its containment
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-system-design-interviews
+
+### Q2
+
+Your monolith now has five subdomains and six teams. Team Orders commits a one-line tax fix, and the CI pipeline rebuilds the entire WAR and reruns every subdomain's tests, so a billing bug blocks the release.
+
+**Interviewer's question:** Which of the five dark energy forces is the pipeline hitting, and why does a single shared artifact cost team autonomy and a fast deployment pipeline?
+
+**Solution:** A single shared artifact forces a full rebuild, full test, and full redeploy for every change — the dark energy forces the monolith cannot fully satisfy.
+
+**System-design components:**
+- One shared artifact — the single app.war
+- One pipeline — builds and tests every subdomain
+- Full redeploy — every instance replaced together
+- Six teams — blocked on each other's changes
+
+```mermaid
+flowchart LR
+  C["tax fix in Orders"] --> B["rebuild whole WAR"]
+  B --> T["rerun 200 tests"]
+  T --> D["redeploy 4 instances"]
+  D --> X["Billing change ships too"]
+```
+
+```java
+// PIPELINE SIDE — one team's one-line change rebuilds the single shared artifact for everyone
+// PARTIES: TA = Team Orders · TBL = Team Billing · CI = the one pipeline
+// STATE (before):
+//    artifact : { subdomains: ["Orders","Billing"], file: "app.war" }
+//    tests_run : 20
+//    instances : 4
+//    restarted : 0
+// DEF: change · CALLED BY: TA committing a one-line fix in Orders
+// -> commit : "fix tax rounding in Orders"
+//    step 1 · rebuild the whole WAR : build_scope : "Orders only" -> "Orders + Billing"
+//    step 2 · rerun every subdomain's tests : tests_run : 20 -> 200   BECAUSE one artifact means every subdomain retests
+//    step 3 · redeploy all instances : restarted : 0 -> 4   BECAUSE a single WAR replaces every instance, Billing's traffic included
+// <- release : "app.war" shipped · both teams' code goes out together
+//    alt TBL has a broken test : TA's fix is blocked -> team autonomy is lost
+```
+
+_This is exactly the dark energy forces — slow pipeline and lost team autonomy — in this chapter._
+
+_Covers:_ The five dark energy forces · The monolith solution and its containment
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-system-design-interviews
+
+### Q3
+
+An architect weighs splitting the monolith into services. A skeptical reviewer asks what the monolith actually wins, given that most operations span two subdomains.
+
+**Interviewer's question:** Which five dark matter forces favor keeping one component, and how does the monolith satisfy each for a typical two-subdomain operation?
+
+**Solution:** Simple and efficient local interactions, ACID over BASE, and minimal runtime and design-time coupling — the monolith wins on all five.
+
+**System-design components:**
+- Simple interactions — one local call
+- Efficient interactions — zero network round trips
+- ACID transaction — no saga
+- Low runtime + design-time coupling
+
+```mermaid
+flowchart LR
+  OP["placeOrder + reserveCredit"] --> L["local, 0 hops"]
+  OP --> A["one ACID txn"]
+  OP --> NC["no cross-service coupling"]
+```
+
+```java
+// OPERATION SIDE — the five dark-matter forces keep one operation local, efficient, and ACID
+// PARTIES: APP = the monolith · DB = its single database
+// DEF: credit — the Credit subdomain's ledger; here credit entity "CUST-9" = {used:100}
+// DEF: order — the Order subdomain's row; here order "PO-5002" = {total:0}
+// STATE (before):
+//    order_entities : { "PO-5002": {total:0} }
+//    credit_entities : { "CUST-9": {used:100} }
+//    local_ops : 0
+// DEF: placeOrder · CALLED BY: APP running an operation across Order + Credit
+// -> order_id : "PO-5002" · -> customer : "CUST-9" · -> amount : 30
+//    step 1 · write the order in-process : order_entities["PO-5002"].total : 0 -> 30
+//    step 2 · reserve credit in the same transaction : credit_entities["CUST-9"].used : 100 -> 130   BECAUSE both subdomains share one database
+//    step 3 · the operation stays local : local_ops : 0 -> 1   BECAUSE no request leaves the process (0 network hops)
+// <- result : "COMMITTED" in 0 hops · simple, efficient, ACID — every dark-matter force satisfied
+//    alt microservices : local_ops : 1 -> 0, and the same operation becomes 2 network hops + an eventual saga
+```
+
+_This is exactly the five dark matter forces that pull the architecture toward one component._
+
+_Covers:_ The five dark matter forces
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-system-design-interviews
+
+### Q4
+
+The monolith is getting painful to build, but the team is not ready to rewrite it as microservices. The lead asks how to contain the damage without splitting into services.
+
+**Interviewer's question:** What is a modular monolith, and how do vertical slices plus an incremental build contain the drawbacks of the monolith?
+
+**Solution:** Organize subdomains into vertical slices of presentation, business, and persistence logic, and speed the pipeline with incremental builds.
+
+**System-design components:**
+- Vertical slice — presentation + business + persistence per subdomain
+- Incremental build — rebuild only changed slices
+- Parallelized build + test steps
+- Automated merge queue
+
+```mermaid
+flowchart LR
+  E["edit orders/persistence"] --> S["orders slice"]
+  S -->|rebuild| IB["incremental build"]
+  BL["billing slice"] -.skip.-> IB
+```
+
+```java
+// SLICE SIDE — a modular monolith packages each subdomain as a vertical slice, containing the change
+// PARTIES: DEV = a developer · CI = the build tool
+// DEF: slice — a vertical cut through presentation, business and persistence for one subdomain; here slice "orders" = {layers: 0}
+// STATE (before):
+//    slices : { "orders": {layers: 0}, "billing": {layers: 0} }
+//    changed_slices : []
+//    tests_run : 200
+// DEF: change · CALLED BY: DEV editing the orders persistence layer
+// -> file : "orders/persistence/order-repo.kt"
+//    step 1 · assign the file to its slice : slices["orders"].layers : 0 -> 3   BECAUSE a slice owns presentation + business + persistence
+//    step 2 · mark only that slice dirty : changed_slices : [] -> ["orders"]
+//    step 3 · rebuild just the slice : tests_run : 200 -> 20   BECAUSE billing's slice is untouched
+// <- build : "orders" slice rebuilt · the change is contained to one vertical slice
+//    alt no slices : every layer of every subdomain rebuilds -> tests_run : 20 -> 200
+```
+
+_This is exactly the modular monolith — vertical slices plus incremental builds — in this chapter._
+
+_Covers:_ The monolith solution and its containment
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-system-design-interviews
+
 ## Key Concepts
 
 ### The Problem
@@ -274,6 +458,15 @@ flowchart TD
 ### The Solution
 
 Structure the application as a single deployable/executable component that uses a single database and contains all of the application's subdomains.
+
+```mermaid
+flowchart LR
+  P["placeOrder(PO-5002)"] --> T1["BEGIN T1"]
+  T1 --> O["write order row"]
+  T1 --> C["reserve credit"]
+  O --> CM["COMMIT T1"]
+  C --> CM
+```
 
 
 ### Key Facts

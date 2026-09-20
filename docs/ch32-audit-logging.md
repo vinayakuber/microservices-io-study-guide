@@ -158,6 +158,178 @@ n0["<b>1. Request arrives</b><br/>create_order for PO-2001"]:::start
 ```
 
 
+## Interview Questions
+
+### Q1
+
+A user named alice views, creates, and pays for order PO-2001. The team needs a durable record of her actions so support can reconstruct what she did later.
+
+**Interviewer's question:** What is the Audit Logging solution, and what does one record capture?
+
+**Solution:** Record user activity in a database: each action a user performs is written as an audit row naming who did what to which target and when.
+
+**System-design components:**
+- User (alice)
+- Order Service
+- audit database
+- audit row (id, user, action, target, at)
+
+```mermaid
+flowchart LR
+  U["alice"] -->|"view/create/pay"| S["Order Service"]
+  S -->|"INSERT row"| D["audit database"]
+  D -->|"3 rows"| L["audit_log"]
+```
+
+```java
+// ORDER SERVICE SIDE — every user action becomes one audit row in the database
+// PARTIES: U1 = user alice · SVC = Order Service · DB = audit database
+// DEF: audit — a durable row recording who did what to which target and when; here (1,"alice","view_order","PO-2001",now)
+// STATE (before):
+//    audit_log : []                                  // rows: (id, user, action, target, at)
+// DEF: record_activity · CALLED BY: U1 performing actions
+// -> action1 : ("alice","view_order","PO-2001")
+//    step 1 · INSERT audit row id=1   audit_log : [] -> [(1,"alice","view_order","PO-2001",now)]
+// -> action2 : ("alice","create_order","PO-2001")
+//    step 2 · INSERT audit row id=2   audit_log : [1 row] -> [(1,"alice","view_order","PO-2001",now),(2,"alice","create_order","PO-2001",now)]
+// -> action3 : ("alice","pay_order","PO-2001")
+//    step 3 · INSERT audit row id=3   audit_log : [2 rows] -> [(1,"alice","view_order","PO-2001",now),(2,"alice","create_order","PO-2001",now),(3,"alice","pay_order","PO-2001",now)]
+// <- outcome : audit_log : 3 rows · WHO=alice, WHAT=view/create/pay, WHEN=timestamp   BECAUSE the DB now holds a record of her actions
+```
+
+_This is the chapter's record-user-activity step: every action becomes a durable row with who, what, and when._
+
+_Covers:_ Recording user activity
+
+_From the 28 problems:_ 20-metrics-monitoring · 26-payment-system
+
+### Q2
+
+A support agent must answer whether alice paid for PO-2001, a compliance auditor needs to know who touched the order, and security wants every payment action.
+
+**Interviewer's question:** Who reads the audit log, and how does a query reconstruct a user's behavior?
+
+**Solution:** Customer support, compliance, and security read the log; querying by user returns that user's actions in order, and the same rows answer "what did alice do" or "who touched PO-2001".
+
+**System-design components:**
+- Support agent
+- compliance auditor
+- security team
+- audit database
+
+```mermaid
+flowchart LR
+  S["Support"] -->|"query user=alice"| D["audit database"]
+  C["Compliance"] -->|"query target=PO-2001"| D
+  K["Security"] -->|"query action=pay_order"| D
+  D -->|"ordered rows"| R["reconstruction"]
+```
+
+```java
+// SUPPORT SIDE — reading the audit log reconstructs what one user did, for support/compliance/security
+// PARTIES: SUP = support agent · DB = audit database
+// STATE (before):
+//    audit_log : [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2),(3,"alice","pay_order","PO-2001",t3)]
+//    answer : []                                   // the reconstruction SUP builds
+// DEF: recent_actions · CALLED BY: SUP investigating "did alice pay?"
+// -> user : "alice"
+//    step 1 · match row id=1    answer : [] -> [(1,"alice","view_order","PO-2001",t1)]
+//    step 2 · match row id=2    answer : [(1,"alice","view_order","PO-2001",t1)] -> [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2)]
+//    step 3 · match row id=3    answer : [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2)] -> [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2),(3,"alice","pay_order","PO-2001",t3)]
+// <- outcome : answer : 3 rows · row id=3 is the payment -> SUP confirms "yes, alice paid at t3"
+//    alt compliance : query "target=PO-2001" to learn who touched it · alt security : query "action=pay_order"
+```
+
+_This is the chapter's who-reads-the-log step: support, compliance, and security reconstruct a user's recent behavior from the same rows._
+
+_Covers:_ Who reads the log
+
+_From the 28 problems:_ 20-metrics-monitoring · 26-payment-system
+
+### Q3
+
+The audit() calls are scattered between business statements inside create_order, and the method is getting hard to read.
+
+**Interviewer's question:** What is the main drawback of audit logging, and where does the audit code sit?
+
+**Solution:** The auditing code is intertwined with the business logic, making it more complicated — audit() calls sit between business statements inside a method.
+
+**System-design components:**
+- Order Service
+- audit() calls
+- business statements
+- inline audit rows
+
+```mermaid
+flowchart LR
+  M["create_order"] -->|"save()"| B["business"]
+  M -->|"audit()"| A["inline_audit"]
+  A -.->|"intertwined"| B
+```
+
+```java
+// ORDER SERVICE SIDE — audit code interleaves with business logic, making the method harder to read
+// PARTIES: SVC = Order Service
+// DEF: inline — audit code that sits between business statements inside one method; here the 2 audit() calls inside create_order
+// STATE (before):
+//    inline_audit : []                 // hand-written audit rows
+// DEF: create_order · CALLED BY: a client request
+// -> order_id : "PO-2001"
+//    step 1 · save the order, then call audit()     inline_audit : [] -> [(1,"create_order","PO-2001")]
+//    step 2 · publish, then call audit()            inline_audit : [1 row] -> [(1,"create_order","PO-2001"),(2,"order_published","PO-2001")]
+//    step 3 · the 2 audit() calls sit between business statements -> the method is harder to read
+// <- outcome : inline_audit : 2 rows · business logic more complicated   BECAUSE the auditing code is intertwined with it
+```
+
+_This is the chapter's intertwined-code drawback: audit() calls between business statements complicate the flow._
+
+_Covers:_ Auditing and event sourcing
+
+_From the 28 problems:_ 20-metrics-monitoring · 26-payment-system
+
+### Q4
+
+The team is tired of hand-writing audit() calls that can drift from what actually happened. They consider making the audit implicit.
+
+**Interviewer's question:** Which related pattern is described as a reliable way to implement auditing, and why?
+
+**Solution:** Event Sourcing: the event log itself is the audit trail, so appending domain events removes the explicit audit() calls.
+
+**System-design components:**
+- Order Service
+- event store
+- domain events
+- implicit audit trail
+
+```mermaid
+flowchart LR
+  S["Order Service"] -->|"append event"| E["event store"]
+  E -->|"OrderCreated, OrderPublished"| L["event_log"]
+  L -->|"is the audit trail"| A["audit read"]
+```
+
+```java
+// ORDER SERVICE SIDE — event sourcing makes auditing implicit: the event log itself is the audit trail
+// PARTIES: SVC = Order Service · ES = event store
+// DEF: event — a domain fact appended to the event store that doubles as the audit record; here (1,"OrderCreated")
+// STATE (before):
+//    event_log : []                    // event-sourced alternative: events ARE the audit record
+//    audit_calls : 0                   // explicit audit() calls the service writes
+// DEF: create_order · CALLED BY: a client request
+// -> order_id : "PO-2001"
+//    step 1 · append the creation event    event_log : [] -> [(1,"OrderCreated")]  BECAUSE the domain event is the fact of creation
+//    step 2 · append the publication event    event_log : [1 row] -> [(1,"OrderCreated"),(2,"OrderPublished")]  BECAUSE publishing is itself a domain fact
+//    step 3 · no audit() call needed    audit_calls : 0 -> 0  BECAUSE the audit is a read of event_log, not a separate write
+// <- outcome : event_log : 2 rows · audit_calls : 0 · the audit trail is the event log itself
+//    alt hand-written audit : 2 explicit audit() calls between business statements -> the method is harder to read and the audit can drift
+```
+
+_This is the chapter's event-sourcing alternative: the event log itself is the audit trail, removing the intertwined audit() calls._
+
+_Covers:_ Auditing and event sourcing
+
+_From the 28 problems:_ 20-metrics-monitoring · 26-payment-system
+
 ## Key Concepts
 
 ### The Problem
@@ -168,6 +340,13 @@ n0["<b>1. Request arrives</b><br/>create_order for PO-2001"]:::start
 ### The Solution
 
 Record user activity in a database, giving a record of user actions.
+
+```mermaid
+flowchart LR
+  U["alice"] -->|"view/create/pay"| S["Order Service"]
+  S -->|"INSERT row"| D["audit database"]
+  D -->|"3 rows"| L["audit_log"]
+```
 
 
 ### Key Facts

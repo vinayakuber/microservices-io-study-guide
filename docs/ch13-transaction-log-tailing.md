@@ -173,6 +173,204 @@ flowchart TD
 ```
 
 
+## Interview Questions
+
+### Q1
+
+Your order service writes events to an outbox table, and you want a relay that does not repeatedly query the table but instead follows the database's own record of committed writes.
+
+**Interviewer's question:** How does Transaction Log Tailing discover and publish outbox messages, and which database mechanisms does it read?
+
+**Solution:** A tailer reads the database transaction log — MySQL binlog, Postgres WAL, or DynamoDB streams — recognizes each outbox insert, and publishes the embedded message to the broker.
+
+**System-design components:**
+- Transaction log — MySQL binlog / Postgres WAL / DynamoDB streams
+- Tailer process — reads the log at a saved position
+- Outbox insert — the log entry to recognize
+- Message broker — receives each published message
+
+```mermaid
+flowchart LR
+  SVC["Order Service commits"] -->|outbox insert| DB[("PostgreSQL")]
+  DB -->|WAL entry| WAL[("Write-ahead log")]
+  WAL -->|read at position| TLR["Log tailer"]
+  TLR -->|publish OrderCreated| BRK[("Message broker")]
+```
+
+```java
+// TAILER SIDE — the relay reads the WAL and publishes each committed outbox insert
+// PARTIES: SVC = Order Service · DB = PostgreSQL database · WAL = write-ahead log · TLR = log tailer · BRK = message broker
+// STATE (before):
+//    outbox : [ ]
+//    wal : [ ]
+//    position : 0
+//    published : [ ]
+// DEF: commit_outbox · CALLED BY: SVC committing a transaction that inserts outbox row 50
+// -> event : "OrderCreated"
+//    step 1 · insert outbox row : outbox : [ ] -> [ (50, "OrderCreated") ]
+//    step 2 · WAL records the commit : wal : [ ] -> [ { "op":"insert", "table":"outbox", "row":(50,"OrderCreated") } ]   BECAUSE the commit is appended to the WAL as a log entry
+// <- output : DB has (50,"OrderCreated") committed · WAL has 1 new entry
+// DEF: tail_once · CALLED BY: TLR reading the WAL at its saved position 0
+// -> read : next WAL entry at position 0
+//    step 1 · read next entry : entry : "none" -> { "op":"insert", "row":(50,"OrderCreated") }   BECAUSE position 0 is the first unread WAL entry
+//    step 2 · publish OrderCreated : published : [ ] -> [ "OrderCreated" ]
+//    step 3 · advance position : position : 0 -> 1
+// <- output : BRK receives [ "OrderCreated" ] · tailer position now 1
+```
+
+_This is Transaction Log Tailing — read the log, recognize each outbox insert, and publish it._
+
+_Covers:_ Tail the transaction log
+
+_From the 28 problems:_ 19-distributed-message-queue · 26-payment-system
+
+### Q2
+
+You are worried a relay could publish an event for a transaction that later rolls back, or that atomicity would require a two-phase commit between the database and the broker.
+
+**Interviewer's question:** Why is Transaction Log Tailing guaranteed accurate without 2PC?
+
+**Solution:** The log records only committed writes, so a rolled-back transaction's outbox insert never appears and is never published, and the broker is never enlisted in the database transaction.
+
+**System-design components:**
+- Commit — the write the log records
+- Rollback — the write the log never records
+- Tailer — publishes only what the log shows committed
+- Broker — never enlisted, so no 2PC
+
+```mermaid
+flowchart LR
+  TX1["Commit OrderCreated"] -->|binlog write| LOG[("Binlog")]
+  TX2["Rollback OrderShipped"] -->|no committed write| LOG
+  LOG -->|only committed rows| TLR["Publishes OrderCreated only"]
+  TLR --> BRK[("Broker, never enlisted")]
+```
+
+```java
+// TAILER SIDE — the log carries only committed writes, so a rolled-back event is never published
+// PARTIES: SVC = Order Service · DB = MySQL database · LOG = binlog · TLR = log tailer · BRK = message broker
+// STATE (before):
+//    outbox : [ ]
+//    binlog : [ ]
+//    published : [ ]
+// DEF: commit_tx · CALLED BY: SVC committing a transaction
+// -> event : "OrderCreated"
+//    step 1 · insert outbox row : outbox : [ ] -> [ (60, "OrderCreated") ]
+//    step 2 · binlog append : binlog : [ ] -> [ { "seq":60, "op":"write", "table":"outbox", "row":(60,"OrderCreated") } ]   BECAUSE the commit is written to the binlog
+// <- output : TLR sees seq 60 and publishes "OrderCreated" · no 2PC (BRK is never enlisted)
+// DEF: rollback_tx · CALLED BY: SVC rolling back a different transaction
+// -> event : "OrderShipped"
+//    step 1 · insert outbox row : outbox : [ (60,"OrderCreated") ] -> [ (60,"OrderCreated"), (61,"OrderShipped") ]
+//    step 2 · rollback : outbox : [ (60,"OrderCreated"), (61,"OrderShipped") ] -> [ (60,"OrderCreated") ]   BECAUSE the rollback undoes the insert
+//    step 3 · binlog unchanged : binlog : [ { "seq":60, "op":"write", "table":"outbox", "row":(60,"OrderCreated") } ] -> [ { "seq":60, "op":"write", "table":"outbox", "row":(60,"OrderCreated") } ]   BECAUSE a rolled-back write is not committed to the binlog
+// <- output : TLR never sees "OrderShipped" · BRK receives only "OrderCreated" (0 copies of "OrderShipped")
+```
+
+_This is Transaction Log Tailing's accuracy guarantee — the log records commits only, so no 2PC is needed._
+
+_Covers:_ No 2PC and guaranteed accurate
+
+_From the 28 problems:_ 19-distributed-message-queue · 26-payment-system
+
+### Q3
+
+Your tailer published an event but crashed before it saved its log position. On restart it reads the same entry again and publishes it a second time, and now the consumer has seen the event twice.
+
+**Interviewer's question:** Why is avoiding duplicate publishing tricky, and how do you keep the consumer safe?
+
+**Solution:** A tailer that crashes between publishing and saving its position re-reads and re-publishes the same entry on restart, so the consumer records processed message ids and skips duplicates.
+
+**System-design components:**
+- Log position — how far the tailer has read
+- Crash window — publish before position-save
+- Re-read entry — published twice
+- Consumer dedupe — processed-message table
+
+```mermaid
+flowchart LR
+  TLR["Tailer reads seq 70"] -->|publish OrderCreated| BRK[("Broker")]
+  TLR -->|crash before save| P["position stays 69"]
+  P -->|restart, re-read seq 70| TLR2["Tailer re-publishes"]
+  TLR2 --> BRK
+  BRK -->|OrderCreated x2| CNS["Consumer dedupes to once"]
+```
+
+```java
+// TAILER SIDE — a crash between publish and position-save re-reads an entry, so consumers dedupe
+// PARTIES: TLR = log tailer · DB = MySQL database · BRK = message broker · CNS = consumer service
+// STATE (before):
+//    binlog : [ { "seq":70, "row":(70,"OrderCreated") } ]
+//    position : 69
+//    published : [ ]
+//    processed : { }
+// DEF: tail_seq70 · CALLED BY: TLR reading the next binlog entry
+// -> read : entry seq 70
+//    step 1 · publish OrderCreated : published : [ ] -> [ "OrderCreated" ]
+//    step 2 · CRASH : position : 69 -> 69   // tailer dies BEFORE saving seq 70, so position stays 69
+// <- outcome : BRK has [ "OrderCreated" ] · saved position still 69
+// DEF: tail_restart · CALLED BY: TLR after restart, resuming from saved position 69
+// -> read : entry seq 70 again   // position 69 means seq 70 is re-read
+//    step 1 · re-publish OrderCreated : published : [ "OrderCreated" ] -> [ "OrderCreated", "OrderCreated" ]   BECAUSE seq 70 was published but never saved, so duplicate
+//    step 2 · save position : position : 69 -> 70
+//    step 3 · CNS dedupes : processed : { } -> { "OrderCreated" : true }   BECAUSE CNS runs INSERT ... ON CONFLICT DO NOTHING on its processed table
+// <- output : BRK delivered "OrderCreated" twice · CNS handled it once (the second copy is skipped)
+```
+
+_This is Transaction Log Tailing's duplicate tradeoff — the crash window forces consumer-side dedupe._
+
+_Covers:_ Database-specific and duplicate-prone
+
+_From the 28 problems:_ 19-distributed-message-queue · 26-payment-system
+
+### Q4
+
+Your team built a tailer for MySQL binlog, then split a service onto PostgreSQL and realized the same code cannot read the new database's log format.
+
+**Interviewer's question:** Why is Transaction Log Tailing database-specific, and what does a tailer have to know to follow one database's log?
+
+**Solution:** The tailer must parse the specific log format — MySQL binlog, Postgres WAL, or DynamoDB streams — so it is coupled to one database and needs a reader per database type.
+
+**System-design components:**
+- MySQL binlog — one log format
+- Postgres WAL — a different log format
+- DynamoDB streams — a third mechanism
+- Tailer — written per database
+
+```mermaid
+flowchart LR
+  MY[("MySQL binlog")] -->|reader A| TLR["Tailer"]
+  PG[("Postgres WAL")] -->|reader B| TLR
+  DD[("DynamoDB streams")] -->|reader C| TLR
+  TLR --> BRK[("Broker")]
+```
+
+```java
+// TAILER SIDE — each database logs commits in its own format, so the tailer needs a database-specific reader
+// PARTIES: TLR = log tailer · BRK = message broker
+// DEF: mysql_binlog — MySQL's log entry = { "seq":80, "op":"write", "table":"outbox", "row":(80,"OrderCreated") }
+// DEF: pg_wal — PostgreSQL's WAL entry = { "lsn":"0/1A2B", "op":"insert", "table":"outbox", "row":(80,"OrderCreated") }
+// STATE (before):
+//    published : [ ]
+//    position_mysql : 79
+//    position_pg : "0/0000"
+// DEF: tail_mysql · CALLED BY: TLR reading MySQL's binlog
+// -> read : entry seq 80
+//    step 1 · parse the binlog row : event : "none" -> "OrderCreated"   BECAUSE the reader understands MySQL's op and row fields
+//    step 2 · publish : published : [ ] -> [ "OrderCreated" ]
+//    step 3 · advance : position_mysql : 79 -> 80
+// <- output : BRK receives [ "OrderCreated" ] · a binlog reader followed MySQL
+// DEF: tail_postgres · CALLED BY: TLR reading PostgreSQL's WAL with the SAME code
+// -> read : entry at lsn 0/1A2B
+//    step 1 · parse fails : event : "none" -> "none"   BECAUSE the MySQL reader does not know the WAL's lsn field
+// <- output : BRK receives 0 messages · one reader per database, so PostgreSQL needs its own WAL reader
+```
+
+_This is Transaction Log Tailing's database-specific tradeoff — the tailer is coupled to one log format._
+
+_Covers:_ Database-specific and duplicate-prone
+
+_From the 28 problems:_ 19-distributed-message-queue · 26-payment-system
+
 ## Key Concepts
 
 ### The Problem
@@ -183,6 +381,14 @@ flowchart TD
 ### The Solution
 
 Tail the log and publish each outbox insert to the broker, using MySQL binlog, Postgres WAL, or DynamoDB table streams.
+
+```mermaid
+flowchart LR
+  SVC["Order Service commits"] -->|outbox insert| DB[("PostgreSQL")]
+  DB -->|WAL entry| WAL[("Write-ahead log")]
+  WAL -->|read at position| TLR["Log tailer"]
+  TLR -->|publish OrderCreated| BRK[("Message broker")]
+```
 
 
 ### Key Facts

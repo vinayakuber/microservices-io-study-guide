@@ -203,6 +203,177 @@ n0["<b>1. Issue crosses threshold</b><br/>FP-77A3 count 2, state OPEN, threshold
 ```
 
 
+## Interview Questions
+
+### Q1
+
+Your order service runs as many instances across many machines, and one instance starts failing whenever it looks up a customer that is missing from the database. You need the message and the stack trace captured at the moment of the throw, not reconstructed later.
+
+**Interviewer's question:** Walk me through the first stage of Exception tracking — what does a service instance throw, and what exactly does the handler capture from it?
+
+**Solution:** The handler catches the exception and packages its error message plus the stack trace into a reportable record at the source, before anything is lost.
+
+**System-design components:**
+- Order Service instance — throws and catches
+- Exception object — error message + stack trace
+- Handler catch block — packages the record
+- Report record — msg + stack + timestamp
+
+```mermaid
+flowchart LR
+  U1["User calls GET /orders REQ-7001"] -->|"throws"| E["Exception: customer is null"]
+  E -->|"caught"| H["Handler catch block"]
+  H -->|"packages"| R["Report msg + stack + ts"]
+```
+
+```java
+// ORDER SERVICE SIDE — one request throws, and the handler captures the message plus stack trace before the thread dies
+// PARTIES: SVC = Order Service instance · U1 = the user calling the service · DB = the database that returns no row
+// STATE (before):
+//    req : { id:"REQ-7001", path:"/orders", status:"OPEN" }
+//    report : {}
+// DEF: handle_request · CALLED BY: U1 submitting GET /orders with id REQ-7001
+// -> req_id : "REQ-7001"
+//    step 1 · query the customer row for REQ-7001 -> none   // lookup : "pending" -> null   BECAUSE DB holds no row for REQ-7001
+//    step 2 · throw NullPointerException("customer is null")   // err : null -> "customer is null"
+//    step 3 · catch in the handler, capture message + stack trace   // report : {} -> {msg:"customer is null", stack:"SVC.doGet line 42", ts:19}
+// <- captured : report = {msg:"customer is null", stack:"SVC.doGet line 42", ts:19} · 1 exception now held for reporting
+//    alt no catch block : the thread dies, report stays {} -> the failure is invisible to every later step
+```
+
+_This is the capture stage of Exception tracking — the throw, the message-plus-stack-trace, and the handler that packages them._
+
+_Covers:_ Capture the exception
+
+_From the 28 problems:_ 20-metrics-monitoring
+
+### Q2
+
+A single instance's log file is not where your developers look, so you stand up a centralized exception tracking service. Every caught exception must reach it without slowing down the request path it is observing.
+
+**Interviewer's question:** How does a service report a captured exception to the centralized tracker, and why is the exception also written to the local log?
+
+**Solution:** The service POSTs the message plus stack trace to the tracking service, receives an acknowledgement, and also writes the same line to its local log so Log aggregation keeps a copy.
+
+**System-design components:**
+- Order Service — the sender
+- Exception tracking service — the receiver
+- HTTP POST /exceptions — the transport
+- Local log file — the secondary copy
+
+```mermaid
+flowchart LR
+  SVC["Order Service"] -->|"POST /exceptions"| TRK["Exception tracking service"]
+  TRK -->|"200 stored"| SVC
+  SVC -->|"also writes"| LOG["Local log file"]
+```
+
+```java
+// ORDER SERVICE SIDE — the captured exception is POSTed to the centralized tracker and also written to the local log
+// PARTIES: SVC = Order Service instance · TRK = exception tracking service
+// STATE (before):
+//    report : { id:"EX-7001", msg:"customer is null", stack:"SVC.doGet line 42", ts:19 }
+//    sent : false
+//    logfile : []
+// DEF: report_exception · CALLED BY: the handler right after it catches, over HTTP
+// -> ex_id : "EX-7001"
+//    step 1 · serialize the report into a request body   // payload : {} -> {id:"EX-7001", msg:"customer is null", stack:"SVC.doGet line 42"}
+//    step 2 · POST /exceptions to TRK -> stored   // tracker_store : [] -> ["EX-7001"]
+//    step 3 · TRK returns 200, SVC marks it sent   // sent : false -> true
+//    step 4 · also write the line to the local log   // logfile : [] -> ["EX-7001 customer is null"]
+// <- ack : "EX-7001 stored" · the exception now lives in the central tracker AND the local log
+//    alt TRK unreachable : POST fails, sent stays false, but logfile still gains the line -> Log aggregation keeps a copy
+```
+
+_This is the report stage — pointing the service at the centralized tracker, sending the message plus stack trace, and acknowledging it._
+
+_Covers:_ Report to a centralized tracker
+
+_From the 28 problems:_ 20-metrics-monitoring
+
+### Q3
+
+The same null-customer bug is firing across hundreds of instances, and if every throw becomes its own row, the noise buries the signal. Your tracker must collapse all the repeats into a single issue.
+
+**Interviewer's question:** How does the centralized tracker de-duplicate exceptions — what is the key it fingerprints on, and what happens on the first sighting versus a repeat?
+
+**Solution:** The tracker fingerprints each exception by its stack trace, creates a tracked issue on the first sighting, and increments the same issue on every later report with the same fingerprint.
+
+**System-design components:**
+- Stack-trace fingerprint — the dedup key
+- Issue store — fingerprint to count map
+- First sighting — creates the issue
+- Repeat — increments the count
+
+```mermaid
+flowchart LR
+  SVC1["Instance 1 report"] -->|"fp FP-77A3"| TRK["Tracker issues map"]
+  SVC2["Instance 2 report"] -->|"fp FP-77A3"| TRK
+  TRK -->|"create then increment"| I["Issue FP-77A3 count 2"]
+```
+
+```java
+// TRACKER SIDE — two instances of the same bug collapse into one tracked issue keyed on the stack-trace fingerprint
+// PARTIES: SVC1 = Order Service instance 1 · SVC2 = Order Service instance 2 · TRK = exception tracking service
+// STATE (before):
+//    issues : {}   // fingerprint -> issue map, the tracker's store, empty
+// DEF: ingest · CALLED BY: TRK for each reported exception, keyed on the stack-trace hash
+// -> ex1 : { id:"EX-7001", msg:"customer is null", fp:"FP-77A3" }
+//    step 1 · hash the stack trace into a fingerprint   // fp : null -> "FP-77A3"
+//    step 2 · look up issues["FP-77A3"] -> not found, so create the issue   // issues : {} -> {"FP-77A3":{count:1, state:"OPEN"}}
+//    step 3 · later SVC2 reports the SAME bug with fp "FP-77A3" -> seen, so increment   // issues["FP-77A3"].count : 1 -> 2
+// <- aggregate : issues = {"FP-77A3":{count:2, state:"OPEN"}} · 2 exceptions deduplicated into 1 issue
+//    alt a new fingerprint "FP-1B20" : issues : {"FP-77A3":{count:2}} -> {"FP-77A3":{count:2}, "FP-1B20":{count:1}} · a 2nd distinct issue
+```
+
+_This is the de-duplication and aggregation stage — fingerprinting by stack trace, creating on first sight, and incrementing on repeat._
+
+_Covers:_ De-duplicate and aggregate
+
+_From the 28 problems:_ 20-metrics-monitoring
+
+### Q4
+
+An aggregated issue is still not fixed until a human sees it. Your tracker should wake someone when an issue crosses a threshold, and record when the underlying bug is actually closed.
+
+**Interviewer's question:** After aggregation, how does Exception tracking turn a pile of exceptions into a fixed product — what notifies the developer and what marks the issue resolved?
+
+**Solution:** The tracker notifies a developer when an issue needs attention; the developer investigates the message and stack trace, fixes the underlying cause, and marks the issue resolved.
+
+**System-design components:**
+- Threshold crossing — triggers the notify
+- Notification — to the on-call developer
+- Investigation — reads msg + stack trace
+- Resolution state — OPEN to RESOLVED
+
+```mermaid
+flowchart LR
+  TRK["Tracker issue count 2"] -->|"crosses threshold 1"| DEV["On-call developer"]
+  DEV -->|"commits fix"| FIX["commit-9f2c"]
+  FIX -->|"marks"| RES["state RESOLVED"]
+```
+
+```java
+// TRACKER SIDE — an issue whose count crosses the threshold notifies the developer, who fixes and resolves it
+// PARTIES: TRK = exception tracking service · DEV = the on-call developer
+// STATE (before):
+//    issue : { fp:"FP-77A3", count:2, state:"OPEN" }
+//    alert : []
+// DEF: notify_and_resolve · CALLED BY: TRK when an issue's count crosses the threshold 1
+// -> issue_fp : "FP-77A3"
+//    step 1 · count 2 crosses threshold 1 -> notify DEV   // alert : [] -> ["FP-77A3 -> DEV"]
+//    step 2 · DEV reads the message and stack, finds the null-customer path, commits a fix   // fix : null -> "commit-9f2c"
+//    step 3 · DEV marks the issue resolved   // issue.state : "OPEN" -> "RESOLVED"
+// <- resolution : issue.state = "RESOLVED" · the underlying bug is closed, not just the symptom logged
+//    alt the bug reappears : a new report with fp "FP-77A3" -> count : 2 -> 3 and state : "RESOLVED" -> "OPEN"
+```
+
+_This is the final stage — notifying developers, investigating, and resolving the underlying issue._
+
+_Covers:_ Notify developers and resolve
+
+_From the 28 problems:_ 20-metrics-monitoring
+
 ## Key Concepts
 
 ### The Problem
@@ -213,6 +384,13 @@ n0["<b>1. Issue crosses threshold</b><br/>FP-77A3 count 2, state OPEN, threshold
 ### The Solution
 
 Report all exceptions to a centralized exception tracking service that aggregates and tracks them and notifies developers.
+
+```mermaid
+flowchart LR
+  U1["User calls GET /orders REQ-7001"] -->|"throws"| E["Exception: customer is null"]
+  E -->|"caught"| H["Handler catch block"]
+  H -->|"packages"| R["Report msg + stack + ts"]
+```
 
 
 ### Key Facts

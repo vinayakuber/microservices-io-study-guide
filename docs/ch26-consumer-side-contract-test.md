@@ -193,6 +193,184 @@ flowchart TD
 ```
 
 
+## Interview Questions
+
+### Q1
+
+Order Service changed its endpoint, and the OrderServiceProxy stopped talking to it. The team wants a test whose subject is the client itself — not the provider — asking whether the proxy can still communicate.
+
+**Interviewer's question:** What does a consumer-side contract test verify, and which two directions of communication does "can communicate" cover?
+
+**Solution:** It verifies that the client of a service can communicate with the service: the client sends a well-formed request and consumes the service's reply.
+
+**System-design components:**
+- OrderServiceProxy (client)
+- Order Service
+- client-side test
+- request + reply assertions
+
+```mermaid
+flowchart LR
+  T["Client-side test"] -->|"asserts"| S["sends GET /orders/ORD-4007"]
+  T -->|"asserts"| R["reads status + JSON body"]
+  T -->|"subjects"| C["OrderServiceProxy"]
+```
+
+```java
+// CLIENT SIDE — verify the client can communicate with the service (the client's half of the contract)
+// PARTIES: CLI = OrderServiceProxy (the client) · SVC = Order Service (the service) · TST = the client-side test
+// STATE (before):
+//    request : { method:"", path:"", headers:{} }
+//    response : { status:0, body:{} }
+// DEF: call_get_order · CALLED BY: TST exercising the client against the service contract
+// -> order_id : "ORD-4007"
+//    step 1 · form the request : request.method : "" -> "GET" · request.path : "" -> "/orders/ORD-4007"  BECAUSE the client must send the service's expected method and path
+//    step 2 · send and receive : response.status : 0 -> 200  BECAUSE the service answers the well-formed request
+//    step 3 · parse the body : response.body : {} -> {"orderId":"ORD-4007","state":"CREATED"}  BECAUSE the client reads the order's JSON from the reply
+// <- verdict : "pass" · response.status : 200  BECAUSE the client sent a valid request and consumed the reply
+//    alt client cannot communicate : response.status : 200 -> 500  BECAUSE the client sent a malformed path
+//       verdict : "pass" -> "fail"  BECAUSE the client no longer reaches the service's contract
+```
+
+_This is the chapter's core statement: the client is the thing under test, and communicating means both sending and reading._
+
+_Covers:_ The client's half of the contract
+
+_From the 28 problems:_ 03-framework-for-system-design-interviews
+
+### Q2
+
+A developer typos the path template in OrderServiceProxy, changing /orders to /order. The request leaves the client but never reaches a valid endpoint.
+
+**Interviewer's question:** What three pieces must the client get right in its outgoing request, and how does a wrong path fail the test?
+
+**Solution:** The client must send the method, substitute the concrete id into the path template, and advertise the headers it needs; a wrong path means the request misses the service's endpoint and the test fails.
+
+**System-design components:**
+- OrderServiceProxy
+- Order Service
+- method/path/headers builder
+
+```mermaid
+flowchart LR
+  C["OrderServiceProxy"] -->|"method GET"| R["outbound request"]
+  C -->|"path /orders/ORD-4007"| R
+  C -->|"Accept header"| R
+  R -->|"hits endpoint"| S["Order Service"]
+```
+
+```java
+// CLIENT SIDE — the outgoing request: the client must form the service's expected method, path, and headers
+// PARTIES: CLI = OrderServiceProxy · SVC = Order Service
+// STATE (before):
+//    outbound : { method:"", path:"", headers:{} }
+//    verdict : ""
+// DEF: build_request · CALLED BY: the client-side test
+// -> order_id : "ORD-4007" · -> accept : "application/json"
+//    step 1 · method : outbound.method : "" -> "GET"  BECAUSE the contract says GET /orders/{orderId}
+//    step 2 · path : outbound.path : "" -> "/orders/ORD-4007"  BECAUSE the client substitutes the order id into the path template
+//    step 3 · headers : outbound.headers : {} -> {"Accept":"application/json"}  BECAUSE the client advertises the format it can read
+// <- outbound : {"method":"GET","path":"/orders/ORD-4007","headers":{"Accept":"application/json"}}
+//    alt wrong path : outbound.path : "/orders/ORD-4007" -> "/order/ORD-4007"  BECAUSE a client typo drops the plural
+//       verdict : "pass" -> "fail"  BECAUSE the service expects /orders, not /order
+```
+
+_This is the chapter's first half of "can communicate": forming the outgoing request correctly._
+
+_Covers:_ Forming the outgoing request
+
+_From the 28 problems:_ 03-framework-for-system-design-interviews
+
+### Q3
+
+The service now returns a Content-Type header and a JSON body, and the proxy must decode them into its own fields. A client that misparses a healthy reply is still broken.
+
+**Interviewer's question:** What must the client do with the incoming response, in order?
+
+**Solution:** The client confirms the status is a success, checks the content-type header, then decodes the body into its own fields such as orderId and state.
+
+**System-design components:**
+- OrderServiceProxy
+- Order Service
+- status check
+- header check
+- body decoder
+
+```mermaid
+flowchart LR
+  S["Order Service"] -->|"200 + JSON body"| C["OrderServiceProxy"]
+  C -->|"read status"| A["received.status"]
+  C -->|"read Content-Type"| B["received.headers"]
+  C -->|"decode"| D["parsed: orderId, state"]
+```
+
+```java
+// CLIENT SIDE — the incoming response: the client must read the service's status, headers, and body correctly
+// PARTIES: CLI = OrderServiceProxy · SVC = Order Service
+// STATE (before):
+//    received : { status:0, headers:{}, body:{} }
+//    parsed : { orderId:"", state:"" }
+// DEF: consume_response · CALLED BY: the client-side test after the call returns
+// -> raw_reply : {"status":200,"headers":{"Content-Type":"application/json"},"body":{"orderId":"ORD-4007","state":"CREATED"}}
+//    step 1 · read the status : received.status : 0 -> 200  BECAUSE the client confirms the call succeeded before parsing
+//    step 2 · read the headers : received.headers : {} -> {"Content-Type":"application/json"}  BECAUSE the client checks the body is JSON before decoding
+//    step 3 · decode the body : parsed.orderId : "" -> "ORD-4007" · parsed.state : "" -> "CREATED"  BECAUSE the client decodes the JSON body into its own fields
+// <- parsed : {"orderId":"ORD-4007","state":"CREATED"} · received.status : 200
+//    alt unexpected body : received.body : {} -> {"error":"not found"}  BECAUSE the service returned an error shape instead
+//       parsed.orderId : "ORD-4007" -> ""  BECAUSE an error body carries no orderId to decode
+```
+
+_This is the chapter's second half of "can communicate": consuming the incoming response correctly._
+
+_Covers:_ Consuming the incoming response
+
+_From the 28 problems:_ 03-framework-for-system-design-interviews
+
+### Q4
+
+The team debates where to put the test: on the provider (consumer-driven) or on the client (consumer-side). They need the test to catch a client regression the moment it is written.
+
+**Interviewer's question:** Which side is the subject under test in a consumer-side contract test, and how does it relate to the consumer-driven contract test?
+
+**Solution:** The client is the subject: the test asserts what the client sends and what it reads, and both assertions must hold; it complements the consumer-driven test, which checks the provider meets expectations.
+
+**System-design components:**
+- OrderServiceProxy (subject)
+- Order Service
+- request assertion
+- response assertion
+
+```mermaid
+flowchart LR
+  T["Consumer-side test"] -->|"checks sends"| S["GET /orders/ORD-4007"]
+  T -->|"checks reads"| R["orderId, state"]
+  T -.->|"complements"| D["consumer-driven (provider side)"]
+```
+
+```java
+// CLIENT SIDE — the client is the subject under test, not the provider
+// PARTIES: CLI = OrderServiceProxy (subject) · SVC = Order Service (the service it talks to)
+// DEF: behavior — the client's observable actions; here what it sends ("GET /orders/ORD-4007") and reads ("orderId,state"), held in cli_behavior
+// STATE (before):
+//    cli_behavior : { sends:"", reads:"" }
+//    checks : 0
+//    failures : 0
+// DEF: assert_client_can_talk · CALLED BY: the consumer-side test
+// -> order_id : "ORD-4007"
+//    step 1 · check outgoing : cli_behavior.sends : "" -> "GET /orders/ORD-4007"  BECAUSE the test asserts the client forms the correct request
+//    step 2 · check incoming : cli_behavior.reads : "" -> "orderId,state"  BECAUSE the test asserts the client parses the reply's fields
+//    step 3 · tally : checks : 0 -> 2  BECAUSE both the request and the response assertions pass
+// <- failures : 0  BECAUSE the client can communicate with the service
+//    alt client cannot talk : cli_behavior.sends : "GET /orders/ORD-4007" -> "GET /order/ORD-4007"  BECAUSE the client used the wrong path
+//       failures : 0 -> 1  BECAUSE the wrong path means the client cannot reach the service's endpoint
+```
+
+_This is the chapter's framing: the client is the subject, and the two assertions together prove it can communicate._
+
+_Covers:_ The client is the thing under test · The client's half of the contract
+
+_From the 28 problems:_ 03-framework-for-system-design-interviews
+
 ## Key Concepts
 
 ### The Problem
@@ -203,6 +381,13 @@ flowchart TD
 ### The Solution
 
 Verify that the client of a service can communicate with the service.
+
+```mermaid
+flowchart LR
+  T["Client-side test"] -->|"asserts"| S["sends GET /orders/ORD-4007"]
+  T -->|"asserts"| R["reads status + JSON body"]
+  T -->|"subjects"| C["OrderServiceProxy"]
+```
 
 
 ### Key Facts

@@ -206,6 +206,176 @@ flowchart TD
 ```
 
 
+## Interview Questions
+
+### Q1
+
+Your order service writes to a normalized Order table, but queries must compute totals, discounts, and joins by replaying past events every time. Reads have become expensive and slow.
+
+**Interviewer's question:** Why does the current state get hard to read when the write model is normalized, and what does CQRS change?
+
+**Solution:** A normalized write model makes reads require costly joins and replay; CQRS defines separate query and command models so reads use a shape optimized for them.
+
+**System-design components:**
+- Write model — normalized, for commands
+- Read model — for queries
+- Replay — what reads must avoid
+- CQRS — separates the two models
+
+```mermaid
+flowchart LR
+  CMD["Command"] -->|writes| WM["Write model (normalized)"]
+  QRY["Query"] -->|reads| RM["Read model (denormalized)"]
+  WM -.->|replay + join| SLOW["slow reads"]
+  RM -->|precomputed| FAST["fast reads"]
+```
+
+```java
+// ORDER SERVICE SIDE — the problem CQRS fixes: reading the current state from a normalized write model means replaying and joining
+// PARTIES: SVC = Order Service · WM = the normalized write model
+// STATE (before):
+//    events : [{ type:"order_created", total:120.00 }, { type:"order_updated", total:95.00 }]
+//    computed : { total:"none" }
+// DEF: read_order_total · CALLED BY: a query on the normalized write model
+// -> order_id : "PO-77"
+//    step 1 · replay event 1 : computed.total : "none" -> 120.00
+//    step 2 · replay event 2 : computed.total : 120.00 -> 95.00   BECAUSE order_updated changed the total
+//    step 3 · join with other tables to finish the read : computed.total : 95.00 -> 95.00 (plus joins)
+// <- outcome : computed.total : 95.00 · every read replays events and joins, so a dedicated read model would be faster
+```
+
+_This is CQRS's motivation — the normalized write model makes reads expensive, so queries need their own model._
+
+_Covers:_ Why current state gets hard to read
+
+_From the 28 problems:_ 21-ad-click-aggregation · 13-search-autocomplete
+
+### Q2
+
+You want a query that returns an order with its customer name and line totals in one lookup, without any join at read time.
+
+**Interviewer's question:** How does the view database serve queries, and what does a denormalized document look like?
+
+**Solution:** The query side uses a view database whose data is denormalized into documents matching the query shape, so a read is a single lookup.
+
+**System-design components:**
+- View database — the query-side store
+- Denormalized document — matches the query
+- Document store — the storage engine
+- Single lookup — how the read is served
+
+```mermaid
+flowchart LR
+  QRY["Query"] -->|single lookup| VDB[("View DB (document)")]
+  VDB -->|returns| DOC["Doc C-42: order + customer + lines"]
+```
+
+```java
+// ORDER SERVICE SIDE — the view database serves queries from a denormalized document, one lookup per read
+// PARTIES: QRY = the query · VDB = the view database (a document store)
+// STATE (before):
+//    docs : {}
+// DEF: build_view_document · CALLED BY: VDB when the view is materialized
+// -> order_id : "C-42"
+//    step 1 · denormalize the order plus its customer and lines : doc : "none" -> { id:"C-42", total:95.00, customer:"Ada", lines:[{sku:"B-9",qty:2}] }
+//    step 2 · store the document : docs : {} -> { "C-42" : { id:"C-42", total:95.00, customer:"Ada", lines:[...] } }
+//    step 3 · serve the read as one lookup : read : "none" -> docs["C-42"]
+// <- outcome : read : { id:"C-42", total:95.00, customer:"Ada" } · the query is one document read, no join at query time
+```
+
+_This is CQRS's view database — denormalized documents make each read a single lookup._
+
+_Covers:_ Define the view database
+
+_From the 28 problems:_ 21-ad-click-aggregation · 13-search-autocomplete
+
+### Q3
+
+The write model updated an order's total, and the view database still shows the old number. You want the view to track the write model as changes happen.
+
+**Interviewer's question:** How does the view database stay up to date with the write model?
+
+**Solution:** The view is updated by subscribing to domain events published by the write model; each event handler updates the corresponding document.
+
+**System-design components:**
+- Write model — publishes events
+- OrderUpdated event — carries the change
+- View database — stores the document
+- Event handler — applies the update
+
+```mermaid
+flowchart LR
+  WM["Write model"] -->|total 120.00 to 95.00| EVT["OrderUpdated"]
+  EVT -->|handler updates doc| VDB[("View DB")]
+  VDB -->|doc total 95.00| DOC["Doc C-42"]
+```
+
+```java
+// ORDER SERVICE SIDE — the view stays up to date by consuming the write model's domain events
+// PARTIES: WM = the write model · EVT = a domain event · VDB = the view database
+// STATE (before):
+//    write_db : { id:"C-42", total:120.00 }
+//    view_db : { id:"C-42", total:120.00 }
+// DEF: update_total · CALLED BY: WM on a command
+// -> order_id : "C-42" · -> new_total : 95.00
+//    step 1 · write model updates its own data : write_db["C-42"].total : 120.00 -> 95.00
+//    step 2 · write model publishes the event : event : "none" -> { type:"OrderUpdated", order_id:"C-42", total:95.00 }
+//    step 3 · view handler applies the event : view_db["C-42"].total : 120.00 -> 95.00   BECAUSE the handler copied the new total into the document
+// <- outcome : view_db : { id:"C-42", total:95.00 } · the view now matches the write model
+```
+
+_This is CQRS keeping the view up to date — domain events from the write model drive the view database._
+
+_Covers:_ Keep the view up to date via domain events
+
+_From the 28 problems:_ 21-ad-click-aggregation · 13-search-autocomplete
+
+### Q4
+
+Immediately after an order total changed, a reader queries the view and still sees the old total for a short while before it catches up.
+
+**Interviewer's question:** Why is a CQRS view eventually consistent, and what does a reader observe during the lag?
+
+**Solution:** The view updates asynchronously after the write's event is delivered, so a reader can see the previous total until the handler applies the event.
+
+**System-design components:**
+- Write model — commits and publishes
+- Event delivery — asynchronous
+- View handler — applies the event later
+- Reader — observes the lag
+
+```mermaid
+flowchart LR
+  WM["Write model total 95.00"] -->|OrderUpdated| EVT["event"]
+  EVT -->|delayed| VDB[("View DB still 120.00")]
+  VDB -->|reader| READER["sees 120.00 until caught up"]
+```
+
+```java
+// ORDER SERVICE SIDE — the view is eventually consistent, so a reader can see the old total during the lag window
+// PARTIES: WM = the write model · VDB = the view database · READER = a client querying the view
+// STATE (before):
+//    view_db : { id:"C-42", total:120.00 }
+//    write_db : { id:"C-42", total:95.00 }
+//    lag : 0
+// DEF: update_total · CALLED BY: WM at t=0ms
+// -> order_id : "C-42" · -> new_total : 95.00
+//    step 1 · write model commits : write_db["C-42"].total : 120.00 -> 95.00
+//    step 2 · the event is queued but the view has not applied it yet : view_db["C-42"].total : 120.00 -> 120.00 · lag : 0 -> 2   BECAUSE delivery and handling are asynchronous
+// <- state : view_db still 120.00 · a reader querying now sees 120.00, the old total
+// DEF: apply_event · CALLED BY: VDB when the event arrives
+// -> event : { type:"OrderUpdated", order_id:"C-42", total:95.00 }
+//    step 1 · handler applies the event : view_db["C-42"].total : 120.00 -> 95.00
+//    step 2 · the view catches up : lag : 2 -> 0
+// <- outcome : view_db : { id:"C-42", total:95.00 } · the reader who waited now sees 95.00
+```
+
+_This is CQRS's eventual-consistency tradeoff — the view lags the write model until its event is applied._
+
+_Covers:_ The tradeoffs
+
+_From the 28 problems:_ 21-ad-click-aggregation · 13-search-autocomplete
+
 ## Key Concepts
 
 ### The Problem
@@ -216,6 +386,14 @@ flowchart TD
 ### The Solution
 
 Define a read-only view database designed for a query, kept up to date by subscribing to domain events published by the services that own the data.
+
+```mermaid
+flowchart LR
+  CMD["Command"] -->|writes| WM["Write model (normalized)"]
+  QRY["Query"] -->|reads| RM["Read model (denormalized)"]
+  WM -.->|replay + join| SLOW["slow reads"]
+  RM -->|precomputed| FAST["fast reads"]
+```
 
 
 ### Key Facts

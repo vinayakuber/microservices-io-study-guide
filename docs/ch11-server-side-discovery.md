@@ -215,6 +215,185 @@ flowchart TD
 ```
 
 
+## Interview Questions
+
+### Q1
+
+A client must call order-service but has no discovery logic. The application teaches it one well-known router address instead of the registry.
+
+**Interviewer's question:** How does a router hide the changing set of instances from the client?
+
+**Solution:** The client calls a router (load balancer) at a well-known location; the router queries the registry and forwards the request to an available instance, so the client never performs discovery.
+
+**System-design components:**
+- Well-known router address
+- Registry query by the router
+- Forward to an instance
+- Discovery-free client
+
+```mermaid
+flowchart LR
+  C["client"] -->|"well-known address"| R["router"]
+  R --> REG["registry"]
+  REG -->|"instances"| R
+  R -->|"forward"| SVC["order-service instance"]
+```
+
+```java
+// ROUTER SIDE — the client calls a well-known router, which consults the registry and forwards to an instance
+// PARTIES: CLI = client · RTR = router (load balancer) · REG = service registry · SVC = order-service instance
+// DEF: router — the load balancer the client calls at a well-known address = RTR, which forwards to router_target "10.0.3.7:8080"
+// DEF: target — the instance location the router forwards to = "10.0.3.7:8080"
+// STATE (before):
+//    registry : {"order-service" -> [{"host":"10.0.3.7","port":8080},{"host":"10.0.3.8","port":8080}]}
+//    lookup : []
+//    router_target : "unset"
+//    forwarded : "none"
+// DEF: a client sends a request · CALLED BY: CLI calling the router's well-known address
+// -> request : "POST http://router.example.com/orders"
+//    step 1 · RTR queries REG : lookup : [] -> ["10.0.3.7:8080","10.0.3.8:8080"]   BECAUSE the router asks the registry for available instances
+//    step 2 · RTR picks one : router_target : "unset" -> "10.0.3.7:8080"
+//    step 3 · RTR forwards : forwarded : "none" -> "10.0.3.7:8080"   BECAUSE the router relays the request to the chosen instance
+// <- forwarded call : "POST http://10.0.3.7:8080/orders"   (the client never resolved the instance itself)
+```
+
+_This is exactly the router-hides-the-instances mechanism in this chapter._
+
+_Covers:_ A router hides the instances
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions
+
+### Q2
+
+The team runs on AWS and wants a single managed component to act as both the load balancer and the registry for order-service.
+
+**Interviewer's question:** How does an ELB collapse the router and the registry into one, and how do instances get registered?
+
+**Solution:** The ELB load-balances traffic (router) and also functions as the registry; instances are registered explicitly via an API call or automatically via an autoscaling group.
+
+**System-design components:**
+- ELB as router
+- ELB as registry
+- Explicit API registration
+- Autoscaling-group registration
+
+```mermaid
+flowchart LR
+  C["client"] --> ELB["ELB (router + registry)"]
+  ELB --> I1["i-abc"]
+  ELB --> I2["i-def"]
+  ASG["autoscaling group"] -->|"register i-ghi"| ELB
+```
+
+```java
+// ELB SIDE — the load balancer is also the registry; instances register explicitly or via an autoscaling group
+// PARTIES: CLI = client · ELB = Elastic Load Balancer (router + registry) · EC2 = service instances
+// DEF: target — one EC2 instance the ELB load-balances across = elb_targets hosts "10.0.5.1" and "10.0.5.2"
+// STATE (before):
+//    elb_targets : {"order-service" -> [{"id":"i-abc","host":"10.0.5.1"},{"id":"i-def","host":"10.0.5.2"}]}
+// DEF: an autoscaling group adds an instance · CALLED BY: the ASG scaling out
+// -> scale_out : {"id":"i-ghi","host":"10.0.5.3"}
+//    step 1 · ASG registers with ELB : elb_targets["order-service"] : [{"id":"i-abc","host":"10.0.5.1"},{"id":"i-def","host":"10.0.5.2"}] -> [{"id":"i-abc","host":"10.0.5.1"},{"id":"i-def","host":"10.0.5.2"},{"id":"i-ghi","host":"10.0.5.3"}]
+//    step 2 · target count : 2 -> 3   BECAUSE the autoscaling group registered the new EC2 instance
+// <- load-balanced set : ["10.0.5.1","10.0.5.2","10.0.5.3"]   (ELB now spreads traffic across 3 instances)
+//    alt explicit API call : an operator calls the ELB register-target API -> target count : 3 -> 3 (the same i-ghi is already present)
+```
+
+_This is exactly the ELB-as-router-and-registry behavior in this chapter._
+
+_Covers:_ ELB: router and registry in one
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions
+
+### Q3
+
+The team runs a cluster where a proxy lives on every host, so a client only ever dials a local port.
+
+**Interviewer's question:** How do cluster proxies on every host implement server-side discovery?
+
+**Solution:** Each host runs a proxy; the client connects to the local proxy's port for the service, and the proxy forwards the request to an instance somewhere in the cluster.
+
+**System-design components:**
+- Per-host proxy
+- Local port per service
+- Proxy forwarding into the cluster
+
+```mermaid
+flowchart LR
+  C["client"] -->|"localhost:8080"| PRX["host proxy"]
+  PRX -->|"forward"| SVC["order-service pod 10.0.6.9"]
+```
+
+```java
+// CLUSTER SIDE — each host runs a proxy; the client connects to the local proxy's port and it forwards into the cluster
+// PARTIES: CLI = client on a host · PRX = per-host proxy (server-side router) · SVC = service instance in the cluster
+// DEF: cluster — the set of hosts whose services the proxy reaches = cluster_map mapping order-service to "port 8080"
+// DEF: proxy — the per-host router the client dials at a local port = PRX, which forwards to proxy_target "10.0.6.9:8080"
+// DEF: target — the instance location the proxy forwards to = "10.0.6.9:8080"
+// STATE (before):
+//    cluster_map : {"order-service" -> "port 8080"}
+//    proxy_target : "unset"
+//    selected : []
+//    forwarded : "none"
+// DEF: a client calls a service · CALLED BY: CLI connecting to the local proxy
+// -> connect : "localhost:8080"   (the port assigned to order-service)
+//    step 1 · proxy resolves the port : proxy_target : "unset" -> "order-service"   BECAUSE port 8080 is assigned to order-service in the cluster
+//    step 2 · proxy finds an instance : selected : [] -> ["10.0.6.9:8080"]   BECAUSE the proxy looks up the cluster for order-service
+//    step 3 · proxy forwards : forwarded : "none" -> "10.0.6.9:8080"   BECAUSE it relays the request to that instance
+// <- forwarded call : "POST http://10.0.6.9:8080/orders"   (the client only ever spoke to localhost:8080)
+//    alt another host : its local proxy forwards the same port to a different pod 10.0.6.12
+```
+
+_This is exactly the cluster-proxy form of server-side discovery in this chapter._
+
+_Covers:_ Cluster proxies on every host
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions
+
+### Q4
+
+The team chose server-side discovery and now accounts for its costs before shipping.
+
+**Interviewer's question:** What are the costs of server-side discovery compared to client-side?
+
+**Solution:** More network hops than client-side discovery, plus a router that must be installed, configured, replicated for availability and capacity, and made to support the needed protocols.
+
+**System-design components:**
+- Extra network hop
+- Install/configure the router
+- Replicate the router
+- Protocol support (HTTP, gRPC, Thrift)
+
+```mermaid
+flowchart LR
+  C["client"] -->|"hop 1"| R["router"]
+  R -->|"hop 2"| REG["registry"]
+  R -->|"hop 3"| SVC["instance"]
+  R --> REP["replicas + protocols"]
+```
+
+```java
+// ROUTER SIDE — server-side discovery adds a network hop and a component that must be replicated and protocol-fit
+// PARTIES: CLI = client · RTR = router · REG = registry · SVC = instance
+// STATE (before):
+//    hops : 0
+//    router_replicas : 1
+//    supported : ["http"]
+// DEF: measure one request's cost · CALLED BY: CLI sending a request through the router
+// -> request : "POST /orders"
+//    step 1 · hops : 0 -> 3   BECAUSE the path is CLI -> RTR -> REG -> SVC, one more hop than client-side discovery's 2
+//    step 2 · replicate the router : router_replicas : 1 -> 3   BECAUSE the router must be replicated for availability and capacity
+//    step 3 · protocol check : supported : ["http"] -> ["http","grpc","thrift"]   BECAUSE the router must speak the clients' protocols
+// <- cost summary : "3 hops, 3 replicas, protocols [http, grpc, thrift]"   (more moving parts than client-side)
+//    alt cloud-managed : an ELB absorbs install/configure/replicate -> the operator burden falls to the cloud provider
+```
+
+_This is exactly the extra-hop and replication/protocol costs in this chapter._
+
+_Covers:_ Costs: extra hops, protocols, replication
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions
+
 ## Key Concepts
 
 ### The Problem
@@ -225,6 +404,14 @@ flowchart TD
 ### The Solution
 
 The client calls a router (load balancer) at a well-known location; the router queries a registry and forwards to an available instance.
+
+```mermaid
+flowchart LR
+  C["client"] -->|"well-known address"| R["router"]
+  R --> REG["registry"]
+  REG -->|"instances"| R
+  R -->|"forward"| SVC["order-service instance"]
+```
 
 
 ### Key Facts

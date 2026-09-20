@@ -200,6 +200,187 @@ flowchart TD
 ```
 
 
+## Interview Questions
+
+### Q1
+
+The API Gateway team's OrderServiceProxy calls GET /orders/{orderId} on Order Service. The gateway needs a test that pins down the exact HTTP shape it relies on, before the provider silently changes it.
+
+**Interviewer's question:** What does a consumer-driven contract test verify about a REST endpoint, and which concrete pieces of the shape are enumerated?
+
+**Solution:** It verifies the HTTP method and path, the request headers and body, and the response status, headers, and body — the shape, not the provider's business logic.
+
+**System-design components:**
+- API Gateway (consumer)
+- Order Service (provider)
+- contract test
+- OrderServiceProxy
+
+```mermaid
+flowchart LR
+  T["Contract test"] -->|"expects"| S["GET /orders/{orderId}"]
+  T -->|"expects"| H["Accept: application/json"]
+  T -->|"expects"| R["status 200 + JSON body"]
+  T -->|"runs against"| P["Order Service"]
+```
+
+```java
+// PROVIDER SIDE — the GET /orders/{orderId} contract test enumerates the API shape, not business logic
+// PARTIES: GW = API Gateway (consumer) · SVC = Order Service (provider) · TST = contract test
+// STATE (before):
+//    shape : { method:"", path:"", headers:{}, status:0, body:{} }
+// DEF: expect_order_endpoint · CALLED BY: GW team encoding what OrderServiceProxy needs
+// -> order_id : "ORD-4007"
+//    step 1 · expected method and path : shape.method : "" -> "GET" · shape.path : "" -> "/orders/{orderId}"  BECAUSE OrderServiceProxy calls GET /orders/{orderId}
+//    step 2 · expected headers : shape.headers : {} -> {"Accept":"application/json"}  BECAUSE the proxy sends Accept and reads JSON
+//    step 3 · expected status : shape.status : 0 -> 200  BECAUSE the proxy needs a success code to parse the body
+//    step 4 · expected body : shape.body : {} -> {"orderId":"ORD-4007","state":"CREATED"}  BECAUSE the proxy reads the order's JSON from the reply
+// <- contract : {"method":"GET","path":"/orders/ORD-4007","headers":{"Accept":"application/json"},"status":200,"body":{"orderId":"ORD-4007","state":"CREATED"}}
+//    alt provider deviates : SVC answers 404  BECAUSE the provider changed the endpoint -> the suite fails with "expected 200, got 404"
+```
+
+_This is the chapter's enumerated REST shape: method, path, headers, body, and the response status, headers, and body._
+
+_Covers:_ Agreement between two services
+
+_From the 28 problems:_ 03-framework-for-system-design-interviews
+
+### Q2
+
+Order Service has two consumers — the API Gateway (REST) and Order History Service (published events). Each depends on a different part of Order Service's API, and the provider cannot guess both.
+
+**Interviewer's question:** Who writes a consumer-driven contract test suite, and how does it reach the provider's test suite?
+
+**Solution:** Each consumer team writes its own suite for the aspects of the API it uses and contributes it to the provider's test suite, for example via a pull request.
+
+**System-design components:**
+- API Gateway team
+- Order History Service team
+- Order Service (provider)
+- pull request
+
+```mermaid
+flowchart LR
+  G["API Gateway team"] -->|"PR: gateway-orders"| S["Order Service test suite"]
+  H["Order History team"] -->|"PR: history-events"| S
+  S -->|"holds both suites"| P["provider pipeline"]
+```
+
+```java
+// PROVIDER SIDE — each consumer team contributes its own suite to Order Service's test suite
+// PARTIES: GW = API Gateway team · OH = Order History Service team · SVC = Order Service (provider)
+// STATE (before):
+//    suites : []                               // the provider's collection of contributed suites, empty
+//    test_count : 0
+// DEF: contribute_suite · CALLED BY: GW team opening a pull request
+// -> contributor : "GW" · -> suite_name : "gateway-orders"
+//    step 1 · author the test : test_count : 0 -> 1  BECAUSE the gateway suite needs one test for GET /orders/{orderId}
+//    step 2 · merge the PR : suites : [] -> [{"owner":"GW","name":"gateway-orders","tests":1}]  BECAUSE the suite is added to the provider's test suite via pull request
+// <- suites : 1 entry · owner : "GW" · test_count : 1
+//
+// DEF: contribute_suite · CALLED BY: OH team, a second consumer, via another pull request
+// -> contributor : "OH" · -> suite_name : "history-events"
+//    step 1 · author the test : test_count : 1 -> 2  BECAUSE Order History adds a suite that checks the published events
+//    step 2 · merge the PR : suites : [{"owner":"GW","name":"gateway-orders","tests":1}] -> [{"owner":"GW","name":"gateway-orders","tests":1},{"owner":"OH","name":"history-events","tests":1}]  BECAUSE the second suite tests the event aspects relevant to this consumer
+// <- suites : 2 entries · owners : ["GW"] -> ["GW","OH"]
+```
+
+_This is the chapter's contribute-your-suite mechanism: every consumer adds its own expectations to the provider's suite._
+
+_Covers:_ Consumers publish their expectations
+
+_From the 28 problems:_ 03-framework-for-system-design-interviews
+
+### Q3
+
+Order Service renamed GET /orders/{orderId} during a refactor. The gateway's contributed suite is running in the provider's deployment pipeline, and the team needs to know whether the change will ship.
+
+**Interviewer's question:** When the provider's pipeline runs the contributed suites, how does a test compare expected versus actual, and what does a failure mean?
+
+**Solution:** Each test invokes the provider and compares the actual status, headers, and body against the consumer's expected values; a failure means the producer made a breaking change and must fix the API or talk to the consumer team.
+
+**System-design components:**
+- Order Service (provider)
+- deployment pipeline
+- gateway-orders suite
+- expected vs actual comparison
+
+```mermaid
+flowchart LR
+  P["Pipeline"] -->|"runs suite"| T["gateway-orders"]
+  T -->|"invokes"| S["Order Service"]
+  S -->|"actual 404"| C["compare: expected 200"]
+  C -->|"mismatch"| F["fail the suite"]
+```
+
+```java
+// PROVIDER SIDE — the deployment pipeline compares the consumer's expected response against the actual
+// PARTIES: SVC = Order Service (provider) · GW = API Gateway (consumer) · PIPE = deployment pipeline
+// STATE (before):
+//    expected : { status:200, body:{"orderId":"ORD-4007","state":"CREATED"} }
+//    actual : { status:0, body:{} }
+//    matches : 0
+// DEF: verify_one_request · CALLED BY: PIPE running the gateway-orders suite
+// -> order_id : "ORD-4007"
+//    step 1 · invoke the provider : actual.status : 0 -> 200  BECAUSE SVC serves GET /orders/ORD-4007
+//    step 2 · read the body : actual.body : {} -> {"orderId":"ORD-4007","state":"CREATED"}  BECAUSE SVC returns the order's JSON
+//    step 3 · compare the status : matches : 0 -> 1  BECAUSE actual.status 200 equals expected.status 200
+//    step 4 · compare the body : matches : 1 -> 2  BECAUSE actual.body equals expected.body, so both checks hold
+// <- verdict : "pass"  BECAUSE matches equals 2 (status and body both agree)
+//    alt provider breaks the API : SVC drops GET /orders/{orderId}
+//       actual.status : 200 -> 404  BECAUSE the endpoint was removed or renamed
+//       verdict : "pass" -> "fail"  BECAUSE 404 does not equal expected.status 200
+//       PIPE fails the suite -> the producer team must fix the API or talk to the consumer team
+```
+
+_This is the chapter's pipeline verdict: a failing contributed suite is a breaking change the producer must fix or negotiate._
+
+_Covers:_ The provider pipeline verifies everyone
+
+_From the 28 problems:_ 03-framework-for-system-design-interviews
+
+### Q4
+
+The gateway team wants to specify the order interaction without exhaustively testing every input. They settle on a small set of examples, one per interaction.
+
+**Interviewer's question:** How does testing by example specify a contract, and what kind of test is a consumer contract test for a REST API?
+
+**Solution:** The interaction is defined by examples called contracts, each made of the example messages exchanged during one interaction — the request and the reply; for a REST API these are mock controller tests, not business-logic tests.
+
+**System-design components:**
+- API Gateway (consumer)
+- Order Service (provider)
+- example request
+- example reply
+
+```mermaid
+flowchart LR
+  C["Contract"] -->|"holds"| R["example request: GET /orders/ORD-4007"]
+  C -->|"holds"| P["example reply: 200 + body"]
+  C -->|"is a"| M["mock controller test"]
+```
+
+```java
+// PROVIDER SIDE — testing by example: a contract is the pair of example messages for ONE interaction
+// PARTIES: GW = API Gateway (consumer) · SVC = Order Service (provider)
+// STATE (before):
+//    contract : { request:{}, reply:{} }
+//    kind : ""
+// DEF: define_contract · CALLED BY: GW team, using testing by example
+// -> order_id : "ORD-4007"
+//    step 1 · example request : contract.request : {} -> {"method":"GET","path":"/orders/ORD-4007","headers":{"Accept":"application/json"}}  BECAUSE the example request is one message of the interaction
+//    step 2 · example reply : contract.reply : {} -> {"status":200,"body":{"orderId":"ORD-4007","state":"CREATED"}}  BECAUSE the example reply is the second message of the interaction
+//    step 3 · identify the test style : kind : "" -> "mock-controller"  BECAUSE consumer contract tests for a REST API are mock controller tests
+// <- contract : {"request":{"method":"GET","path":"/orders/ORD-4007"},"reply":{"status":200,"body":{"orderId":"ORD-4007","state":"CREATED"}}}
+//    alt another example : order_id : "ORD-4007" -> "ORD-4008"  BECAUSE each contract is one example; a second contract covers a second order
+```
+
+_This is the chapter's testing-by-example specification: contracts are example request/reply message pairs, i.e. mock controller tests._
+
+_Covers:_ Testing by example
+
+_From the 28 problems:_ 03-framework-for-system-design-interviews
+
 ## Key Concepts
 
 ### The Problem
@@ -210,6 +391,14 @@ flowchart TD
 ### The Solution
 
 Verify that a service meets the expectations of its clients: each consumer team writes a contract test suite and adds it to the provider's test suite via a pull request.
+
+```mermaid
+flowchart LR
+  T["Contract test"] -->|"expects"| S["GET /orders/{orderId}"]
+  T -->|"expects"| H["Accept: application/json"]
+  T -->|"expects"| R["status 200 + JSON body"]
+  T -->|"runs against"| P["Order Service"]
+```
 
 
 ### Key Facts

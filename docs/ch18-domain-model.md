@@ -203,6 +203,174 @@ flowchart TD
 ```
 
 
+## Interview Questions
+
+### Q1
+
+Your order service has grown from a simple script into a tangle of procedures that each recompute line totals and know every field of the Order. You want to model the domain instead.
+
+**Interviewer's question:** How does a factory method like Order.create construct an order, and why is it called instead of a bare constructor?
+
+**Solution:** The domain model expresses behavior through methods on domain objects; a factory method like Order.create runs the construction logic so callers get a fully-valid order.
+
+**System-design components:**
+- Order — the domain object
+- create — a factory method on Order
+- Line items — data passed into the factory
+- Total — computed by the factory
+
+```mermaid
+flowchart LR
+  SVC["Order Service"] -->|Order.create| F["Order.create"]
+  F -->|new Order| ORD["Order PO-77"]
+  ORD -->|total 120.00| TOT["computed by the factory"]
+```
+
+```java
+// ORDER SERVICE SIDE — the domain model uses a factory method to construct a valid order, instead of an ad-hoc script
+// PARTIES: SVC = Order Service · ORD = the Order domain object · LN = a line item passed to the factory
+// DEF: item — one line supplied to the factory = { sku:"B-9", qty:3, unit_price:40.00 }
+// STATE (before):
+//    orders : {}
+// DEF: create · CALLED BY: SVC when the client places an order
+// -> order_id : "PO-77" · -> customer_id : "CUST-7" · -> item : { sku:"B-9", qty:3, unit_price:40.00 }
+//    step 1 · factory makes the Order : orders : {} -> {"PO-77": { state:"CREATED", total:0.00 }}
+//    step 2 · factory attaches the line : orders["PO-77"].items : [] -> [{ sku:"B-9", qty:3, unit_price:40.00 }]
+//    step 3 · factory computes the total : orders["PO-77"].total : 0.00 -> 120.00   BECAUSE 3 x 40.00 = 120.00
+// <- outcome : orders : { "PO-77" : { state:"CREATED", total:120.00, items:[{ sku:"B-9", qty:3 }] } } · the factory returns a fully-valid order
+```
+
+_This is the Domain Model replacing a script — Order.create encapsulates the construction logic._
+
+_Covers:_ Model the domain, not the procedure
+
+_From the 28 problems:_ 03-framework-for-system-design-interviews
+
+### Q2
+
+A client wants to change the quantity on an existing order, and the new total must be recalculated inside the domain object, not by the caller.
+
+**Interviewer's question:** How does a method like revise encapsulate behavior with the state it changes?
+
+**Solution:** The behavior that changes an order's data lives as a method on the order, so it recomputes the total in the same place as the state it mutates.
+
+**System-design components:**
+- Order.revise — behavior on the domain object
+- quantity — the state being changed
+- total — recomputed by the method
+- Caller — passes only the new values
+
+```mermaid
+flowchart LR
+  SVC["Order Service"] -->|revise qty 3 to 5| ORD["Order PO-77"]
+  ORD -->|recompute total 120.00 to 200.00| TOT["encapsulated in the method"]
+```
+
+```java
+// ORDER SERVICE SIDE — behavior and state live together: revise mutates the order and recomputes its total
+// PARTIES: SVC = Order Service (caller) · ORD = Order domain object
+// STATE (before):
+//    order : { id:"PO-77", state:"CREATED", items:[{ sku:"B-9", qty:3, unit_price:40.00 }], total:120.00 }
+// DEF: revise · CALLED BY: SVC on the order object
+// -> sku : "B-9" · -> new_qty : 5
+//    step 1 · method changes the line quantity : order.items[0].qty : 3 -> 5
+//    step 2 · method recomputes the total : order.total : 120.00 -> 200.00   BECAUSE 5 x 40.00 = 200.00
+//    step 3 · the caller receives the mutated object : order : { qty:3, total:120.00 } -> { qty:5, total:200.00 }
+// <- outcome : order : { id:"PO-77", items:[{ sku:"B-9", qty:5 }], total:200.00 } · the total changed with the state it depends on
+```
+
+_This is the Domain Model encapsulating behavior with its state — the caller never computes the total itself._
+
+_Covers:_ Encapsulate behavior with the state it changes
+
+_From the 28 problems:_ 03-framework-for-system-design-interviews
+
+### Q3
+
+An order can only be cancelled from the CREATED state, and a cancel on an already-shipped order must be rejected. The guard must live inside the object.
+
+**Interviewer's question:** How does a domain method guard life-cycle transitions, and what happens on an illegal transition?
+
+**Solution:** The method checks the current state before transitioning; if the transition is illegal it throws, so the object can never reach an invalid state.
+
+**System-design components:**
+- Order.cancel — the life-cycle method
+- State check — CREATED allowed
+- Throw — on an illegal transition
+- State — transitions to CANCELLED
+
+```mermaid
+flowchart LR
+  SVC["Order Service"] -->|cancel| ORD["Order PO-77"]
+  ORD -->|state CREATED?| CHK["check"]
+  CHK -->|yes| CAN["state to CANCELLED"]
+  CHK -->|no, SHIPPED| ERR["throw"]
+```
+
+```java
+// ORDER SERVICE SIDE — the domain method guards the life-cycle transition so the object cannot reach an invalid state
+// PARTIES: SVC = Order Service (caller) · ORD = Order domain object
+// DEF: legal_state — the only state a cancel is allowed from = "CREATED"
+// STATE (before):
+//    order : { id:"PO-77", state:"CREATED" }
+// DEF: cancel · CALLED BY: SVC on the order
+// -> command : "cancel"
+//    step 1 · method checks the transition is legal : order.state : "CREATED" == "CREATED" -> legal
+//    step 2 · method transitions the state : order.state : "CREATED" -> "CANCELLED"
+// <- outcome : order : { id:"PO-77", state:"CANCELLED" }
+// DEF: cancel (second call) · CALLED BY: SVC after the order has shipped
+// -> command : "cancel" on order : { id:"PO-77", state:"SHIPPED" }
+//    step 1 · method checks the transition is legal : order.state : "SHIPPED" == "CREATED" -> ILLEGAL
+//    step 2 · method throws instead of transitioning : order.state : "SHIPPED" -> "SHIPPED"   BECAUSE SHIPPED cannot be cancelled
+// <- outcome : throws "IllegalState" · the object stays SHIPPED
+```
+
+_This is the Domain Model guarding transitions — cancel throws unless the order is still CREATED._
+
+_Covers:_ Guard life-cycle transitions inside the method
+
+_From the 28 problems:_ 03-framework-for-system-design-interviews
+
+### Q4
+
+Your model has a repository that loads orders, a delivery-information object that just holds data, and an order that carries behavior plus state. You want to organize these three kinds of classes.
+
+**Interviewer's question:** How do state-only, behavior-only, and mixed classes fit together in a domain model?
+
+**Solution:** Behavior-only services or repositories carry the operations, state-only value objects carry immutable data, and entities mix state with behavior that changes it.
+
+**System-design components:**
+- OrderRepository — behavior-only, loads orders
+- Order — entity with state and behavior
+- DeliveryInformation — state-only value object
+- findOrderById — behavior on the repository
+
+```mermaid
+flowchart LR
+  SVC["Order Service"] -->|findOrderById| REPO["OrderRepository"]
+  REPO -->|returns| ORD["Order entity: state + behavior"]
+  ORD -->|holds| DLVRY["DeliveryInformation: state only"]
+```
+
+```java
+// ORDER SERVICE SIDE — the three kinds of classes in a domain model: behavior-only, state-only, and a mix of both
+// PARTIES: SVC = Order Service · REPO = OrderRepository · ORD = Order entity · DLVRY = DeliveryInformation
+// STATE (before):
+//    order_rows : { "PO-77" : { sku:"B-9", qty:3, unit_price:40.00, total:120.00, ship_to:"12 High St" } }
+// DEF: findOrderById · CALLED BY: SVC on the behavior-only repository
+// -> order_id : "PO-77"
+//    step 1 · repository loads the row and builds the entity : loaded : "none" -> order_rows["PO-77"]
+//    step 2 · the repository builds the mixed entity : order : "none" -> { state:"CREATED", total:120.00, method:"revise" }
+//    step 3 · the entity holds a state-only value object : order.delivery : "none" -> { ship_to:"12 High St" }   BECAUSE DeliveryInformation only carries data
+// <- outcome : order "PO-77" returned · state-only data, behavior-only repository, and a mixed entity share the workload
+```
+
+_This is the Domain Model organizing its classes — entities mix behavior and state, value objects hold data, and repositories hold operations._
+
+_Covers:_ Mix state-only, behavior-only, and both
+
+_From the 28 problems:_ 03-framework-for-system-design-interviews
+
 ## Key Concepts
 
 ### The Problem
@@ -213,6 +381,13 @@ flowchart TD
 ### The Solution
 
 Organize business logic as an object model — a network of relatively small classes that correspond directly to concepts from the problem domain, where most classes have both state and behavior.
+
+```mermaid
+flowchart LR
+  SVC["Order Service"] -->|Order.create| F["Order.create"]
+  F -->|new Order| ORD["Order PO-77"]
+  ORD -->|total 120.00| TOT["computed by the factory"]
+```
 
 
 ### Key Facts

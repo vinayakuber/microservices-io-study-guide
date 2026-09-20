@@ -106,6 +106,144 @@ registerChapter({
 // <- commit T2 : outbox now [ (1, "E1"), (2, "E2") ] · relay reads by id and publishes "E1" before "E2"`
     }
   ],
+  interview: [
+    {
+      scenario: "Your order service must create an order and publish an OrderPlaced event, but a crash between the database write and the broker publish would either lose the event or leak one for a rolled-back write. You refuse to use 2PC.",
+      q: "How does the Transactional Outbox make the data change and its event atomic without 2PC?",
+      solution: "The service inserts the outbox row in the same local transaction that updates the aggregate, so commit makes both durable and rollback drops both; a separate relay publishes later.",
+      components: [
+        "Business write — the aggregate update in the local transaction",
+        "Outbox row — the event stored in the same transaction",
+        "Local commit — makes both rows durable together",
+        "Relay — publishes outbox rows after commit"
+      ],
+      diagram: `flowchart LR
+  SVC["Order Service"] -->|INSERT order| DB[("Database")]
+  SVC -->|INSERT outbox row| DB
+  DB -->|COMMIT both or neither| DONE["Both durable"]
+  DB -.->|rollback| UNDO["Both dropped"]`,
+      code: `// ORDER SERVICE SIDE — commit a business write and its event together, without 2PC
+// PARTIES: SVC = Order Service · DB = its relational database · BRK = message broker
+// STATE (before):
+//    orders : { }
+//    outbox : [ ]
+//    tx : "none"
+// DEF: place_order · CALLED BY: U7 placing order "PO-77"
+// -> order_id : "PO-77" · -> total : 45.00
+//    step 1 · begin T1 : tx : "none" -> "open"   BECAUSE SVC starts a local transaction (BRK is NOT enlisted, so no 2PC)
+//    step 2 · insert business : orders : { } -> { "PO-77" : "PENDING" }
+//    step 3 · insert outbox row : outbox : [ ] -> [ (101, "OrderPlaced") ]
+//    step 4 · commit T1 : tx : "open" -> "committed"   BECAUSE both rows live in the same local transaction
+// <- result : outbox : [ (101, "OrderPlaced") ] · BRK received 0 messages so far
+//    alt rollback T1 : orders : { } -> { } · outbox : [ (101, "OrderPlaced") ] -> [ ] · event NOT published   BECAUSE the rollback undoes both inserts`,
+      tieback: "This is the Transactional Outbox — one local transaction writes the business data and the outbox row together.",
+      refs: ["One transaction for the write and the message"],
+      problems: ["26-payment-system", "19-distributed-message-queue"]
+    },
+    {
+      scenario: "Two events for the same order — OrderPlaced then PaymentAuthorized — sit in your outbox, and the relay must hand them to the broker in that exact order.",
+      q: "How does the outbox relay publish messages in the order the application wrote them?",
+      solution: "The relay selects unsent rows ordered by id and publishes each in that order, then marks it sent.",
+      components: [
+        "Outbox row id — insertion order",
+        "Ordered query — ORDER BY id ASC",
+        "Publish step — one row per broker send",
+        "Mark-sent — UPDATE per row"
+      ],
+      diagram: `flowchart LR
+  DB[("Outbox table")] -->|SELECT sent=false ORDER BY id ASC| RLY["Relay"]
+  RLY -->|publish id 101 first| BRK[("Broker")]
+  RLY -->|publish id 102 second| BRK
+  RLY -->|mark sent| DB`,
+      code: `// RELAY SIDE — publish unsent outbox rows to the broker in the order they were inserted
+// PARTIES: RLY = message relay · DB = its relational database · BRK = message broker
+// STATE (before):
+//    outbox : [ (101, "OrderPlaced", sent=false), (102, "PaymentAuthorized", sent=false) ]
+//    published : [ ]
+// DEF: relay_poll · CALLED BY: a polling loop, every 200 ms
+// -> query : SELECT * FROM outbox WHERE sent=false ORDER BY id ASC   // returns id 101 then id 102
+//    step 1 · fetch rows : pending : [ ] -> [ (101, "OrderPlaced"), (102, "PaymentAuthorized") ]   BECAUSE ORDER BY id returns the committed-first row first
+//    step 2 · publish id 101 : published : [ ] -> [ "OrderPlaced" ]
+//    step 3 · mark id 101 : outbox : [(101,"OrderPlaced",sent=false),(102,"PaymentAuthorized",sent=false)] -> [(101,"OrderPlaced",sent=true),(102,"PaymentAuthorized",sent=false)]
+//    step 4 · publish id 102 : published : [ "OrderPlaced" ] -> [ "OrderPlaced", "PaymentAuthorized" ]
+//    step 5 · mark id 102 : outbox : [(101,"OrderPlaced",sent=true),(102,"PaymentAuthorized",sent=false)] -> [(101,"OrderPlaced",sent=true),(102,"PaymentAuthorized",sent=true)]
+// <- output : BRK receives [ "OrderPlaced", "PaymentAuthorized" ] in id order · outbox fully sent`,
+      tieback: "This is the Transactional Outbox relay — ordered by id, so earlier events are published first.",
+      refs: ["The relay publishes in order"],
+      problems: ["26-payment-system", "19-distributed-message-queue"]
+    },
+    {
+      scenario: "Your relay published an outbox row then crashed before marking it sent. On restart it publishes the same row again, and the consumer now sees the event twice.",
+      q: "Why does the Transactional Outbox give at-least-once delivery, and what must consumers do?",
+      solution: "The relay can crash between publishing and marking, so a restart re-publishes the still-unsent row; consumers record processed message ids and skip duplicates.",
+      components: [
+        "Publish-then-mark window",
+        "Crash — row still unsent",
+        "Restart — re-publishes the row",
+        "Consumer processed table — dedupes"
+      ],
+      diagram: `flowchart LR
+  RLY["Relay"] -->|publish OrderPlaced| BRK[("Broker")]
+  RLY -->|crash before mark| DB[("Outbox row still sent=false")]
+  DB -->|re-select on restart| RLY2["Relay re-publishes"]
+  RLY2 --> BRK
+  BRK -->|OrderPlaced x2| CNS["Consumer dedupes"]`,
+      code: `// RELAY + CONSUMER SIDE — a crash between publish and mark re-sends the row, so the consumer dedupes
+// PARTIES: RLY = message relay · DB = its relational database · BRK = message broker · CNS = consumer service
+// STATE (before):
+//    outbox : [ (101, "OrderPlaced", sent=false) ]
+//    published : [ ]
+//    processed : { }
+// DEF: relay_publish · CALLED BY: the relay on its next poll
+// -> row : (101, "OrderPlaced", sent=false)
+//    step 1 · publish OrderPlaced to BRK : published : [ ] -> [ "OrderPlaced" ]
+//    step 2 · CRASH before mark : outbox : [(101,"OrderPlaced",sent=false)] -> [(101,"OrderPlaced",sent=false)]   // the relay dies; row still unsent
+// <- outcome : BRK delivered "OrderPlaced" once · outbox row (101,"OrderPlaced") still sent=false
+// DEF: relay_restart · CALLED BY: the relay after restart, polling again
+// -> query : SELECT * FROM outbox WHERE sent=false   // returns (101, "OrderPlaced", sent=false) again
+//    step 1 · re-publish OrderPlaced : published : [ "OrderPlaced" ] -> [ "OrderPlaced", "OrderPlaced" ]   BECAUSE the row was never marked sent, so at-least-once duplicate
+//    step 2 · mark id 101 : outbox : [(101,"OrderPlaced",sent=false)] -> [(101,"OrderPlaced",sent=true)]
+//    step 3 · CNS dedupes : processed : { } -> { "OrderPlaced" : true }   BECAUSE CNS runs INSERT ... ON CONFLICT DO NOTHING on its processed table
+// <- output : BRK delivered "OrderPlaced" twice · CNS handled it once (the second copy is idempotently skipped)`,
+      tieback: "This is the Transactional Outbox's at-least-once tradeoff — the publish-mark window forces consumer idempotency.",
+      refs: ["The crash window means at-least-once"],
+      problems: ["26-payment-system", "19-distributed-message-queue"]
+    },
+    {
+      scenario: "Two instances of your order service update the same order — instance A approves it, instance B ships it — each committing its own event to the shared outbox. The broker must still see Approved before Shipped.",
+      q: "How does event ordering survive multiple service instances writing to the same outbox?",
+      solution: "Each committed transaction gets an outbox row whose id grows with commit order; the relay reads by id, so T1 (Approved) is published before T2 (Shipped).",
+      components: [
+        "Instance A — commits T1 first",
+        "Instance B — commits T2 second",
+        "Outbox row id — commit order",
+        "Relay — publishes by id"
+      ],
+      diagram: `flowchart LR
+  A["Instance A commits T1"] -->|row id 1| DB[("Outbox table")]
+  B["Instance B commits T2"] -->|row id 2| DB
+  DB -->|ORDER BY id| RLY["Relay"]
+  RLY -->|Approved then Shipped| BRK[("Broker")]`,
+      code: `// TWO SERVICE INSTANCES SIDE — one aggregate, two commits, and the broker still sees them in order
+// PARTIES: SVC1 = Order Service instance A · SVC2 = Order Service instance B · DB = shared database · BRK = message broker
+// STATE (before):
+//    aggregate : { "PO-77" : "PENDING" }
+//    outbox : [ ]
+// DEF: tx_T1 · CALLED BY: SVC1 updating aggregate "PO-77"
+// -> txn : "T1"
+//    step 1 · update aggregate : aggregate : { "PO-77" : "PENDING" } -> { "PO-77" : "APPROVED" }
+//    step 2 · insert outbox : outbox : [ ] -> [ (1, "OrderApproved") ]   BECAUSE T1 commits first, its outbox row gets id 1
+// <- commit T1 : outbox now [ (1, "OrderApproved") ]
+// DEF: tx_T2 · CALLED BY: SVC2 updating the same aggregate "PO-77"
+// -> txn : "T2"
+//    step 1 · update aggregate : aggregate : { "PO-77" : "APPROVED" } -> { "PO-77" : "SHIPPED" }
+//    step 2 · insert outbox : outbox : [ (1, "OrderApproved") ] -> [ (1, "OrderApproved"), (2, "OrderShipped") ]   BECAUSE T2 commits after T1, its row gets id 2
+// <- commit T2 : outbox now [ (1, "OrderApproved"), (2, "OrderShipped") ] · relay reads by id and publishes "OrderApproved" before "OrderShipped"`,
+      tieback: "This is the Transactional Outbox's ordering guarantee — the outbox row id reproduces commit order across instances.",
+      refs: ["Ordering must survive multiple instances"],
+      problems: ["26-payment-system", "19-distributed-message-queue"]
+    }
+  ],
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'The write and the message drift apart', content: '<p><strong>Why.</strong> A service command must update aggregates in the database AND send events to a broker, but 2PC across the two is not viable and coupling the service to both is undesirable.</p><p><strong>Claim.</strong> Without atomicity, a committed database change can lose its event (crash before send) or an event can escape a transaction that rolls back.</p><p><strong>Grounding.</strong> The reference: sending a message mid-transaction is unreliable because there is no guarantee the transaction commits, and sending after commit has no guarantee the service will not crash first.</p><p><strong>In the wild.</strong> Any saga participant or domain-event publisher hits this: it must change state and publish in one step.</p>' },

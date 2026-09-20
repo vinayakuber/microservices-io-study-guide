@@ -78,6 +78,109 @@ registerChapter({
 `
     }
   ],
+  interview: [
+    {
+      scenario: 'Your team wants microservices but starts with a working monolith that runs the business today. Rebuilding it in one release is impossible, so you need a path that moves one piece at a time.',
+      q: 'How does the strangler application approach migrating a monolith?',
+      solution: 'The migration proceeds by building the new system gradually around the old one, re-implementing one feature at a time, so the monolith keeps running while the new system takes over piece by piece.',
+      components: ['Working monolith — runs the business', 'New system — built gradually', 'One feature at a time — the increment', 'Monolith shrinks — as features move'],
+      diagram: `flowchart LR
+  MONO["Monolith"] -->|"re-implement search"| NEW["New system"]
+  NEW -->|"search served"| NEW
+  MONO -->|"keeps"| REST["checkout + accounts"]`,
+      code: `// MONOLITH SIDE — the strangler grows by moving one feature at a time out of the monolith
+// PARTIES: MONO = legacy monolith · NEW = new strangler application · U1 = user
+// STATE (before):
+//    mono_features : { "search": true, "checkout": true, "accounts": true }
+//    new_features  : {}
+// DEF: migrate · CALLED BY: the team for each feature, one at a time
+// -> feature : "search"
+//    step 1 · re-implement "search" as a microservice in NEW   // new_features : {} -> { "search": true }
+//    step 2 · cut "search" traffic over to the new service   // mono_features.search : true -> false
+//    step 3 · the monolith keeps only the remaining features   // mono_features : { "search": true, "checkout": true, "accounts": true } -> { "checkout": true, "accounts": true }
+// <- state : mono_features = { "checkout": true, "accounts": true } · new_features = { "search": true } — one piece moved, not the whole monolith at once`,
+      tieback: 'This is the migration stage — building the new system gradually around the old one, one feature at a time.',
+      refs: ['The migration problem'],
+      problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
+    },
+    {
+      scenario: 'The strangler now fronts both the new services and the monolith. A request arrives for a path that has not been migrated yet, and it must keep working exactly as before.',
+      q: 'How does the strangler decide which system handles each request?',
+      solution: 'A router fronts both systems and looks up each request\'s path in a route table; migrated paths go to new services, and unmigrated paths fall back to the monolith so it keeps running as before.',
+      components: ['Router — fronts both systems', 'Route table — path to backend', 'Migrated paths — new services', 'Unmigrated paths — fall back to the monolith'],
+      diagram: `flowchart LR
+  RTR["Strangler router"] -->|"/search"| NEW["New search service"]
+  RTR -->|"/checkout"| MONO["Monolith"]
+  RTR -->|"lookup"| T["route_table"]`,
+      code: `// STRANGLER SIDE — a request for an unmigrated path falls back to the monolith, unchanged
+// PARTIES: RTR = strangler router · NEW = new microservice · MONO = legacy monolith · U1 = user
+// STATE (before):
+//    route_table : { "/search": "NEW", "/checkout": "MONO" }
+// DEF: route · CALLED BY: RTR on each incoming request
+// -> request : { "path": "/checkout" }
+//    step 1 · look up "/checkout" in route_table   // matched : "" -> "MONO"   BECAUSE /checkout has not been migrated yet
+//    step 2 · forward to the matched backend   // target : "" -> "MONO"
+//    step 3 · MONO serves checkout exactly as before
+// <- response : "checkout page" from MONO — NEW never receives this request
+//    alt path "/search" : matched : "MONO" -> "NEW" · target : "" -> "NEW" — NEW serves it, since /search was already migrated`,
+      tieback: 'This is the routing stage — the router sends migrated paths to new services and everything else to the monolith.',
+      refs: ['The strangler routes requests'],
+      problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
+    },
+    {
+      scenario: 'The strangler is more than re-hosting old features. You want to add a feature the monolith never had, and use it to show the business what microservices enable.',
+      q: 'What two kinds of services make up the strangler application, and why are the new-feature services useful?',
+      solution: 'One kind re-implements functionality that previously lived in the monolith, and the other implements brand-new features; the new-feature services are useful because they demonstrate to the business the value of using microservices.',
+      components: ['Re-implemented features — take over monolith work', 'Brand-new features — no monolith twin', 'Value demonstration — the new features\' role', 'Ongoing strangling — until the monolith retires'],
+      diagram: `flowchart LR
+  NEW["New system"] -->|"re-implemented"| CHECKOUT["checkout"]
+  NEW -->|"brand-new"| WISH["wishlist"]
+  WISH -->|"demonstrates"| VALUE["value to business"]`,
+      code: `// STRANGLER SIDE — a brand-new feature lands in the new app, showing the business what microservices enable
+// PARTIES: NEW = new strangler application · MONO = legacy monolith · RTR = strangler router · U1 = user
+// DEF: brand — a brand-new feature with no monolith twin, added only to the new app; here "wishlist"
+// DEF: route — a mapping from a request path to the system that serves it; here "/search" -> "NEW"
+// STATE (before):
+//    new_features : { "search": true }        // re-implemented monolith features
+//    brand_new    : {}                          // features with no monolith twin
+//    route_table  : { "/search": "NEW" }
+// DEF: add_feature · CALLED BY: the team to add a feature the monolith never had
+// -> feature : "wishlist"
+//    step 1 · build "wishlist" as a new microservice   // brand_new : {} -> { "wishlist": true }
+//    step 2 · register it in the router   // route_table : { "/search": "NEW" } -> { "/search": "NEW", "/wishlist": "NEW" }
+//    step 3 · record it as owned by NEW   // new_features : { "search": true } -> { "search": true, "wishlist": true }
+// <- state : NEW now serves { "search": true, "wishlist": true } — MONO never had a wishlist feature to cut over`,
+      tieback: 'This is the two-kinds stage — re-implemented features plus brand-new ones that demonstrate microservices\' value.',
+      refs: ['Two kinds of service'],
+      problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
+    },
+    {
+      scenario: 'The migration is only half done, so the monolith and the strangler are both live. Your operations team now has two systems to deploy and run for the same business.',
+      q: 'What is the cost of running the strangler alongside the monolith?',
+      solution: 'During the migration the monolith and the strangler both run, and both must be operated and deployed, so you pay for two systems side by side for as long as the migration takes.',
+      components: ['Monolith — still live', 'Strangler — also live', 'Two deploys — per release', 'The cost lasts — until the monolith retires'],
+      diagram: `flowchart LR
+  RELEASE["Release"] -->|"deploy"| MONO["Monolith"]
+  RELEASE -->|"deploy"| NEW["Strangler"]
+  MONO -->|"until retired"| COST["two systems to run"]
+  NEW --> COST`,
+      code: `// OPS SIDE — one release must deploy both systems, so the migration cost is two systems side by side
+// PARTIES: MONO = legacy monolith · NEW = new strangler application · OPS = operations team
+// STATE (before):
+//    systems : { "MONO": true }           // only the monolith was running before migration
+//    deploys : 0                          // systems deployed per release
+// DEF: release · CALLED BY: OPS on each change
+// -> version : "r2026-09"
+//    step 1 · the strangler goes live alongside the monolith   // systems : { "MONO": true } -> { "MONO": true, "NEW": true }
+//    step 2 · deploy both systems this release   // deploys : 0 -> 2   BECAUSE both must be operated and deployed
+//    step 3 · the double cost persists while both are live   // retired : false -> false   // the monolith is not gone yet
+// <- systems : 2 live · deploys : 2 per release · you pay for two systems for as long as the migration takes
+//    alt migration complete : systems : { "MONO": true, "NEW": true } -> { "NEW": true }   BECAUSE the legacy monolith is finally retired`,
+      tieback: 'This is the cost stage — two systems to run side by side until the strangling finishes and the legacy monolith is retired.',
+      refs: ['Two systems to run'],
+      problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
+    }
+  ],
   concepts: {
     cards: [
       {

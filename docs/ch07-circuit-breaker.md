@@ -210,6 +210,183 @@ flowchart TD
 ```
 
 
+## Interview Questions
+
+### Q1
+
+A checkout service calls a payments service that has died. Calls keep arriving, and the breaker must stop the cascade before it spreads.
+
+**Interviewer's question:** What makes a circuit breaker trip, and what happens once it does?
+
+**Solution:** The proxy counts consecutive failures; when the count crosses a threshold it trips, and for the timeout period all attempts fail immediately.
+
+**System-design components:**
+- Failure counter
+- Threshold
+- Tripped (OPEN) state
+- Immediate rejection
+
+```mermaid
+flowchart LR
+  C["Checkout"] --> P["breaker proxy"]
+  P -->|"fails"| SVC["Payments (down)"]
+  P --> O["OPEN when failures >= threshold"]
+```
+
+```java
+// PROXY SIDE — CLOSED state: a breaker trips when consecutive failures cross the threshold
+// PARTIES: CLIENT = caller thread · PROXY = circuit breaker · SVC = remote service (down)
+// STATE (before):
+//    breaker : { state: "CLOSED", consecutive_failures: 0, threshold: 4, timeout_s: 60 }
+//    remote_calls : 0
+// DEF: forward · CALLED BY: CLIENT, four requests in a row at 00:00:00, 00:00:01, 00:00:02, 00:00:03
+// -> request : "charge-card-1"
+//    step 1 · PROXY forwards the call to SVC : remote_calls : 0 -> 1
+//    step 2 · SVC is down; a failure is counted : consecutive_failures : 0 -> 1
+//    step 3 · the second call fails : consecutive_failures : 1 -> 2
+//    step 4 · the third call fails : consecutive_failures : 2 -> 3
+//    step 5 · the fourth call hits the threshold : consecutive_failures : 3 -> 4  BECAUSE 4 >= threshold 4
+//    step 6 · PROXY opens the circuit : state : "CLOSED" -> "OPEN"
+// <- verdict : "OPEN" tripped at 00:00:03 · every later attempt fails immediately for the timeout
+```
+
+_This is exactly the trip-on-consecutive-failures mechanism in this chapter._
+
+_Covers:_ Trip on consecutive failures
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-system-design-interviews
+
+### Q2
+
+The payments service is down and the breaker has tripped. New checkout requests keep arriving within the timeout window.
+
+**Interviewer's question:** While the breaker is open, what happens to incoming attempts, and why does it stop the cascade?
+
+**Solution:** Attempts fail immediately without calling the service, so threads are not consumed waiting, and the failure of one service no longer drains its callers.
+
+**System-design components:**
+- Open breaker
+- Fail-fast rejection
+- Protected caller threads
+
+```mermaid
+flowchart LR
+  C["Checkout"] --> P["breaker (OPEN)"]
+  P -. "fail fast" .-> C
+  P -. "never calls" .- SVC["Payments (down)"]
+```
+
+```java
+// PROXY SIDE — OPEN state: while open, every attempt fails immediately, so SVC is never touched
+// PARTIES: CLIENT = caller thread · PROXY = circuit breaker · SVC = remote service (down)
+// STATE (before):
+//    breaker : { state: "OPEN", timeout_s: 60, opened_at: "00:00:03" }
+//    attempts : 0
+//    svc_calls : 0
+//    elapsed : 0
+// DEF: reject · CALLED BY: CLIENT, requests arriving at 00:00:10 and 00:00:30 inside the 60 s window
+// -> request : "charge-card-2" at 00:00:10
+//    step 1 · PROXY sees the window is not over : elapsed : 0 -> 7  BECAUSE 00:00:10 - 00:00:03 = 7 s < 60 s
+//    step 2 · PROXY rejects without touching SVC : attempts : 0 -> 1
+//    step 3 · a second request also fails fast : attempts : 1 -> 2
+//    step 4 · SVC received nothing : svc_calls : 0 -> 0  BECAUSE the breaker short-circuits
+// <- verdict : "FAIL_FAST" twice (00:00:10, 00:00:30) · threads freed at once, SVC untouched
+```
+
+_This is exactly the fail-fast-while-open behavior in this chapter._
+
+_Covers:_ Fail fast while open
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-system-design-interviews
+
+### Q3
+
+The payments service has recovered, but the breaker is still open. The timeout is about to expire and the team watches the first request after it.
+
+**Interviewer's question:** What does the breaker do in the half-open state, and how do the probe's outcomes decide recovery or re-trip?
+
+**Solution:** After the timeout it lets a limited number of test requests through; success resumes normal operation, and a failure restarts the timeout period.
+
+**System-design components:**
+- Timeout expiry
+- Limited test requests
+- Resume on success
+- Re-trip on failure
+
+```mermaid
+flowchart LR
+  O["OPEN"] -->|"timeout expires"| H["HALF-OPEN"]
+  H -->|"probe succeeds"| C["CLOSED"]
+  H -->|"probe fails"| O
+```
+
+```java
+// PROXY SIDE — HALF-OPEN state: after the timeout, one test request is allowed through
+// PARTIES: CLIENT = caller thread · PROXY = circuit breaker · SVC = remote service (recovered)
+// STATE (before):
+//    breaker : { state: "OPEN", consecutive_failures: 4, timeout_s: 60, opened_at: "00:00:03", probe_count: 0 }
+//    reply : null
+// DEF: probe · CALLED BY: CLIENT, the first request after the timeout, at 00:01:03
+// -> request : "charge-card-3" at 00:01:03
+//    step 1 · the timeout has expired : state : "OPEN" -> "HALF-OPEN"  BECAUSE 00:01:03 - 00:00:03 = 60 s >= 60 s
+//    step 2 · PROXY lets the test request pass : probe_count : 0 -> 1
+//    step 3 · SVC answers OK this time : reply : null -> "approved"
+//    step 4 · success resumes normal operation : state : "HALF-OPEN" -> "CLOSED"
+//    step 5 · the failure counter resets : consecutive_failures : 4 -> 0
+// <- verdict : "CLOSED" resumed at 00:01:03 · normal operation restored
+//    alt test request fails : state : "HALF-OPEN" -> "OPEN"  BECAUSE the timeout period begins again
+```
+
+_This is exactly the half-open probe and its two outcomes in this chapter._
+
+_Covers:_ Probe in half-open
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-system-design-interviews
+
+### Q4
+
+The team sets a 250 ms timeout, but the payments service reliably answers in about 600 ms even when healthy.
+
+**Interviewer's question:** What is the one hard dial in a circuit breaker, and what are the two failure modes of tuning it wrong?
+
+**Solution:** Choosing timeout values is the challenge: too short creates false positives on a healthy but slow service, and too long hides real outages behind latency.
+
+**System-design components:**
+- Timeout threshold
+- False positives
+- Excessive latency
+
+```mermaid
+flowchart LR
+  T["timeout 250ms"] --> FP["false positive (healthy 600ms marked down)"]
+  T2["timeout 5000ms"] --> EL["excessive latency (real outage hidden)"]
+```
+
+```java
+// PROXY SIDE — tuning: a too-short timeout marks a healthy but slow service as failed
+// PARTIES: CLIENT = caller thread · PROXY = circuit breaker · SVC = remote service (slow but alive)
+// STATE (before):
+//    breaker : { state: "CLOSED", consecutive_failures: 0, threshold: 4, timeout_ms: 250 }
+//    remote_calls : 0
+//    verdict : "UNSET"
+//    reply : null
+//    avg_latency_ms : 600
+// DEF: call · CALLED BY: CLIENT, a request against a service that answers in about 600 ms
+// -> request : "charge-card-4"
+//    step 1 · PROXY forwards the call : remote_calls : 0 -> 1
+//    step 2 · SVC is alive but needs 600 ms : reply : null -> "approved" at 600 ms
+//    step 3 · PROXY gave up at 250 ms : verdict : "UNSET" -> "TIMEOUT"  BECAUSE 600 ms > timeout_ms 250
+//    step 4 · the timeout counts as a failure : consecutive_failures : 0 -> 1
+// <- verdict : "TIMEOUT" recorded as a failure · a healthy service is marked down, a false positive
+//    alt timeout too long : 5000 ms waits through real outages  BECAUSE excessive latency hides the failure
+```
+
+_This is exactly the threshold-tuning tradeoff in this chapter._
+
+_Covers:_ Tune thresholds carefully
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-system-design-interviews
+
 ## Key Concepts
 
 ### The Problem
@@ -220,6 +397,13 @@ flowchart TD
 ### The Solution
 
 The client invokes a remote service through a proxy that trips after a threshold of consecutive failures, fails fast for a timeout, then lets test requests through.
+
+```mermaid
+flowchart LR
+  C["Checkout"] --> P["breaker proxy"]
+  P -->|"fails"| SVC["Payments (down)"]
+  P --> O["OPEN when failures >= threshold"]
+```
 
 
 ### Key Facts

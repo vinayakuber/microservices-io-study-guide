@@ -195,6 +195,183 @@ flowchart TD
 ```
 
 
+## Interview Questions
+
+### Q1
+
+A single shared gateway serves the product page to both the desktop web client and the mobile client. The desktop renders five fields; the mobile client renders only two, over a slow mobile network, and pays to download the other three.
+
+**Interviewer's question:** Why does one shared gateway fail these two clients, and what is the concrete cost of that mismatch?
+
+**Solution:** A one-size-fits-all gateway sends every client the same shape, so the mobile client downloads fields it never renders — the wasted fields travel the slowest link for nothing.
+
+**System-design components:**
+- Shared gateway
+- Desktop web client
+- Mobile client
+- wasted-fields counter
+
+```mermaid
+flowchart LR
+  G["Shared gateway"] -->|"5 fields"| W["Desktop client (renders 5)"]
+  G -->|"5 fields"| M["Mobile client (renders 2)"]
+  M -->|"3 unused fields"| X["wasted on slow network"]
+```
+
+```java
+// GATEWAY SIDE — one shared gateway sends both clients the same shape, wasting the slowest link
+// PARTIES: GW = shared gateway · WEB = desktop web client · MOB = mobile client
+// STATE (before):
+//    fields : []                              // the fields the shared gateway returns
+//    needed : []                              // the fields the requesting client actually renders
+//    extra : 0                                // fields sent but not needed
+// DEF: serve_product_page · CALLED BY: GW answering a mobile request
+// -> request : {"client":"MOB","product":"P-9"}    // the mobile client asks for the product page
+//    step 1 · gateway sends the full desktop shape    fields : [] -> ["title","author","price","reviews","buying_options"]
+//    step 2 · mobile renders only two of them    needed : [] -> ["title","price"]
+//    step 3 · count the waste    extra : 0 -> 3  BECAUSE the gateway sent 5 fields and the mobile client uses only 2
+// <- extra : 3 · fields = 5, needed = 2, so 3 fields travel a slow mobile network for nothing
+//    alt a dedicated mobile gateway existed : fields : ["title","author","price","reviews","buying_options"] -> ["title","price"] -> extra : 0 -> 0
+```
+
+_This is the chapter's opening problem: a single one-size-fits-all API cannot fit every client's data or network._
+
+_Covers:_ Why one shared gateway cannot fit every client
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-system-design-interviews
+
+### Q2
+
+The web team wants the full product payload, while the mobile team wants only title and price — and each team wants to change its API without asking the other. They decide to split the single gateway.
+
+**Interviewer's question:** What does the Backends for frontends pattern define, and who owns and operates each resulting API module?
+
+**Solution:** A separate API gateway for each type of client, each exposing an API shaped for its one client and developed and operated by the team that owns that client.
+
+**System-design components:**
+- Web gateway (public API team)
+- Mobile gateway (mobile team)
+- Desktop web client
+- Mobile client
+
+```mermaid
+flowchart LR
+  W["Web client"] -->|"GET /web/product/P-9"| GW["GW-W (public API team)"]
+  M["Mobile client"] -->|"GET /mobile/product/P-9"| GM["GW-M (mobile team)"]
+  GW -->|"4 fields"| W
+  GM -->|"2 fields"| M
+```
+
+```java
+// GATEWAY SIDE — two clients hit two different gateways, each shaped for its owner
+// PARTIES: WEB = desktop web client · MOB = mobile client · GWW = Web gateway · GWM = Mobile gateway
+// STATE (before):
+//    gw_web : {owner:"public API team", hits:0}     // the web client's own gateway
+//    gw_mobile : {owner:"mobile team", hits:0}       // the mobile client's own gateway
+//    payload : {}                                    // what the last gateway returned
+//    total_hits : 0
+// DEF: route_by_client · CALLED BY: WEB and MOB each hitting their own gateway
+// -> web_request : "GET /web/product/P-9"
+// -> mobile_request : "GET /mobile/product/P-9"
+//    step 1 · WEB hits GWW    gw_web.hits : 0 -> 1  · payload : {} -> {"title":"POJOs in Action","author":"Chris Richardson","price":39.99,"reviews":12}
+//    step 2 · MOB hits GWM    gw_mobile.hits : 0 -> 1  · payload : {"title":"POJOs in Action","author":"Chris Richardson","price":39.99,"reviews":12} -> {"title":"POJOs in Action","price":39.99}
+//    step 3 · tally both gateways    total_hits : 0 -> 2  BECAUSE each request was served by its own separate gateway process
+// <- output : GWW returns 4 fields to WEB · GWM returns 2 fields to MOB · each client gets exactly its own API
+//    alt a single shared gateway existed : both requests hit one process -> total_hits : 0 -> 2 on one gateway returning one compromise shape
+```
+
+_This is the chapter's core solution: one gateway per client, each owned and operated by a single client team._
+
+_Covers:_ One gateway per client
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-system-design-interviews
+
+### Q3
+
+The mobile gateway hits an out-of-memory fault in production. The team needs to know whether the web client's page also goes down.
+
+**Interviewer's question:** Why does running each API module as its own process matter, and what happens to the web client when the mobile gateway crashes?
+
+**Solution:** Because each API module is a standalone process, a fault in one cannot easily impact the others — the web gateway keeps serving while the mobile gateway is down, and each is independently observable and scalable.
+
+**System-design components:**
+- Mobile gateway process
+- Web gateway process
+- out-of-memory fault
+
+```mermaid
+flowchart LR
+  F["OOM fault"] -->|"crashes"| GM["GW-M process"]
+  GM -->|"status crashed"| X["errors 1"]
+  GW["GW-W process"] -->|"still serves"| W["Web client"]
+  GM -.->|"does not affect"| GW
+```
+
+```java
+// GATEWAY SIDE — one misbehaving module cannot take down the others
+// PARTIES: GWM = Mobile gateway · GWW = Web gateway
+// STATE (before):
+//    gw_mobile : {status:"running", errors:0}      // mobile's own process
+//    gw_web : {status:"running", hits:0}           // web's separate process
+// DEF: crash_one_gateway · CALLED BY: GWM hitting an out-of-memory fault
+// -> fault : {"api":"mobile","error":"out-of-memory"}
+//    step 1 · GWM crashes    gw_mobile.status : "running" -> "crashed"
+//    step 2 · its error count rises    gw_mobile.errors : 0 -> 1  BECAUSE the mobile API hit an out-of-memory fault
+//    step 3 · GWW still serves    gw_web.hits : 0 -> 1  BECAUSE the web gateway runs in a different process and never saw the fault
+// <- output : GWW returns 1 page to its client while GWM is down · the crash is contained to one process
+//    alt both APIs shared one process : the same fault crashes the single gateway -> every client loses its API at once
+```
+
+_This is the chapter's isolation benefit: separate processes keep one misbehaving API from taking down the others._
+
+_Covers:_ Isolation buys reliability
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-system-design-interviews
+
+### Q4
+
+The web and mobile gateways each hand-write an auth edge function, and the two copies are drifting. The team wants one implementation both gateways can share.
+
+**Interviewer's question:** What duplication risk do separate gateways introduce, and how should the common code be handled so it does not block the teams?
+
+**Solution:** Separate gateways can re-implement the same edge functionality; the common code should live in a shared library used by all gateways, and the update process must stay lightweight or the gateway becomes a bottleneck.
+
+**System-design components:**
+- Mobile gateway
+- Web gateway
+- shared edge-function library
+- verify_access_token
+
+```mermaid
+flowchart LR
+  GM["GW-M"] -->|needs| F["verify_access_token"]
+  GW["GW-W"] -->|needs| F
+  F -->|moved into| LIB["shared library"]
+  LIB --> GM
+  LIB --> GW
+```
+
+```java
+// GATEWAY SIDE — two stacks would duplicate a common edge function unless it is shared
+// PARTIES: GWM = Mobile gateway · GWW = Web gateway · LIB = shared edge-function library
+// DEF: edge — the gateway edge where per-client logic such as auth runs; here the function "verify_access_token" held in edge_fn
+// STATE (before):
+//    edge_fn : {}                              // where the auth edge function lives
+// DEF: add_edge_function · CALLED BY: GWM and GWW both needing the same function
+// -> function : "verify_access_token"          // a common function both gateways need
+//    step 1 · GWM implements it    edge_fn : {} -> {owner:"mobile team", code:"verify_access_token"}
+//    step 2 · GWW copies it    edge_fn : {owner:"mobile team", code:"verify_access_token"} -> {owner:"web team", code:"verify_access_token (copy 2)"}
+//    step 3 · refactor into LIB    edge_fn : {owner:"web team", code:"verify_access_token (copy 2)"} -> {owner:"shared library", code:"verify_access_token"}
+// <- edge_fn : {owner:"shared library", code:"verify_access_token"} · one shared implementation used by both gateways, the duplicate removed
+//    alt the two gateways used different stacks : the code could not be shared -> the function stays duplicated in two places
+```
+
+_This is the chapter's duplication-and-bottleneck risk, resolved by putting common edge functionality in a shared library._
+
+_Covers:_ The duplication and bottleneck risks
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-system-design-interviews
+
 ## Key Concepts
 
 ### The Problem
@@ -205,6 +382,13 @@ flowchart TD
 ### The Solution
 
 Implement a separate API gateway for each type of client, owned and operated by a single client team.
+
+```mermaid
+flowchart LR
+  G["Shared gateway"] -->|"5 fields"| W["Desktop client (renders 5)"]
+  G -->|"5 fields"| M["Mobile client (renders 2)"]
+  M -->|"3 unused fields"| X["wasted on slow network"]
+```
 
 
 ### Key Facts

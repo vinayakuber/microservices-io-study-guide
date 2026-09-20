@@ -150,6 +150,187 @@ flowchart TD
 ```
 
 
+## Interview Questions
+
+### Q1
+
+Order Service needs a database URL and password to connect on startup. The team compiled those values into a QA build and now that build cannot talk to the production database.
+
+**Interviewer's question:** What does Externalized Configuration solve, and when does the service read its configuration?
+
+**Solution:** It lets one service run in multiple environments without modification: on startup the service reads its configuration — database credentials and network location — from an external source such as OS environment variables.
+
+**System-design components:**
+- Order Service
+- OS environment
+- database server
+- DB_URL / DB_PASSWORD
+
+```mermaid
+flowchart LR
+  S["Order Service"] -->|"startup read"| E["OS environment"]
+  E -->|"DB_URL"| C["config"]
+  E -->|"DB_PASSWORD"| C
+  C -->|"opens"| D["DB connection"]
+```
+
+```java
+// ORDER SERVICE SIDE — on startup, read DB credentials and location from the environment, not the code
+// PARTIES: SVC = order service · ENV = deployment environment (OS) · DB = database server
+// STATE (before):
+//    config : {}                               // SVC holds no DB settings yet at launch
+//    connection : ""                           // no DB connection established yet
+// DEF: startup · CALLED BY: the runtime launching SVC
+// -> env : {"DB_URL":"jdbc:mysql://prod-db:3306/orders","DB_PASSWORD":"prod-secret"}
+//    step 1 · SVC reads DB_URL from the environment    config : {} -> {"db_url":"jdbc:mysql://prod-db:3306/orders"}
+//    step 2 · SVC reads DB_PASSWORD from the environment    config : {"db_url":"jdbc:mysql://prod-db:3306/orders"} -> {"db_url":"jdbc:mysql://prod-db:3306/orders","db_password":"prod-secret"}
+//    step 3 · SVC opens a connection using those values    connection : "" -> "open"  BECAUSE the config now holds a URL and a password the DB accepts
+// <- config : {"db_url":"jdbc:mysql://prod-db:3306/orders","db_password":"prod-secret"} · connection : "open"
+//    alt DB_PASSWORD missing from ENV : connection : "" -> "failed"  BECAUSE the supplied configuration does not match what the service expects
+```
+
+_This is the chapter's startup read: configuration comes from the environment, not the code._
+
+_Covers:_ Read configuration at startup from the environment
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions
+
+### Q2
+
+The release pipeline pushes one orders-service.jar to QA and production. QA must talk to a QA database; production must talk to the production database — without rebuilding anything.
+
+**Interviewer's question:** How does one build serve two environments without modification or recompilation?
+
+**Solution:** Each environment injects its own values at startup, so the same artifact resolves different database locations and credentials — the QA instance connects to the QA database, production to the production database.
+
+**System-design components:**
+- orders-service.jar (one artifact)
+- QA environment
+- production environment
+- per-environment DB values
+
+```mermaid
+flowchart LR
+  A["orders-service.jar"] -->|"deployed"| Q["QA env"]
+  A -->|"deployed"| P["Production env"]
+  Q -->|"injects qa-db"| QD["QA database"]
+  P -->|"injects prod-db"| PD["Production database"]
+```
+
+```java
+// DEPLOYMENT SIDE — the SAME build runs in QA and production because each environment supplies its own values
+// PARTIES: ENVQA = QA environment · ENVPROD = production environment · DB = database server
+// DEF: connection — the open link to a dependency, established from config; here "qa-db" or "prod-db"
+// STATE (before):
+//    artifact : "orders-service.jar"        // the identical, unmodified build
+//    qa_config : {}                         // what the QA deployment resolves at startup
+//    prod_config : {}                       // what the production deployment resolves at startup
+//    qa_connection : ""                     // DB connection the QA instance opens
+//    prod_connection : ""                   // DB connection the production instance opens
+// DEF: deploy · CALLED BY: a release pipeline pushing the same artifact to two environments
+// -> artifact : "orders-service.jar"        // one build, no recompilation for either environment
+//    step 1 · ENVQA injects its DB values    qa_config : {} -> {"db_url":"jdbc:mysql://qa-db:3306/orders","db_password":"qa-secret"}
+//    step 2 · ENVPROD injects different DB values    prod_config : {} -> {"db_url":"jdbc:mysql://prod-db:3306/orders","db_password":"prod-secret"}
+//    step 3 · the QA instance connects to its own DB    qa_connection : "" -> "qa-db"  BECAUSE qa_config points at the QA database
+//    step 4 · the production instance connects to its own DB    prod_connection : "" -> "prod-db"  BECAUSE prod_config points at the production database
+// <- connections : qa = "qa-db" · prod = "prod-db" — one artifact "orders-service.jar", two different databases
+```
+
+_This is the chapter's run-unchanged-across-environments step: the differences live in the environment, not the build._
+
+_Covers:_ Run unchanged across environments
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions
+
+### Q3
+
+The web service's RegistrationServiceProxy is configured with a logical name REGISTRATION-SERVICE instead of a host and port. Instances move, but the name must stay valid.
+
+**Interviewer's question:** In the RegistrationServiceProxy example, what is REGISTRATION-SERVICE, and how does it become a real address?
+
+**Solution:** REGISTRATION-SERVICE is the logical name of the service; client-side discovery resolves it into a real network location that the proxy then calls.
+
+**System-design components:**
+- Web service (RegistrationServiceProxy)
+- registration service
+- client-side discovery
+- USER_REGISTRATION_URL
+
+```mermaid
+flowchart LR
+  W["Web service"] -->|"binds"| U["USER_REGISTRATION_URL"]
+  U -->|"logical name"| D["client-side discovery"]
+  D -->|"resolves"| R["http://10.0.0.7:8080/user"]
+  W -->|"calls"| R
+```
+
+```java
+// WEB SERVICE SIDE — config names the dependency logically; client-side discovery resolves the real location
+// PARTIES: WEB = web service (RegistrationServiceProxy) · REG = registration service · DISC = client-side discovery
+// DEF: url — the network location string held in config; here "http://REGISTRATION-SERVICE/user" resolving to "http://10.0.0.7:8080/user"
+// STATE (before):
+//    config : {}                              // WEB holds no registration URL yet
+//    resolved_url : ""                        // real network location, not yet found
+//    call_target : ""                         // the resolved address the proxy will call
+// DEF: startup · CALLED BY: the runtime launching WEB with an injected environment variable
+// -> env : {"USER_REGISTRATION_URL":"http://REGISTRATION-SERVICE/user"}
+//    step 1 · WEB binds the variable user_registration_url from the environment    config : {} -> {"user_registration_url":"http://REGISTRATION-SERVICE/user"}
+//    step 2 · WEB asks DISC to resolve the logical name REGISTRATION-SERVICE    resolved_url : "" -> "http://10.0.0.7:8080/user"  BECAUSE REGISTRATION-SERVICE is a logical name, not a network location
+//    step 3 · the proxy calls the resolved instance    call_target : "" -> "http://10.0.0.7:8080/user"
+// <- resolved_url : "http://10.0.0.7:8080/user" — RegistrationServiceProxy reaches REG
+```
+
+_This is the chapter's logical-name resolution: externalized config defers the location problem to client-side discovery._
+
+_Covers:_ Resolve logical names via discovery
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions
+
+### Q4
+
+A deployment ships with a missing DB_PASSWORD, or a wrong database URL. The code is unchanged and correct, but the environment supplied bad values.
+
+**Interviewer's question:** What new failure mode does externalizing configuration open up, and what issue does the pattern leave unresolved?
+
+**Solution:** Once configuration lives outside the code, a deployment can be given the wrong values; the open issue is how to ensure the supplied configuration matches what the service expects.
+
+**System-design components:**
+- Service
+- deployment environment
+- supplied config
+- startup validation
+
+```mermaid
+flowchart LR
+  E["Environment"] -->|"supplies config"| S["Service"]
+  E -->|"missing DB_PASSWORD"| M["mismatch"]
+  S -->|"startup"| C["connection failed"]
+  M --> C
+```
+
+```java
+// SERVICE SIDE — the environment supplied the wrong values, so the unchanged code fails to connect
+// PARTIES: SVC = order service · ENV = deployment environment · DB = database server
+// DEF: supplied — the configuration the environment injects at startup; here missing the DB_PASSWORD key
+// STATE (before):
+//    config : {}                              // what SVC resolves at startup
+//    connection : ""                          // the DB connection SVC opens
+//    expected_keys : ["db_url","db_password"]  // the keys the service needs
+// DEF: startup · CALLED BY: the runtime launching SVC with an incomplete environment
+// -> env : {"DB_URL":"jdbc:mysql://prod-db:3306/orders"}     // DB_PASSWORD is missing
+//    step 1 · SVC reads only what the environment supplied    config : {} -> {"db_url":"jdbc:mysql://prod-db:3306/orders"}
+//    step 2 · SVC finds a missing key    expected_keys : ["db_url","db_password"] -> ["db_url","db_password"]  BECAUSE db_password is absent from config
+//    step 3 · the connection fails    connection : "" -> "failed"  BECAUSE the supplied configuration does not match what the service expects
+// <- connection : "failed" · the open issue : how to ensure the supplied configuration matches what is expected at deploy time
+//    alt validation in place : the pipeline checks expected_keys against the supplied config -> the deploy is refused before SVC ever starts
+```
+
+_This is the chapter's resulting-context issue: portability is bought with a new verification duty at deploy time._
+
+_Covers:_ Read configuration at startup from the environment · Resolve logical names via discovery
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions
+
 ## Key Concepts
 
 ### The Problem
@@ -160,6 +341,14 @@ flowchart TD
 ### The Solution
 
 Externalize all configuration, including database credentials and network location; on startup the service reads it from an external source such as OS environment variables.
+
+```mermaid
+flowchart LR
+  S["Order Service"] -->|"startup read"| E["OS environment"]
+  E -->|"DB_URL"| C["config"]
+  E -->|"DB_PASSWORD"| C
+  C -->|"opens"| D["DB connection"]
+```
 
 
 ### Key Facts

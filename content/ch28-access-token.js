@@ -79,6 +79,52 @@ registerChapter({
 // <- pay_verdict : "authorized" — the charge is processed for "alice"`
     }
   ],
+  interview: [
+    {
+      scenario: "The API gateway is the single entry point for every client request. Instead of having each downstream service re-authenticate the same requestor, the team wants one trusted identity statement that rides along with later requests.",
+      q: "Who authenticates the requestor and issues the access token, and what does that token carry?",
+      solution: "The API gateway authenticates the request and mints an access token — e.g. a JSON Web Token — that securely identifies the requestor for every later request.",
+      components: ["Client app", "API gateway", "JSON Web Token", "identity claim"],
+      diagram: "flowchart LR\n  C[\"Client\"] -->|\"credentials\"| G[\"API gateway\"]\n  G -->|\"verifies\"| A[\"gw_auth\"]\n  G -->|\"signs claim\"| J[\"JWT token\"]\n  J -->|\"returned\"| C",
+      code: "// API GATEWAY SIDE — authenticate the requestor once and mint a token that carries their identity\n// PARTIES: CL = client app · GW = API Gateway (single entry point) · SVC = order service\n// DEF: auth — confirming WHO the requestor is, once, at the gateway; here gw_auth = {\"alice\":\"verified\"}\n// STATE (before):\n//    gw_auth : {}                              // identities GW has verified this session\n//    payload : \"\"                              // the identity claim GW will sign into the token\n//    token : \"\"                                // the access token GW will hand back\n// DEF: authenticate · CALLED BY: CL posting credentials to the login route\n// -> credentials : {\"user\":\"alice\",\"password\":\"hunter2\"}\n//    step 1 · GW verifies the credentials    gw_auth : {} -> {\"alice\":\"verified\"}\n//    step 2 · GW builds the identity claim    payload : \"\" -> {\"sub\":\"alice\"}\n//    step 3 · GW signs the claim into a JSON Web Token    token : \"\" -> \"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig\"  BECAUSE the signature lets any service verify the identity without re-authenticating\n// <- token : \"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig\" returned to CL for every later request\n//    alt unknown user : gw_auth : {} -> {\"alice\":\"unknown\"} · token : \"\" -> \"\"  BECAUSE there is no verified identity to sign, so no token is issued",
+      tieback: "This is the chapter's authenticate-at-the-gateway step: one authentication mints a portable signed token.",
+      refs: ["Authenticate at the gateway"],
+      problems: ["26-payment-system", "27-digital-wallet"]
+    },
+    {
+      scenario: "A service receives a forwarded request carrying the token and must decide, without a round-trip to the gateway, whether the requestor may perform the operation.",
+      q: "How does a service verify the requestor and check authorization straight from the token?",
+      solution: "The service verifies the token signature to confirm identity, reads the identity from the token's claims, then checks the requestor's role against the operation before proceeding.",
+      components: ["Order service", "token signature check", "role map", "authorization verdict"],
+      diagram: "flowchart LR\n  G[\"Gateway\"] -->|\"token\"| S[\"Order service\"]\n  S -->|\"verify signature\"| V[\"verdict authentic\"]\n  S -->|\"read claims\"| I[\"requestor alice\"]\n  S -->|\"check role\"| A[\"verdict authorized\"]",
+      code: "// ORDER SERVICE SIDE — verify the requestor identity and authorization straight from the token\n// PARTIES: GW = API Gateway · SVC = order service · CL = client app\n// DEF: role — the category of actor a requestor belongs to; here \"customer\" from allowed_roles {\"alice\":\"customer\"}\n// STATE (before):\n//    allowed_roles : {\"alice\":\"customer\"}     // roles that may act on orders\n//    requestor : \"\"                           // identity read out of the token\n//    verdict : \"pending\"                      // the authorization decision, not yet made\n// DEF: handle_order · CALLED BY: GW forwarding a request that carries the token\n// -> token : \"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig\" · -> operation : \"place_order\"\n//    step 1 · SVC verifies the token signature    verdict : \"pending\" -> \"authentic\"\n//    step 2 · SVC reads the identity from the token claims    requestor : \"\" -> \"alice\"\n//    step 3 · SVC checks the role against the operation    verdict : \"authentic\" -> \"authorized\"  BECAUSE allowed_roles maps \"alice\" to \"customer\", which may place an order\n// <- verdict : \"authorized\" — SVC proceeds with \"place_order\"\n//    alt invalid signature : verdict : \"pending\" -> \"rejected\" — SVC refuses the request",
+      tieback: "This is the chapter's verify-at-the-service step: identity and authorization come from the token, with no gateway round-trip.",
+      refs: ["Verify identity and authorization at the service"],
+      problems: ["26-payment-system", "27-digital-wallet"]
+    },
+    {
+      scenario: "Order Service needs to charge the customer's card, so it calls Payment Service. The requestor's identity must survive that second hop intact.",
+      q: "When one service invokes another, what should it do with the access token, and why?",
+      solution: "The service includes the same access token in the request it makes to the other service, so the downstream service verifies identity and authorization from the same token with no fresh authentication.",
+      components: ["Order service", "Payment service", "forwarded token", "payment verdict"],
+      diagram: "flowchart LR\n  O[\"Order service\"] -->|\"same token\"| P[\"Payment service\"]\n  P -->|\"verifies\"| V[\"pay_verdict pending\"]\n  V -->|\"authorized\"| C[\"charge for alice\"]",
+      code: "// PAYMENT SERVICE SIDE — a service includes the token when it calls another service\n// PARTIES: SVC = order service · PAY = payment service · CL = client app\n// STATE (before):\n//    incoming : \"\"                       // token SVC received on its own request\n//    forwarded : \"\"                      // token SVC sends onward to PAY\n//    pay_verdict : \"pending\"             // PAY's authorization decision\n// DEF: invoke_payment · CALLED BY: SVC needing to charge the customer's card\n// -> token : \"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig\"\n//    step 1 · SVC stores the token it received    incoming : \"\" -> \"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig\"\n//    step 2 · SVC attaches the same token to its call to PAY    forwarded : \"\" -> \"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig\"\n//    step 3 · PAY verifies the token and authorizes the charge    pay_verdict : \"pending\" -> \"authorized\"  BECAUSE the token still identifies \"alice\", whose role permits the charge\n// <- pay_verdict : \"authorized\" — the charge is processed for \"alice\"",
+      tieback: "This is the chapter's propagate-the-token step: the same token rides along the whole call chain.",
+      refs: ["Propagate the token across service calls"],
+      problems: ["26-payment-system", "27-digital-wallet"]
+    },
+    {
+      scenario: "Every service in the chain must now validate the token itself. The team worries about the cost and attack surface of spreading verification duty across services.",
+      q: "What does the Access Token pattern buy, and what new duty does it push onto every service?",
+      solution: "It buys that the requestor's identity is securely passed around the system, so services can verify authorization without consulting the gateway — at the cost that each service must implement token validation.",
+      components: ["API gateway", "token-carrying request", "per-service validation", "distributed authorization"],
+      diagram: "flowchart LR\n  G[\"Gateway\"] -->|\"token on every hop\"| A[\"Service A\"]\n  A -->|\"token\"| B[\"Service B\"]\n  B -->|\"validates locally\"| V[\"authorized\"]\n  B -.->|\"no gateway round-trip\"| G",
+      code: "// SERVICE SIDE — the token lets each service authorize locally, without a round-trip back to the gateway\n// PARTIES: GW = API gateway · SVCA = order service · SVCB = payment service\n// DEF: verdict — the authorization decision a service reaches about a request; here \"authorized\"\n// STATE (before):\n//    token : \"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig\"\n//    gateway_consulted : 0                // how many times a service asked GW to re-check\n//    svcb_verdict : \"pending\"\n// DEF: authorize_locally · CALLED BY: SVCB handling a forwarded request\n// -> operation : \"charge_card\"\n//    step 1 · SVCB reads the token it was given    token : \"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig\" -> \"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig\"\n//    step 2 · SVCB validates and authorizes locally    svcb_verdict : \"pending\" -> \"authorized\"  BECAUSE the token already identifies \"alice\" and the service checks the role itself\n//    step 3 · no gateway round-trip    gateway_consulted : 0 -> 0  BECAUSE verification duty is distributed to the services, not delegated back to GW\n// <- svcb_verdict : \"authorized\" · gateway_consulted : 0 · each service must implement its own token validation\n//    alt no token pattern : each hop re-authenticates -> every service duplicates authentication logic and the chain slows to a crawl",
+      tieback: "This is the chapter's resulting benefit and its tradeoff: identity flows with every request, but validation duty spreads to every service.",
+      refs: ["Verify identity and authorization at the service", "Propagate the token across service calls"],
+      problems: ["26-payment-system", "27-digital-wallet"]
+    }
+  ],
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Communicating the requestor identity', content: '<p><strong>Why.</strong> The API gateway authenticates a request and forwards it to numerous services, which may in turn invoke other services.</p><p><strong>Claim.</strong> Each service needs to know who made the request without re-authenticating on every hop.</p><p><strong>Grounding.</strong> The reference problem: how to communicate the identity of the requestor to the services that handle the request.</p><p><strong>In the wild.</strong> Without a shared credential, every service duplicates authentication logic and each hop needs its own proof of identity.</p>' },

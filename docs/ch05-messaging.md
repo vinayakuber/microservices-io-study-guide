@@ -221,6 +221,198 @@ flowchart TD
 ```
 
 
+## Interview Questions
+
+### Q1
+
+A customer cancels an order. The Order Service must tell downstream services without waiting for any of them to act.
+
+**Interviewer's question:** How does the notification style of messaging let a service announce an event and return immediately?
+
+**Solution:** A notification is a message that expects no reply, so the sender publishes it to a channel and returns at once; a consumer reads it later.
+
+**System-design components:**
+- Sender service
+- Message channel
+- Consumer (reads later)
+- No reply expected
+
+```mermaid
+flowchart LR
+  SVC["Order Service"] --> BRK["channel"]
+  BRK --> CON["Refund consumer"]
+  SVC -. "returns immediately" .-> SVC
+```
+
+```java
+// ORDER SERVICE SIDE — publish an OrderCancelled event to a channel; the consumer reads it later
+// PARTIES: SVC = Order Service · BRK = message broker · CON = Refund consumer
+// STATE (before):
+//    orders : {}
+//    channel : []
+//    refunds : {}
+// DEF: cancel_order · CALLED BY: U1 cancelling an order (a notification expects no reply)
+// -> order_id : "PO-7703" · -> event : "OrderCancelled"
+//    step 1 · SVC marks the order cancelled locally : orders : {} -> { "PO-7703": { status: "CANCELLED" } }
+//    step 2 · SVC publishes the event to BRK : channel : [] -> [ "OrderCancelled(PO-7703)" ]
+//    step 3 · SVC returns immediately : reply : "NONE"   BECAUSE a notification sends no reply
+// <- event : "OrderCancelled(PO-7703)" sits in the channel, waiting for CON
+//
+// DEF: consume · CALLED BY: CON polling BRK whenever it is ready
+// -> poll : channel = [ "OrderCancelled(PO-7703)" ]
+//    step 1 · CON receives the message : channel : [ "OrderCancelled(PO-7703)" ] -> []
+//    step 2 · CON starts the refund : refunds : {} -> { "PO-7703": "REFUNDING" }
+// <- message : "OrderCancelled(PO-7703)" consumed · SVC and CON never run at the same instant
+```
+
+_This is exactly the send-and-forget notification style over a messaging channel in this chapter._
+
+_Covers:_ Publish over a messaging channel
+
+_From the 28 problems:_ 19-distributed-message-queue · 10-notification-system
+
+### Q2
+
+A checkout flow needs the current item availability before it quotes a price, so a fire-and-forget message is not enough.
+
+**Interviewer's question:** How does the request/response style get a prompt answer over a channel, and how is the reply matched to its request?
+
+**Solution:** The sender sends a request with a reply-to channel and a correlation id, and the provider replies on that channel, so the reply is matched to the request.
+
+**System-design components:**
+- Request message
+- Reply-to channel
+- Correlation id
+- Prompt reply
+
+```mermaid
+flowchart LR
+  C["Checkout"] --> RQ["request channel"]
+  RQ --> P["Inventory service"]
+  P --> RP["reply-to channel"]
+  RP --> C
+```
+
+```java
+// CONSUMER SERVICE SIDE — request/response: send a request, expect a prompt reply over a channel
+// PARTIES: CLIENT = Checkout · BRK = message broker · SVC = Inventory service
+// DEF: channel — a named conduit through which messages flow; here the reply_to channel "reply_channel" carried "REQ-91:yes 18.75"
+// DEF: reply — the answer the provider returns over the reply channel; here "yes 18.75" for request "REQ-91"
+// STATE (before):
+//    request_channel : []
+//    reply_channel : []
+// DEF: check_availability · CALLED BY: CLIENT needing availability now
+// -> request : { id: "REQ-91", reply_to: "reply_channel", body: "check availability" }
+//    step 1 · CLIENT sends the request to BRK : request_channel : [] -> [ "REQ-91:check availability" ]
+//    step 2 · SVC receives and processes it : request_channel : [ "REQ-91:check availability" ] -> []
+//    step 3 · SVC replies on the reply channel : reply_channel : [] -> [ "REQ-91:yes 18.75" ]
+//    step 4 · CLIENT reads its reply : reply_channel : [ "REQ-91:yes 18.75" ] -> []
+// <- reply : "yes 18.75" delivered to CLIENT · id "REQ-91" matches the request
+//    alt no reply : CLIENT keeps waiting  BECAUSE both sides must be available for the duration
+```
+
+_This is exactly the request/response style with its reply-to channel and correlation id in this chapter._
+
+_Covers:_ Request/response style
+
+_From the 28 problems:_ 19-distributed-message-queue · 10-notification-system
+
+### Q3
+
+A payment succeeds, and three services — billing, shipping, and loyalty — all need to react, without the payment service knowing any of them.
+
+**Interviewer's question:** How does the publish/subscribe style fan one event out to several recipients?
+
+**Solution:** A publisher writes a message to a topic and knows nothing of its recipients; the broker delivers a copy to each subscriber (zero or more).
+
+**System-design components:**
+- Publisher
+- Topic
+- Broker fan-out
+- Multiple subscribers
+
+```mermaid
+flowchart LR
+  PUB["Payment service"] --> TOP["topic: payments"]
+  TOP --> B["Billing"]
+  TOP --> S["Shipping"]
+  TOP --> L["Loyalty"]
+```
+
+```java
+// BROKER SIDE — publish/subscribe: one publisher, three subscribers (zero or more recipients)
+// PARTIES: PUB = Payment service · BRK = message broker · SUB1 = Billing · SUB2 = Shipping · SUB3 = Loyalty
+// DEF: inbox — a per-subscriber mailbox the broker delivers one copy into; here inbox_billing, inbox_shipping, and inbox_loyalty each receive "PaymentProcessed(PAY-311)"
+// STATE (before):
+//    topic : { "payments": [] }
+//    inbox_billing : []
+//    inbox_shipping : []
+//    inbox_loyalty : []
+// DEF: publish_payment_processed · CALLED BY: PUB after a payment is captured
+// -> event : "PaymentProcessed(PAY-311)"
+//    step 1 · PUB publishes once to the topic : topic["payments"] : [] -> [ "PaymentProcessed(PAY-311)" ]
+//    step 2 · BRK fans out to the first subscriber : inbox_billing : [] -> [ "PaymentProcessed(PAY-311)" ]
+//    step 3 · BRK copies to the second subscriber : inbox_shipping : [] -> [ "PaymentProcessed(PAY-311)" ]
+//    step 4 · BRK copies to the third subscriber : inbox_loyalty : [] -> [ "PaymentProcessed(PAY-311)" ]
+//    step 5 · the topic drains after fan-out : topic["payments"] : [ "PaymentProcessed(PAY-311)" ] -> []
+// <- delivery : 3 copies of "PaymentProcessed(PAY-311)" · zero subscribers would mean 0 copies
+//    alt a subscriber is down : BRK holds its copy  BECAUSE the broker buffers per subscriber
+```
+
+_This is exactly the publish/subscribe fan-out with zero-or-more recipients in this chapter._
+
+_Covers:_ Publish/subscribe style
+
+_From the 28 problems:_ 19-distributed-message-queue · 10-notification-system
+
+### Q4
+
+The notification consumer is down for maintenance, but orders keep arriving. The team wants to know what happens to those messages.
+
+**Interviewer's question:** How does messaging buy availability through buffering, and what does that buffering cost?
+
+**Solution:** The broker keeps messages queued until the consumer can process them, decoupling sender from consumer, at the cost of running a highly available broker.
+
+**System-design components:**
+- Message broker buffer
+- Down consumer
+- Loose runtime coupling
+- Broker complexity
+
+```mermaid
+flowchart LR
+  SVC["Order Service"] --> Q["broker queue"]
+  Q -. "held while down" .-> CON["Consumer (DOWN)"]
+  Q --> R["replays on reconnect"]
+```
+
+```java
+// BROKER SIDE — buffering buys availability: consumer down, broker holds the queue until it returns
+// PARTIES: BRK = message broker · SVC = Order Service (publisher) · CON = Consumer
+// STATE (before):
+//    queue : []
+//    con_status : "UP"
+// DEF: publish_while_down · CALLED BY: SVC publishing 12 orders while CON is down
+// -> count : 12
+//    step 1 · CON goes down : con_status : "UP" -> "DOWN"
+//    step 2 · SVC publishes order 1 : queue : [] -> [ 1 ]
+//    step 3 · SVC publishes orders 2 to 12 : queue : [ 1 ] -> [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 ]
+//    step 4 · SVC is not blocked   BECAUSE the broker buffers messages until the consumer can process them
+// <- queue : [ 1 .. 12 ] held while con_status stays "DOWN"
+//
+// DEF: drain_on_reconnect · CALLED BY: CON reconnecting
+// -> reconnect : "true"
+//    step 1 · CON comes back up : con_status : "DOWN" -> "UP"
+//    step 2 · CON drains the queue : queue : [ 1 .. 12 ] -> []
+// <- delivery : 12 messages delivered after reconnect · availability bought with the cost of running a broker
+```
+
+_This is exactly the buffering-for-availability benefit and the broker tax in this chapter._
+
+_Covers:_ Availability through buffering
+
+_From the 28 problems:_ 19-distributed-message-queue · 10-notification-system
+
 ## Key Concepts
 
 ### The Problem
@@ -231,6 +423,13 @@ flowchart TD
 ### The Solution
 
 Services communicate by exchanging messages over messaging channels, asynchronously.
+
+```mermaid
+flowchart LR
+  SVC["Order Service"] --> BRK["channel"]
+  BRK --> CON["Refund consumer"]
+  SVC -. "returns immediately" .-> SVC
+```
 
 
 ### Key Facts

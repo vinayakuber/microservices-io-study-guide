@@ -224,6 +224,187 @@ flowchart TD
 ```
 
 
+## Interview Questions
+
+### Q1
+
+An architect is turning a monolith's subdomains into services and must decide which subdomains go into which service, and whether any may be shared.
+
+**Interviewer's question:** How does the microservice architecture assign subdomains to services, and which single subdomain is allowed to be shared across services?
+
+**Solution:** Each service owns one or more subdomains, each subdomain belongs to exactly one service, and only a shared-library subdomain may be used by many.
+
+**System-design components:**
+- Service — one or more subdomains
+- Subdomain — belongs to a single service
+- Shared-library subdomain — the one allowed exception
+- Team ownership — follows the non-library subdomains
+
+```mermaid
+flowchart LR
+  SUB["ProductCatalog, Inventory, Order"] --> SV["one service each"]
+  LIB["CommonLib"] -->|shared| SV
+  LIB -->|shared| SV2["other services"]
+```
+
+```java
+// DESIGN SIDE — assign each subdomain to exactly one service; a shared library is the lone exception
+// PARTIES: ARC = architect applying the microservice pattern
+// STATE (before):
+//    subdomains : { "ProductCatalog":{type:"business"}, "Inventory":{type:"business"}, "Order":{type:"business"}, "CommonLib":{type:"library"} }
+//    services : []
+// DEF: decompose · CALLED BY: ARC grouping subdomains into services
+// -> subdomain_list : ["ProductCatalog","Inventory","Order","CommonLib"]
+//    step 1 · create a service per business subdomain : services : [] -> ["catalog","inventory","order"]
+//    step 2 · place each subdomain in exactly one service : placement : "unassigned" -> "one-to-one"
+//    step 3 · share the library across all three : CommonLib.owners : 0 -> 3   BECAUSE a shared-library subdomain is the one allowed exception
+// <- service_count : 3 · every non-library subdomain belongs to a single service
+//    alt merge two subdomains : services : 3 -> 2  (a service may hold more than one subdomain)
+```
+
+_This is exactly the services-group-subdomains rule, including the shared-library exception, in this chapter._
+
+_Covers:_ Services group subdomains
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-system-design-interviews
+
+### Q2
+
+Team Orders wants to ship a fix while Team Payment is mid-refactor. Under the monolith both had to ship together; the lead asks what microservices change.
+
+**Interviewer's question:** What makes a service independently deployable, and how does that let one team ship without waiting on another?
+
+**Solution:** Each service gets its own source repository and its own build-test-deploy pipeline, so a team ships its service alone.
+
+**System-design components:**
+- Own source repository per service
+- Own deployment pipeline
+- Per-service tests
+- Independent release
+
+```mermaid
+flowchart LR
+  TO["Team Orders fix"] --> P1["order pipeline"]
+  P1 --> D1["deploy order v2.3"]
+  TP["Team Payment refactor"] -.own pipeline.-> P2["payment pipeline"]
+  P2 -.untouched.-> D2["payment still v2.2"]
+```
+
+```java
+// DEPLOY SIDE — a team ships its service alone through its own repository and pipeline
+// PARTIES: TO = Team Orders · TP = Team Payment · P1 = order pipeline · P2 = payment pipeline
+// STATE (before):
+//    repos : { "order": {pipeline:"P1", tests:14}, "payment": {pipeline:"P2", tests:9} }
+//    deployed : { "order": "v2.2", "payment": "v2.2" }
+//    built_services : []
+//    tests_run : 23
+// DEF: release · CALLED BY: TO shipping order v2.3 while TP is mid-change
+// -> change : "order v2.3"
+//    step 1 · build only the order service : built_services : [] -> ["order"]
+//    step 2 · run only order tests : tests_run : 23 -> 14   BECAUSE each service has its own pipeline and its own tests
+//    step 3 · deploy order alone : deployed["order"] : "v2.2" -> "v2.3"
+//    step 4 · payment pipeline never runs (its service is unchanged)
+// <- release : "order v2.3 live" · TO did not wait for TP
+//    alt one shared pipeline : both services rebuild -> tests_run : 14 -> 23 (lockstep)
+```
+
+_This is exactly independent deployability — own repo, own pipeline — in this chapter._
+
+_Covers:_ Independent deployability
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-system-design-interviews
+
+### Q3
+
+A 'checkout' command must now touch order, payment, and shipping services, each with its own database. The team realizes a single ACID commit no longer spans them.
+
+**Interviewer's question:** Why can't one ACID transaction span services, and how is a distributed command implemented instead?
+
+**Solution:** Loose coupling requires a database per service, so a distributed command becomes a saga — a series of local transactions, eventually consistent.
+
+**System-design components:**
+- Database per service
+- Local transaction — confined to one service
+- Saga — series of local transactions
+- API gateway — the entry point
+
+```mermaid
+flowchart LR
+  API["API gateway"] --> OSV["order: T1"]
+  API --> PSV["payment: T2"]
+  API --> SSV["shipping: T3"]
+  OSV -->|"each commits its own DB"| SAGA["eventually consistent saga"]
+```
+
+```java
+// ORDER SIDE — a distributed command spans three services, each committing to its own database
+// PARTIES: API = API gateway · OSV = order service · PSV = payment service · SSV = shipping service
+// DEF: local — a transaction confined to one service and its own database; here local txn "T1" = {service:"order", state:"NEW"}
+// STATE (before):
+//    local_txns : { "T1": {service:"order", state:"NEW"}, "T2": {service:"payment", state:"NEW"}, "T3": {service:"shipping", state:"NEW"} }
+// DEF: checkout · CALLED BY: API routing a client request to the order service
+// -> order_id : "PO-8801" · -> amount : 25
+//    step 1 · local txn in OSV : local_txns["T1"].state : "NEW" -> "DONE"  (creates the order)
+//    step 2 · local txn in PSV : local_txns["T2"].state : "NEW" -> "DONE"  (charges the card)
+//    step 3 · local txn in SSV : local_txns["T3"].state : "NEW" -> "DONE"  (schedules the shipment)
+//    step 4 · each service commits against its OWN database — no single ACID commit
+// <- saga : "PO-8801" completed via 3 local transactions (eventually consistent, not ACID)
+//    alt step 3 fails : compensating transactions undo T1 and T2 -> local_txns["T1"].state : "DONE" -> "UNDONE"
+```
+
+_This is exactly the distributed-operation-to-saga move forced by a database per service._
+
+_Covers:_ Distributed operations · The collaboration patterns and known uses
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-system-design-interviews
+
+### Q4
+
+A client requests its home feed, which needs data from six services. The team asks how to build it without a shared database.
+
+**Interviewer's question:** What are the four service collaboration patterns, and which ones implement a distributed query as a series of local queries?
+
+**Solution:** Saga and Command-side replica serve distributed commands; API composition and CQRS serve distributed queries as local queries; all rely on Transaction Outbox for messaging.
+
+**System-design components:**
+- Saga — distributed command
+- Command-side replica — replicated read data
+- API composition + CQRS — distributed query
+- Transaction Outbox — atomic publish
+
+```mermaid
+flowchart LR
+  Q["getHomeFeed"] --> API["API composition"]
+  API --> S1["catalog"]
+  API --> S2["watchlist"]
+  API --> S3["profile"]
+  API -->|"6 local queries -> 1 page"| P["composed page"]
+```
+
+```java
+// GATEWAY SIDE — one distributed query becomes a series of local queries (API composition)
+// PARTIES: GW = API gateway · SVC1..SVC6 = six backend services, each with its own DB
+// STATE (before):
+//    responses : []
+//    pending_calls : 0
+//    fanout : 6
+//    delivered : 0
+// DEF: getHomeFeed · CALLED BY: a client device requesting its feed
+// -> device : "tablet-4007" · -> api_call : 1
+//    step 1 · fan out the query : pending_calls : 0 -> 6   BECAUSE each API call fans out to an average of six backend services
+//    step 2 · each service queries its OWN database : responses : [] -> ["catalog","watchlist","ratings","search","profile","ads"]
+//    step 3 · compose the six results : composed : "none" -> "6-merged"
+//    step 4 · deliver one page : delivered : 0 -> 1
+// <- page : 1 response assembled from 6 local queries (no shared database)
+//    alt a service is down : responses : 6 -> 5 (a partial page — availability trades off)
+```
+
+_This is exactly the four collaboration patterns and API composition's local-query assembly in this chapter._
+
+_Covers:_ The collaboration patterns and known uses · Distributed operations
+
+_From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-system-design-interviews
+
 ## Key Concepts
 
 ### The Problem
@@ -234,6 +415,13 @@ flowchart TD
 ### The Solution
 
 Structure the application as a set of two or more independently deployable, loosely coupled services; each service owns one or more subdomains and typically has its own source repository and its own build, test and deploy pipeline.
+
+```mermaid
+flowchart LR
+  SUB["ProductCatalog, Inventory, Order"] --> SV["one service each"]
+  LIB["CommonLib"] -->|shared| SV
+  LIB -->|shared| SV2["other services"]
+```
 
 
 ### Key Facts
