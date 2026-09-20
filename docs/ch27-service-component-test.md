@@ -245,7 +245,7 @@ _Role: stubbed dependency_
 ```mermaid
 flowchart TD
   R["Kitchen Service double"]
-  R --> P0["returns the canned ticket &quot;T-88&quot;"]
+  R --> P0["returns the canned ticket #quot;T-88#quot;"]
   R --> P1["stands in for the real Kitchen Service"]
 ```
 

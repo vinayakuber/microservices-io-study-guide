@@ -173,7 +173,7 @@ _Role: legacy monolith_
 flowchart TD
   R["legacy monolith — the old system being shielded"]
   R --> P0["customer table — cust_id, cust_dob, status_cd on PostgreSQL 14 @ legacy-db-1"]
-  R --> P1["Legacy codes — status_cd &quot;A&quot; for active"]
+  R --> P1["Legacy codes — status_cd #quot;A#quot; for active"]
 ```
 
 ```mermaid

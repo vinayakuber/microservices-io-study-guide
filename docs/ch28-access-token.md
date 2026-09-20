@@ -158,7 +158,7 @@ _Role: identity provider (token issuance)_
 flowchart TD
   R["identity provider — the token issuer"]
   R --> P0["authenticates the requestor (alice)"]
-  R --> P1["mints the JWT &quot;eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig&quot;"]
+  R --> P1["mints the JWT #quot;eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig#quot;"]
 ```
 
 ### API gateway — the single entry point

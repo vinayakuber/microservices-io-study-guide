@@ -229,7 +229,7 @@ _Role: caller_
 ```mermaid
 flowchart TD
   R["the caller — Registration Service"]
-  R --> P0["builds the request { email: &quot;bob@example.com&quot; }"]
+  R --> P0["builds the request { email: #quot;bob@example.com#quot; }"]
   R --> P1["waits synchronously for the reply"]
 ```
 

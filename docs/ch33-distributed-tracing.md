@@ -255,7 +255,7 @@ _Role: transport_
 ```mermaid
 flowchart TD
   R["RabbitMQ broker — the transport"]
-  R --> P0["queue &quot;zipkin&quot; — the span channel"]
+  R --> P0["queue #quot;zipkin#quot; — the span channel"]
   R --> P1["decouples writers from the collector, buffers under load"]
 ```
 

@@ -213,7 +213,7 @@ _Role: collector / aggregator/store_
 flowchart TD
   R["Central logging service — collector + aggregator/store"]
   R --> P0["collects the lines shipped by each service"]
-  R --> P1["indexes them by request id into {&quot;REQ-3001&quot;:[1,2,3]}"]
+  R --> P1["indexes them by request id into {#quot;REQ-3001#quot;:[1,2,3]}"]
 ```
 
 ### Developer — the reader

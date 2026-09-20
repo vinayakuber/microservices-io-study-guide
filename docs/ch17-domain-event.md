@@ -164,8 +164,8 @@ _Role: aggregate/publisher_
 ```mermaid
 flowchart TD
   R["Order aggregate (in Order Service) — the publisher"]
-  R --> P0["change state — flips order state &quot;NEW&quot; -&gt; &quot;PLACED&quot;"]
-  R --> P1["emit DomainEvent — produces &quot;OrderPlaced&quot; { order_id:&quot;PO-2001&quot; }"]
+  R --> P0["change state — flips order state #quot;NEW#quot; -&gt; #quot;PLACED#quot;"]
+  R --> P1["emit DomainEvent — produces #quot;OrderPlaced#quot; { order_id:#quot;PO-2001#quot; }"]
   R --> P2["Transactional Outbox — writes the event row in the same DB transaction"]
   R --> P3["Relay — polls the outbox after commit and publishes to the broker"]
 ```
@@ -177,7 +177,7 @@ _Role: broker/transport_
 ```mermaid
 flowchart TD
   R["message broker — the transport"]
-  R --> P0["carries &quot;OrderPlaced&quot; from the publisher to every subscriber"]
+  R --> P0["carries #quot;OrderPlaced#quot; from the publisher to every subscriber"]
   R --> P1["decouples the aggregate from the consumers"]
 ```
 
@@ -188,7 +188,7 @@ _Role: subscriber/consumer_
 ```mermaid
 flowchart TD
   R["CQRS view updater — the subscriber/consumer"]
-  R --> P0["consume — receives &quot;OrderPlaced&quot; off the broker"]
+  R --> P0["consume — receives #quot;OrderPlaced#quot; off the broker"]
   R --> P1["react — updates its read model order_count 0 -&gt; 1"]
 ```
 

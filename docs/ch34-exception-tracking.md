@@ -214,7 +214,7 @@ _Role: service (source)_
 ```mermaid
 flowchart TD
   R["Order Service — the thrower"]
-  R --> P0["throws the exception EX-1001 with msg &quot;customer is null&quot;"]
+  R --> P0["throws the exception EX-1001 with msg #quot;customer is null#quot;"]
   R --> P1["reports the stack trace SVC.doGet line 42"]
 ```
 
