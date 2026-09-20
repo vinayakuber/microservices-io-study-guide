@@ -52,7 +52,8 @@ registerChapter({
 //    step 1 · one service per capability : services : [] -> ["catalog","inventory","order","delivery"]
 //    step 2 · attach the business object each capability manages : owners : {} -> {"catalog":"Product","inventory":"Stock","order":"Order","delivery":"Shipment"}
 //    step 3 · place them under a top-level capability category : category : "none" -> "Product/Service delivery"   BECAUSE capabilities form a multi-level hierarchy
-// <- service_count : 4 · each service corresponds to one business capability
+//    step 4 · a client query is served by the owning service : query "GET /products/P-1" -> served by "catalog"   BECAUSE owners maps Product -> catalog
+// <- service_count : 4 · each service corresponds to one business capability · queries route to the owning service (read path)
 //    alt merge delivery into order : services : 4 -> 3  (a capability group can map to one service)`
     },
     {

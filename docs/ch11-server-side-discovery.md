@@ -54,6 +54,7 @@ flowchart TD
 //    forwarded : "none"
 // DEF: a client sends a request · CALLED BY: CLI calling the router's well-known address
 // -> request : "POST http://router.example.com/orders"
+//    step 0 · the instances write these rows at startup : registry["order-service"] : [] -> [{"host":"10.0.1.7","port":8080},{"host":"10.0.1.8","port":8080}]   BECAUSE each instance writes its own row on boot (self-registration)
 //    step 1 · RTR queries REG : lookup : [] -> ["10.0.1.7:8080","10.0.1.8:8080"]   BECAUSE the router asks the registry for available instances
 //    step 2 · RTR picks one : router_target : "unset" -> "10.0.1.7:8080"
 //    step 3 · RTR forwards : forwarded : "none" -> "10.0.1.7:8080"   BECAUSE the router relays the request to the chosen instance

@@ -142,7 +142,8 @@ flowchart TD
 //    step 1 · one service per subdomain : services : [] -> ["catalog","inventory","order","delivery"]
 //    step 2 · keep each service cohesive : cohesion : "unknown" -> "strong"   BECAUSE each service is one subdomain with one set of functions
 //    step 3 · keep services loosely coupled : coupling : "unknown" -> "loose"   (each service owns its subdomain's model)
-// <- service_count : 4 · services correspond to subdomains, not to technical layers
+//    step 4 · a client query is served by the service owning that subdomain : query "GET /orders/O-1" -> served by "order"   BECAUSE order management maps to the order service
+// <- service_count : 4 · services correspond to subdomains, not to technical layers · queries route to the owning service (read path)
 //    alt merge two subdomains : services : 4 -> 3  (a service may contain more than one subdomain)
 ```
 

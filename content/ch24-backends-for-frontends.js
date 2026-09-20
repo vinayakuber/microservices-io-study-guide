@@ -51,7 +51,7 @@ registerChapter({
 //    step 1 · WEB hits GW-W    // gw_web.hits : 0 -> 1  · payload : {} -> {title:"POJOs in Action", author:"Chris Richardson", price:39.99, reviews:12}
 //    step 2 · MOB hits GW-M    // gw_mobile.hits : 0 -> 1  · payload : {} -> {title:"POJOs in Action", price:39.99}
 //    step 3 · tally both gateways    // total_hits : 0 -> 2  BECAUSE each request was served by its own separate gateway process
-// <- output : GW-W returns 4 fields to WEB · GW-M returns 2 fields to MOB · each client gets exactly its own API
+// <- output : GW-W returns 4 fields to WEB · GW-M returns 2 fields to MOB · each gateway writes its client's own payload (write) and serves it back (read)
 //    alt a single shared gateway existed : both requests hit one process -> total_hits : 0 -> 2 on a single gateway returning one compromise shape`
     },
     {

@@ -54,7 +54,8 @@ flowchart TD
 // -> boot : {"host":"10.0.1.7","ip":"10.0.1.7","port":8080}
 //    step 1 · SVC registers itself : registry["order-service"] : [] -> [{"host":"10.0.1.7","ip":"10.0.1.7","port":8080}]
 //    step 2 · SVC marks itself available : self_state : "DOWN" -> "AVAILABLE"
-// <- registry row : "order-service" -> [{"host":"10.0.1.7","ip":"10.0.1.7","port":8080}]   (now discoverable)
+//    step 3 · discovery reads the entry back : lookup "order-service" -> returns [{"host":"10.0.1.7","ip":"10.0.1.7","port":8080}]   BECAUSE the registry serves the row the instance wrote
+// <- registry row : "order-service" -> [{"host":"10.0.1.7","ip":"10.0.1.7","port":8080}]   (now discoverable: written by SVC, read by discovery)
 //    alt shutdown : SVC unregisters itself -> registry["order-service"] : [{"host":"10.0.1.7","ip":"10.0.1.7","port":8080}] -> []
 ```
 
