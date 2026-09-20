@@ -190,7 +190,10 @@ explanation, mechanically verify completeness and print the result:
 5. Assert every Mermaid diagram PARSES (run `mermaid.parse` on each; a broken
    diagram is a defect). **Always quote node labels** — unquoted `[` `]` `(` `)`
    inside a label breaks the Mermaid parser (e.g. write `Median["sorted[n/2]"]`,
-   never `Median[sorted[n/2]]`).
+   never `Median[sorted[n/2]]`). **Escape a literal `"` inside a label as
+   `#quot;` — never `&quot;`** (GitHub HTML-decodes code fences before Mermaid
+   sees them, so `&quot;` becomes a literal `"` and breaks the quoted label;
+   `#quot;` has no `&` and survives, then Mermaid renders it back to `"`).
 6. Print an audit line, e.g.:
    `AUDIT PASS: 14 methods, 27 symbols, 0 undefined, 9/9 classes placed, 7/7 diagrams parse`
 7. If any check fails, rewrite until the audit passes. Do not present an
