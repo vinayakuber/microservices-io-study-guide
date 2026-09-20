@@ -93,7 +93,7 @@ registerChapter({
         { num: 4, title: 'Protocol support', detail: 'The router must support the needed protocols (HTTP, gRPC, Thrift) unless it is a TCP-based router.' }
       ],
       program: `// ROUTER SIDE — server-side discovery adds a network hop and a component that must be replicated and protocol-fit
-// PARTIES: CLI = client · RTR = router · REG = registry · SVC = instance
+// PARTIES: CLI = client · RTR = router · REG = registry · SVC = order-service instance
 // STATE (before):
 //    hops : 0
 //    router_replicas : 1
@@ -201,7 +201,7 @@ registerChapter({
   R -->|"hop 3"| SVC["instance"]
   R --> REP["replicas + protocols"]`,
       code: `// ROUTER SIDE — server-side discovery adds a network hop and a component that must be replicated and protocol-fit
-// PARTIES: CLI = client · RTR = router · REG = registry · SVC = instance
+// PARTIES: CLI = client · RTR = router · REG = registry · SVC = order-service instance
 // STATE (before):
 //    hops : 0
 //    router_replicas : 1

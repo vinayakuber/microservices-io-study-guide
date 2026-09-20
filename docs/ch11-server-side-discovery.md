@@ -202,7 +202,7 @@ flowchart TD
 
 ```java
 // ROUTER SIDE — server-side discovery adds a network hop and a component that must be replicated and protocol-fit
-// PARTIES: CLI = client · RTR = router · REG = registry · SVC = instance
+// PARTIES: CLI = client · RTR = router · REG = registry · SVC = order-service instance
 // STATE (before):
 //    hops : 0
 //    router_replicas : 1
@@ -375,7 +375,7 @@ flowchart LR
 
 ```java
 // ROUTER SIDE — server-side discovery adds a network hop and a component that must be replicated and protocol-fit
-// PARTIES: CLI = client · RTR = router · REG = registry · SVC = instance
+// PARTIES: CLI = client · RTR = router · REG = registry · SVC = order-service instance
 // STATE (before):
 //    hops : 0
 //    router_replicas : 1

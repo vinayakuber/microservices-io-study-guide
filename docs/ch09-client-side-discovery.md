@@ -204,7 +204,7 @@ flowchart TD
 
 ```java
 // CLIENT SIDE — hop-count comparison: client-side discovery takes fewer hops and moving parts than server-side
-// PARTIES: CLI = client · REG = registry · SVC = instance · RTR = router (server-side only)
+// PARTIES: CLI = client · REG = registry · SVC = order-service instance · RTR = router (server-side only)
 // STATE (before):
 //    mode : "client-side"
 //    hops_client_side : 0
@@ -380,7 +380,7 @@ flowchart LR
 
 ```java
 // CLIENT SIDE — hop-count comparison: client-side discovery takes fewer hops and moving parts than server-side
-// PARTIES: CLI = client · REG = registry · SVC = instance · RTR = router (server-side only)
+// PARTIES: CLI = client · REG = registry · SVC = order-service instance · RTR = router (server-side only)
 // STATE (before):
 //    mode : "client-side"
 //    hops_client_side : 0

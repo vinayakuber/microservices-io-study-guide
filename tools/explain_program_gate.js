@@ -10,6 +10,11 @@
 //       (digit or quoted literal). A DEF block is the text from one `// DEF:`
 //       to the next `// DEF:` (or end of program).
 //   R3  the program overall must have >= 4 concrete-value lines.
+//   R15 every PARTIES symbol must be DEFINED as a system component, not a bare
+//       black box. A value that names only a box ("instance", "node", "unit",
+//       "server process", "component") with no role noun, engine, @instance, or
+//       parenthetical is a tautology — it names the container, not the concept
+//       (the "what is Zipkin / where does RabbitMQ sit" gap).
 //   R14 (chapter-level) every chapter with a program must cover BOTH a write
 //       path (data created/stored) AND a read path (data queried/served back).
 //       A write-only chapter hides how its store is consumed; a read-only
@@ -30,6 +35,12 @@ const VALUE = /\d|"[^"]+"|'[^']+'/;
 // two halves in different blocks.
 const WRITE = /(stores?|stored|writes?|written|persists?|lands?|opens?\b|insert|publishes?|reports?|appends?|records?\b|saves?|creates?|created|mints?|injects?|ships?|produces?)/i;
 const READ = /(quer(y|ies|ied)|search(es|ing)?|reads?\b|looks?\s*up|lookup|fetch(es|ing)?|select|reassembles?|reconstructs?|retrieves?|displays?|serves?|served|\bgets?\b|\breturns?\b|consumer|consumes?)/i;
+// R15 signal sets — a role noun (writer/broker/collector/aggregator/...) or a
+// human/org noun is a definition; a bare box word is a tautology. Engine names
+// are the datastore engines only (R13's DB_ENGINES) — middleware/system names
+// like zipkin/kafka/rabbitmq are NOT engines and must still name a role.
+const ROLE_NUN = /(service|broker|queue|bus\b|registry|collector|transport|gateway|router|proxy|relay|tailer|sidecar|breaker|index|store|storage|database|warehouse|aggregator|reader|consumer|operator|writer|producer|publisher|reporter|monolith|pipeline|function|engine|orchestrator|coordinator|client|application|\bapi\b|mesh|scheduler|executor|leader|follower|master|slave|replica|balancer|registrar|cluster|log|monitor)/i;
+const HUMAN = /(architect|developer|team|user|customer|analyst|engineer|business)/i;
 const failures = [];
 let programs = 0;
 
@@ -192,7 +203,25 @@ for (const ch of CHAPTERS) {
       }
     });
 
-
+    // R15: no bare black-box component — a PARTIES symbol defined as only a box
+    // ("instance", "node", "server process", "component") with no role noun, no
+    // engine, no @instance, no parenthetical, is a tautology. It names the
+    // container, not the concept; the reader must know WHAT the component is and
+    // WHERE it sits in the writer -> transport -> aggregator -> reader pipeline.
+    const tautology = (v) => {
+      if (HUMAN.test(v) || DB_ENGINES.test(v) || /@\s*\w/.test(v)) return false;
+      if (ROLE_NUN.test(v)) return false;
+      if (/\([^)]/.test(v)) return false;
+      const s = v.replace(/\b(a|an|the)\b/gi, '').trim();
+      return /^[\w .-]* (server|process|component)$/i.test(s) || /^(instance|instances|node|nodes|unit|box|thing)s?$/i.test(s);
+    };
+    L.filter(l => /^\/\/\s*PARTIES:/.test(l)).forEach(pl => {
+      const body = pl.replace(/^\/\/\s*PARTIES:\s*/, '');
+      for (const b of body.split('·').map(s => s.trim())) {
+        const m = b.match(/^([A-Z][A-Z0-9_]*)\s*=\s*(.*)$/);
+        if (m && tautology(m[2])) probs.push(`R15 black-box component '${m[1]}' ("${m[2]}") — name its role/engine/instance, not just a box`);
+      }
+    });
 
     if (probs.length) failures.push({ id: ch.id, section: s.section, probs });
   }
