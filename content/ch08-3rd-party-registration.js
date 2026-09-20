@@ -192,6 +192,54 @@ registerChapter({
       problems: ["01-scale-from-zero-to-millions"]
     }
   ],
+  systemDesign: {
+    pipeline: 'service instance → third-party registrar → service registry',
+    decomposition: [
+      {
+        box: 'the service instance',
+        role: 'service',
+        parts: [
+          'starts and stops the app',
+          'never talks to the registry itself'
+        ]
+      },
+      {
+        box: 'the third-party registrar',
+        role: 'registrar',
+        parts: [
+          'Netflix Prana sidecar',
+          'observes / polls the instance',
+          'registers on startup, unregisters on shutdown'
+        ]
+      },
+      {
+        box: 'the service registry',
+        role: 'registry',
+        parts: [
+          'Eureka',
+          'stores the reachable endpoints',
+          'serves discovery lookups'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  SVC[\"service: order-service instance\"] -->|\"runs beside\"| RGR[\"registrar: Netflix Prana sidecar\"]\n  RGR -->|\"register / unregister\"| REG[(\"registry: Eureka\")]",
+    program: `// SYSTEM DESIGN — third-party registration as a pipeline: service instance -> third-party registrar -> service registry
+// PARTIES: SVC = order-service instance (service: runs the app and never talks to the registry) · RGR = third-party registrar Netflix Prana (registrar: registers on startup, unregisters on shutdown) · REG = service registry Eureka (registry: stores the reachable endpoints)
+// DEF: instance — a runnable copy of a service at a network location; here {"host":"10.0.2.5","port":8080}
+// DEF: entry — a reachable endpoint stored in the registry; here "order-service" -> [{"host":"10.0.2.5","port":8080}]
+// DEF: registrar — the sidecar that owns register/unregister; here Netflix Prana polling every 5 s
+// STATE (before):
+//    registry : {}       // Eureka holds no entry for order-service yet
+//    process_state : "STOPPED"  // the service instance has not started
+// DEF: register_instance · CALLED BY: RGR when the service instance boots
+// -> instance : {"host":"10.0.2.5","port":8080}
+//    step 1 · SVC starts, doing nothing registry-related : process_state : "STOPPED" -> "RUNNING"
+//    step 2 · RGR polls SVC and writes the entry to REG : registry : {} -> { "order-service": [{"host":"10.0.2.5","port":8080}] }
+//    step 3 · REG stores the entry and serves discovery lookups : lookup : "none" -> "10.0.2.5:8080"
+//    step 4 · a client reads the registry and reaches SVC : request : "none" -> "GET /orders"
+// <- entry : "order-service" -> [{"host":"10.0.2.5","port":8080}] · the service never talked to the registry itself
+//    alt registrar down : no register/unregister runs and the registry drifts stale  BECAUSE the registrar sits on the discovery path`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Registration is a lifecycle duty', content: '<p><strong>Why.</strong> A service instance is only reachable through discovery if the registry knows where it lives, so every start and stop must be reflected in the registry.</p><p><strong>Claim.</strong> An instance must be registered on startup, unregistered on shutdown, and evicted if it crashes or runs but cannot handle requests.</p><p><strong>Grounding.</strong> Richardson\'s three forces: register on startup and unregister on shutdown; unregister crashed instances; unregister running-but-incapable instances.</p><p><strong>In the wild.</strong> Leaving a dead endpoint registered means a client-side or server-side discovery lookup can still route a request to a host that will never answer.</p>' },

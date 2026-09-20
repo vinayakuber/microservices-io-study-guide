@@ -227,6 +227,54 @@ registerChapter({
       problems: ["01-scale-from-zero-to-millions"]
     }
   ],
+  systemDesign: {
+    pipeline: 'client → API composer → provider services → their databases',
+    decomposition: [
+      {
+        box: 'API Composer',
+        role: 'API composer',
+        parts: [
+          'query — invokes each provider service that owns a fragment',
+          'join — merges fragments in memory on a shared key',
+          'returns one combined response'
+        ]
+      },
+      {
+        box: 'provider services',
+        role: 'provider services',
+        parts: [
+          'Order Service — owns the order rows',
+          'Customer Service — owns the customer rows',
+          'Inventory Service — owns the stock rows'
+        ]
+      },
+      {
+        box: 'their databases',
+        role: 'databases',
+        parts: [
+          'PostgreSQL 16 @ orders-db-1',
+          'PostgreSQL 16 @ customers-db-1'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  CLI[\"client\"] -->|\"get order O-101\"| CMP[\"API Composer\"]\n  CMP -->|\"fetch order\"| ORD[\"Order Service\"]\n  CMP -->|\"fetch customer\"| CUST[\"Customer Service\"]\n  ORD -->|\"reads\"| ORDDB[(\"PostgreSQL 16 @ orders-db-1\")]\n  CUST -->|\"reads\"| CUSTDB[(\"PostgreSQL 16 @ customers-db-1\")]\n  CMP -->|\"join in memory\"| OUT[\"order + customer name\"]",
+    program: `// SYSTEM DESIGN — API composition as a pipeline: client -> API composer -> provider services -> their databases
+// PARTIES: CLI = client · CMP = API Composer (query orchestrator) · ORD = Order Service (provider service) · CUST = Customer Service (provider service) · ORDDB = PostgreSQL 16 @ orders-db-1 · CUSTDB = PostgreSQL 16 @ customers-db-1
+// DEF: fragment — one partial result a provider returns, keyed by a shared id; here the order fragment { order_id:"O-101", cust_id:"C-77", total:120.00 }
+// DEF: join — merging fragments in memory on the shared key; here cust_id "C-77" pulls in name "Ada"
+// DEF: db — a service-owned database; here ORDDB holds "O-101" and CUSTDB holds "C-77"
+// STATE (before):
+//    orders    : [ { order_id:"O-101", cust_id:"C-77", total:120.00 } ]
+//    customers : [ { id:"C-77", name:"Ada" } ]
+//    joined    : {}
+// DEF: compose_order · CALLED BY: CLI asking for order "O-101"
+// -> order_id : "O-101"
+//    step 1 · CMP queries ORD    order_row : "none" -> { order_id:"O-101", cust_id:"C-77", total:120.00 }  BECAUSE ORD reads its own ORDDB
+//    step 2 · CMP queries CUST by the foreign key    cust_row : "none" -> { id:"C-77", name:"Ada" }
+//    step 3 · CMP joins in memory    joined : {} -> { order_id:"O-101", cust_id:"C-77", total:120.00, name:"Ada" }
+//    step 4 · CMP returns one response    response : "none" -> { order_id:"O-101", name:"Ada", total:120.00 }
+// <- outcome : CLI gets { order_id:"O-101", name:"Ada", total:120.00 }  BECAUSE the composer read each provider's fragment from its own database and joined them in memory`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Cross-service joins break', content: '<p><strong>Why.</strong> The Database per Service pattern gives each service its own private data, so there is no single database left to query.</p><p><strong>Claim.</strong> Any query that needs data from several services is no longer straightforward to implement.</p><p><strong>Grounding.</strong> The reference context: after applying the Microservices architecture and Database per Service, it is no longer straightforward to implement queries that join data from multiple services.</p><p><strong>In the wild.</strong> A product or order detail page whose columns are split across Product, Pricing, Inventory, and Review services.</p>' },

@@ -195,6 +195,49 @@ registerChapter({
       problems: ["20-metrics-monitoring"]
     }
   ],
+  systemDesign: {
+    pipeline: 'writer → transport → collector → aggregator/store → reader',
+    decomposition: [
+      {
+        box: 'Three services — the writers',
+        role: 'writer',
+        parts: [
+          'Order Service — writes a log line tagged REQ-3001',
+          'Customer Service and Payment Service — write their own lines for REQ-3001'
+        ]
+      },
+      {
+        box: 'Central logging service — collector + aggregator/store',
+        role: 'collector / aggregator/store',
+        parts: [
+          'collects the lines shipped by each service',
+          'indexes them by request id into {"REQ-3001":[1,2,3]}'
+        ]
+      },
+      {
+        box: 'Developer — the reader',
+        role: 'reader',
+        parts: [
+          'searches REQ-3001',
+          'reads the 3 correlated lines from the index'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  SVC1[\"Order Service\"] -->|\"ship log\"| LOG[\"Central logging service\"]\n  SVC2[\"Customer Service\"] -->|\"ship log\"| LOG\n  SVC3[\"Payment Service\"] -->|\"ship log\"| LOG\n  LOG -->|\"index by request id\"| IDX[\"aggregated index REQ-3001\"]\n  IDX -->|\"search\"| DEV[\"Developer reader\"]",
+    program: `// SYSTEM DESIGN — log aggregation: writer -> transport -> collector -> aggregator/store -> reader
+// PARTIES: SVC1 = Order Service (writer) · SVC2 = Customer Service (writer) · SVC3 = Payment Service (writer) · LOG = central logging service (collector + aggregator) · DEV = developer (reader)
+// DEF: log — one service log line; here { "request_id":"REQ-3001", "level":"ERROR" }
+// DEF: index — a store mapping a request id to the services that logged it; here { "REQ-3001":[1,2,3] }
+// STATE (before):
+//    index : {}        // no request correlated yet
+//    entries : []      // no log lines stored yet
+// DEF: aggregate_logs · CALLED BY: SVC1 writing, LOG indexing, DEV searching REQ-3001
+// -> request_id : "REQ-3001"
+//    step 1 · SVC1, SVC2, SVC3 each ship a log line   // entries : [] -> [3 lines]   BECAUSE all three services tag their lines with REQ-3001
+//    step 2 · LOG indexes each line by request id   // index : {} -> { "REQ-3001":[1,2,3] }   BECAUSE the collector keys the store by request id
+//    step 3 · DEV searches the index   // found : 0 -> 3   BECAUSE the reader queries the index and gets all three lines back
+// <- outcome : index["REQ-3001"] = [1,2,3] · DEV reads 3 correlated lines  BECAUSE transport moved each write into one aggregated store`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Logs scattered across machines', content: '<p><strong>Why.</strong> An application is multiple services and instances on multiple machines, and requests often span several instances.</p><p><strong>Claim.</strong> With each instance writing to its own local log file, no one place shows the whole story of an application.</p><p><strong>Grounding.</strong> Each service instance writes information about what it is doing to a log file in a standardized format.</p><p><strong>In the wild.</strong> To understand a request that crossed three services you would otherwise have to read three files on three machines.</p>' },

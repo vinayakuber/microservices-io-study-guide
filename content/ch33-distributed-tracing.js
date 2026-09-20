@@ -167,6 +167,70 @@ registerChapter({
       problems: ["20-metrics-monitoring"]
     }
   ],
+  systemDesign: {
+    pipeline: 'writer → transport → collector → aggregator/store → reader',
+    decomposition: [
+      {
+        box: 'each service process (GW, Order, Kitchen, Payment) — the writer',
+        role: 'writer',
+        parts: [
+          'Tracer — mints trace/span ids, propagates B3/W3C headers',
+          'Reporter — batches finished spans',
+          'Sender — transport adapter: HTTP / Kafka / RabbitMQ'
+        ]
+      },
+      {
+        box: 'RabbitMQ broker — the transport',
+        role: 'transport',
+        parts: [
+          'queue "zipkin" — the span channel',
+          'decouples writers from the collector, buffers under load'
+        ]
+      },
+      {
+        box: 'Zipkin server (one central process, NOT per-host) — collector + aggregator + reader',
+        role: 'collector + aggregator/store + reader',
+        parts: [
+          'Collector — ingests spans (HTTP POST /api/v2/spans, or Kafka/RabbitMQ)',
+          'Storage — MySQL 8 @ zipkin-db-1, Cassandra, or Elasticsearch (the trace store)',
+          'Query API — REST: fetch a trace by id',
+          'UI — Zipkin Lens (the timeline browser)'
+        ]
+      },
+      {
+        box: 'operator — the reader',
+        role: 'reader',
+        parts: [
+          'queries a trace id',
+          'reads the timeline, finds the slow hop'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  subgraph APP[\"writer: each service process\"]\n    TR[\"Tracer — mints ids, propagates headers\"] --> RP[\"Reporter — batches spans\"] --> SD[\"Sender — HTTP/Kafka/RabbitMQ\"]\n  end\n  SD -->|\"publish span\"| BRK[\"transport: RabbitMQ (queue zipkin)\"]\n  BRK -->|\"consume\"| CL[\"collector: Zipkin collector\"]\n  CL -->|\"write\"| ST[(\"aggregator: trace store MySQL 8 @ zipkin-db-1\")]\n  ST -->|\"query trace_id\"| QU[\"reader: Zipkin query UI (Lens)\"]\n  QU -->|\"timeline\"| OP[\"operator\"]",
+    program: `// SYSTEM DESIGN — tracing as a pipeline: writer (in-process Tracer -> Reporter -> Sender) -> transport (RabbitMQ) -> collector (Zipkin collector) -> aggregator (trace store MySQL 8 @ zipkin-db-1) -> reader (Zipkin query UI + operator)
+// PARTIES: APP = each service process (writer; internals Tracer -> Reporter -> Sender) · BRK = RabbitMQ broker (transport: queue "zipkin") · ZIP = Zipkin server (collector + storage + query UI) · OP = operator (reader)
+// DEF: tracer — (in-process, inside APP) mints the trace_id/span ids and propagates B3/W3C headers; here mints trace_id "4bf92f3577b34da6a3ce90d0e2b88a4d"
+// DEF: reporter — (in-process, inside APP) batches finished spans; here batches span ("6f9a3c1b8e2d4001", parent="", start=100, end=104)
+// DEF: sender — (in-process, inside APP) the transport adapter (HTTP / Kafka / RabbitMQ); here the RabbitMQ sender publishes to queue "zipkin"
+// DEF: queue — the RabbitMQ channel "zipkin" that carries spans from the senders to the collector; here it carries 4 spans
+// DEF: trace — the set of all spans sharing one trace_id; here trace "4bf92f3577b34da6a3ce90d0e2b88a4d" = 4 spans
+// DEF: collector — (inside ZIP) ingests spans off BRK (HTTP POST /api/v2/spans or the queue consumer); here consumes 4 spans
+// DEF: aggregator — (inside ZIP) the trace store = MySQL 8 @ zipkin-db-1 gathering spans by trace_id; here {"4bf92f3577b34da6a3ce90d0e2b88a4d" : 4 spans}
+// DEF: reader — (inside ZIP) Query API GET /api/v2/traces/<traceId> + Lens UI serving OP; here returns 4 spans as a timeline
+// STATE (before):
+//    zipkin_queue : []   // BRK queue "zipkin" (transport)
+//    trace_store  : {}   // inside ZIP storage (aggregator)
+// DEF: trace_one_request · CALLED BY: one external request finishing across GW -> ORD -> KIT -> PAY
+// -> trace_id : "4bf92f3577b34da6a3ce90d0e2b88a4d"
+//    step 1 · GW tracer mints the ids    trace_id = 128 random bits -> 32 hex chars = "4bf92f3577b34da6a3ce90d0e2b88a4d"
+//    step 2 · GW reporter batches the finished span    span : ("6f9a3c1b8e2d4001", parent="", start=100, end=104) -> queued
+//    step 3 · GW sender publishes to BRK    zipkin_queue : [] -> [span 6f9a3c1b8e2d4001]
+//    step 4 · ZIP collector consumes and writes    trace_store : {} -> {"4bf92f3577b34da6a3ce90d0e2b88a4d" : [span 6f9a3c1b8e2d4001]}
+//    step 5 · ORD/KIT/PAY repeat steps 1-4    trace_store : {1 span} -> {4 spans: 6f9a3c1b8e2d4001..04}   BECAUSE each of the 4 services is its own writer with its own Tracer -> Reporter -> Sender
+//    step 6 · OP queries ZIP Query API    GET /api/v2/traces/4bf92f3577b34da6a3ce90d0e2b88a4d -> the 4 spans (read, nothing written)
+//    step 7 · ZIP Lens UI orders by parent+start    timeline : [] -> [GW@100-104, ORD@105-120, KIT@121-135, PAY@136-150]
+// <- outcome : OP sees the timeline · slow hop = KIT (135 - 121 = 14 ms)   BECAUSE each writer's in-process Tracer -> Reporter -> Sender ships spans over BRK (transport) to ZIP's collector -> storage (aggregator), and ZIP's query UI serves them back (reader)`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Totals hide operations', content: '<p><strong>Why.</strong> A request spans multiple services, each performing one or more operations such as database queries or publishing messages.</p><p><strong>Claim.</strong> External monitoring only reports overall response time and number of invocations, with no insight into individual operations, and log entries for a request are scattered across numerous logs.</p><p><strong>Grounding.</strong> These are the reference forces, along with minimal runtime overhead.</p><p><strong>In the wild.</strong> A slow request looks fine in aggregate until its individual operations are traced.</p>' },

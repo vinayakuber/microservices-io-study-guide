@@ -199,6 +199,50 @@ registerChapter({
       problems: ["20-metrics-monitoring"]
     }
   ],
+  systemDesign: {
+    pipeline: 'service → exception tracker (collect/dedup/aggregate) → developer reader',
+    decomposition: [
+      {
+        box: 'Order Service — the thrower',
+        role: 'service (source)',
+        parts: [
+          'throws the exception EX-1001 with msg "customer is null"',
+          'reports the stack trace SVC.doGet line 42'
+        ]
+      },
+      {
+        box: 'Exception tracking service — collect, dedup, aggregate',
+        role: 'exception tracker',
+        parts: [
+          'normalizes each throw into a fingerprint',
+          'PostgreSQL 16 @ exc-db-1 — folds repeats by fingerprint and bumps the count'
+        ]
+      },
+      {
+        box: 'Developer — the reader',
+        role: 'reader',
+        parts: [
+          'sees one deduplicated issue, not a flood',
+          'triages the issue FP-77A3 against a threshold of 1'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  SVC[\"Order Service\"] -->|\"throw EX-1001\"| TRK[\"Exception tracking service\"]\n  TRK -->|\"fold into fingerprint FP-77A3\"| DB[\"PostgreSQL 16 @ exc-db-1\"]\n  DB -->|\"issue count 2\"| DEV[\"Developer reader\"]",
+    program: `// SYSTEM DESIGN — exception tracking: service -> exception tracker (collect/dedup/aggregate) -> developer reader
+// PARTIES: SVC = Order Service (source service) · TRK = exception tracking service (collector + dedup aggregator) · DB = PostgreSQL 16 @ exc-db-1 (the exception store) · DEV = developer (reader)
+// DEF: exception — one thrown error; here EX-1001 "customer is null" from stack SVC.doGet line 42
+// DEF: fingerprint — a normalized signature that groups repeats; here "FP-77A3"
+// DEF: issue — one distinct fingerprint with its count; here "FP-77A3" count 2
+// STATE (before):
+//    issues : {}        // the store holds no fingerprint yet
+//    reported : 0       // nothing triaged yet
+// DEF: track · CALLED BY: SVC throwing, TRK folding, DEV reading
+// -> exception_id : "EX-1001"
+//    step 1 · SVC throws, TRK normalizes the stack   // fingerprint : "" -> "FP-77A3"   BECAUSE msg "customer is null" and stack SVC.doGet line 42 hash to one signature
+//    step 2 · TRK folds the repeat into the store   // issues : {} -> { "FP-77A3": { count:2 } }   BECAUSE EX-7001 was already seen with the same fingerprint, so dedup bumps the count to 2
+//    step 3 · TRK reports the issue to the developer   // reported : 0 -> 1   BECAUSE count 2 crosses the threshold of 1
+// <- outcome : issues["FP-77A3"].count = 2 · DEV sees one deduplicated issue  BECAUSE the tracker folded EX-1001 and EX-7001 into the same fingerprint`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Scattered exceptions with no view', content: '<p><strong>Why.</strong> A microservice application is many services and instances on many machines, and errors occur while handling requests.</p><p><strong>Claim.</strong> Without a shared place for them, the exceptions those errors throw cannot be seen or tracked as a whole.</p><p><strong>Grounding.</strong> Each failing instance throws an exception carrying an error message and a stack trace, but nothing aggregates them.</p><p><strong>In the wild.</strong> The context is an application of multiple services and instances running on multiple machines, so exceptions are thrown in many places at once.</p>' },

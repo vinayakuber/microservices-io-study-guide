@@ -180,6 +180,85 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** client request → API gateway → function runtime → function
+
+### client — the HTTP caller that sends the request
+
+_Role: client_
+
+```mermaid
+flowchart TD
+  R["client — the HTTP caller that sends the request"]
+  R --> P0["Browser / app — issues GET /restaurants/42"]
+  R --> P1["Waits — for the HTTP response to come back"]
+```
+
+### API gateway — the HTTP entry that maps requests to functions
+
+_Role: gateway_
+
+```mermaid
+flowchart TD
+  R["API gateway — the HTTP entry that maps requests to functions"]
+  R --> P0["Request transform — turns HTTP into an event object"]
+  R --> P1["Invoke — calls the function with the event"]
+  R --> P2["Response — builds the HTTP reply from the result"]
+```
+
+### function runtime — the serverless infrastructure (AWS Lambda)
+
+_Role: function runtime_
+
+```mermaid
+flowchart TD
+  R["function runtime — the serverless infrastructure (AWS Lambda)"]
+  R --> P0["Load function — unpacks the uploaded ZIP restaurant.zip"]
+  R --> P1["Cold start — launches instance i-1 when none is idle"]
+  R --> P2["Scale to zero — frees idle instances when traffic stops"]
+```
+
+### the function — the stateless handler that runs the code
+
+_Role: function_
+
+```mermaid
+flowchart TD
+  R["the function — the stateless handler that runs the code"]
+  R --> P0["index.handler — the named entrypoint"]
+  R --> P1["Stateless — runs only in response to an event"]
+```
+
+```mermaid
+flowchart LR
+  C["client"] -->|"GET /restaurants/42"| GW["API Gateway"]
+  GW -->|"event object"| RT["function runtime (Lambda)"]
+  RT -->|"loads restaurant.zip"| FN["function index.handler"]
+  RT -->|"cold start"| I["instance i-1"]
+  FN -->|"result"| GW
+  GW -->|"status 200"| C
+```
+
+```java
+// SYSTEM DESIGN — serverless: client request -> API gateway -> function runtime -> function
+// PARTIES: CLIENT = the HTTP caller (client) · GW = API Gateway (transforms HTTP into an event, builds the response) · RT = function runtime (AWS Lambda: loads the ZIP, cold-start, scales to zero) · FN = the function (index.handler running the uploaded code)
+// DEF: event — the payload the runtime passes to the handler; here {"method":"GET","path":"/restaurants/42"}
+// DEF: handler — the named entrypoint invoked per event; here "index.handler"
+// DEF: zip — the packaged code the developer uploaded; here "restaurant.zip"
+// DEF: cold_start — launching a fresh instance when none is idle; here instance "i-1" boots
+// STATE (before):
+//    request : {}     // the inbound HTTP request, not yet transformed
+//    instances : {}   // idle function instances, none yet
+// DEF: route_one_request · CALLED BY: CLIENT calling GET /restaurants/42
+// -> method : "GET" · -> path : "/restaurants/42"
+//    step 1 · GW transforms the HTTP request into an event    request : {} -> {"method":"GET","path":"/restaurants/42"}   BECAUSE the gateway turns HTTP into an event object
+//    step 2 · RT loads the ZIP and cold-starts an instance    instances : {} -> {"i-1"}   // the runtime launches one when none are idle
+//    step 3 · RT invokes the handler with the event    runs : 0 -> 1   // handler "index.handler" runs the event
+//    step 4 · GW creates the response from the result    response : "" -> "200"   // the gateway returns an HTTP response
+// <- response : "200" · one HTTP call became one event, one run, and one reply   BECAUSE the gateway and runtime hide every server
+```
+
 ## Interview Questions
 
 ### Q1

@@ -125,6 +125,52 @@ registerChapter({
       problems: ["26-payment-system", "27-digital-wallet"]
     }
   ],
+  systemDesign: {
+    pipeline: 'client → identity provider (token issuance) → API gateway (validation) → service',
+    decomposition: [
+      {
+        box: 'identity provider — the token issuer',
+        role: 'identity provider (token issuance)',
+        parts: [
+          'authenticates the requestor (alice)',
+          'mints the JWT "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"'
+        ]
+      },
+      {
+        box: 'API gateway — the single entry point',
+        role: 'API gateway (validation)',
+        parts: [
+          'validates the token signature',
+          'routes the request to the service with the token attached'
+        ]
+      },
+      {
+        box: 'Order Service — the verifier',
+        role: 'service',
+        parts: [
+          'verifies the signature locally',
+          'checks role customer against operation place_order'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  CL[\"client app\"] -->|\"credentials alice\"| IDP[\"identity provider\"]\n  IDP -->|\"mint JWT\"| GW[\"API gateway\"]\n  GW -->|\"token on request\"| SVC[\"Order Service\"]\n  SVC -->|\"verify signature + role\"| VER[\"authorized\"]",
+    program: `// SYSTEM DESIGN — access token: client -> identity provider (token issuance) -> API gateway (validation) -> service (Order Service verifies + authorizes)
+// PARTIES: CL = client app (requestor) · IDP = identity provider (token issuer) · GW = API gateway (validates and routes) · SVC = Order Service (verifies and authorizes)
+// DEF: token — the signed credential that identifies the requestor; here "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig" (a JSON Web Token with claim {"sub":"alice"})
+// DEF: role — the category the requestor belongs to; here "customer" from {"alice":"customer"}
+// DEF: verdict — the authorization decision a service reaches; here "authorized"
+// STATE (before):
+//    auth : {}             // identities the provider has verified
+//    token : ""
+//    verdict : "pending"
+// DEF: authenticate_and_route · CALLED BY: CL posting credentials on the login route
+// -> credentials : {"user":"alice","password":"hunter2"}
+//    step 1 · IDP authenticates alice    auth : {} -> {"alice":"verified"}
+//    step 2 · IDP mints the JWT    token : "" -> "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"  BECAUSE the signature lets any service verify the identity without re-authenticating
+//    step 3 · GW validates the signature and routes the token to SVC    token : "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig" -> "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"
+//    step 4 · SVC reads the claim and checks the role    verdict : "pending" -> "authorized"  BECAUSE {"sub":"alice"} maps to role "customer" which may place the order
+// <- outcome : verdict "authorized" · no gateway round-trip  BECAUSE each service validates the token locally`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Communicating the requestor identity', content: '<p><strong>Why.</strong> The API gateway authenticates a request and forwards it to numerous services, which may in turn invoke other services.</p><p><strong>Claim.</strong> Each service needs to know who made the request without re-authenticating on every hop.</p><p><strong>Grounding.</strong> The reference problem: how to communicate the identity of the requestor to the services that handle the request.</p><p><strong>In the wild.</strong> Without a shared credential, every service duplicates authentication logic and each hop needs its own proof of identity.</p>' },

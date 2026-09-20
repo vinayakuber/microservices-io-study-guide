@@ -120,6 +120,67 @@ registerChapter({
       problems: ["20-metrics-monitoring"]
     }
   ],
+  systemDesign: {
+    pipeline: 'writer (instrumented service) → transport (push/pull) → collector (metrics service) → aggregator (store/registry) → reader (dashboard)',
+    decomposition: [
+      {
+        box: 'Order Service — the writer',
+        role: 'writer (instrumented service)',
+        parts: [
+          'counter increments on create_order completion',
+          'histogram observes each request duration'
+        ]
+      },
+      {
+        box: 'push/pull transport',
+        role: 'transport (push/pull)',
+        parts: [
+          'push: the service POSTs metrics',
+          'pull: the metrics service GETs /metrics'
+        ]
+      },
+      {
+        box: 'Prometheus — the collector',
+        role: 'collector (metrics service)',
+        parts: [
+          'scrapes or receives the metrics',
+          'provides reporting and alerting'
+        ]
+      },
+      {
+        box: 'time-series registry — the aggregator',
+        role: 'aggregator/store (registry)',
+        parts: [
+          'holds each series keyed by metric name',
+          'stores orders_created and request_ms'
+        ]
+      },
+      {
+        box: 'dashboard — the reader',
+        role: 'reader (dashboard)',
+        parts: [
+          'queries the stored series',
+          'renders the counts and latencies'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  SVC[\"Order Service (writer)\"] -->|\"push POST metrics\"| TR[\"push/pull transport\"]\n  TR -->|\"pull GET /metrics\"| SVC\n  TR -->|\"delivers\"| COL[\"Prometheus (collector)\"]\n  COL -->|\"stores\"| STO[(\"time-series registry (aggregator)\")]\n  STO -->|\"queries\"| DSH[\"dashboard (reader)\"]",
+    program: `// SYSTEM DESIGN — application metrics pipeline: writer (Order Service, instrumented) -> transport (push/pull) -> collector (Prometheus metrics service) -> aggregator (time-series registry) -> reader (dashboard)
+// PARTIES: SVC = Order Service (writer, instrumented) · MS = Prometheus (collector, metrics service) · STO = time-series registry (aggregator, holds each series) · DSH = dashboard (reader)
+// DEF: metric — a measured quantity per operation; here counter orders_created = 3 and request_ms_sum = 123
+// DEF: series — one stored time series keyed by metric name; here {"orders_created":3,"request_ms":[41,37,48]}
+// DEF: transport — how metrics travel; here push (SVC POSTs) or pull (MS GETs /metrics every 15 s)
+// STATE (before):
+//    series : {}
+//    counter : { orders_created: 0 }
+// DEF: instrument_and_aggregate · CALLED BY: SVC counting completions, MS scraping on an interval
+// -> request1 : "PO-2001"
+//    step 1 · SVC increments the counter across 3 completions    counter.orders_created : 0 -> 3
+//    step 2 · SVC pushes {"orders_created":3} to MS    series : {} -> {"orders_created":3,"request_ms":[41,37,48]}
+//    step 3 · MS stores each metric as a series    series : {"orders_created":3} -> {"orders_created":3,"request_ms":[41,37,48]}  BECAUSE orders_created and request_ms each become a stored series
+//    step 4 · DSH queries the series and renders the chart    series : {"orders_created":3,"request_ms":[41,37,48]} -> {"orders_created":3,"request_ms":[41,37,48]}  BECAUSE the dashboard reads the counts and latencies back
+// <- outcome : DSH renders orders_created 3 · request_ms [41,37,48]  BECAUSE the writer shipped the values over the transport, the collector stored them, and the reader pulled them back`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Understanding behavior', content: '<p><strong>Why.</strong> In a microservice architecture it is hard to understand what an application is doing or troubleshoot problems.</p><p><strong>Claim.</strong> The problem is: how to understand the behavior of an application and troubleshoot problems.</p><p><strong>Grounding.</strong> The reference states the applied context is the Microservice architecture pattern, and the force is that any solution must have minimal runtime overhead.</p><p><strong>In the wild.</strong> Without instrumentation, services are a black box beyond their request totals.</p>' },

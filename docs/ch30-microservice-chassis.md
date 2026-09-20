@@ -211,6 +211,71 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** service → chassis framework (libraries) → cross-cutting concerns
+
+### Order Service — the new service
+
+_Role: service_
+
+```mermaid
+flowchart TD
+  R["Order Service — the new service"]
+  R --> P0["adopts the chassis via a Gradle plugin"]
+  R --> P1["inherits the cross-cutting wiring"]
+```
+
+### chassis framework 2.4.0 — the shared libraries
+
+_Role: chassis framework (libraries)_
+
+```mermaid
+flowchart TD
+  R["chassis framework 2.4.0 — the shared libraries"]
+  R --> P0["externalized configuration + health-check URL"]
+  R --> P1["logging, metrics (counter: orders_created), and tracing"]
+```
+
+### the cross-cutting concerns
+
+_Role: cross-cutting concerns_
+
+```mermaid
+flowchart TD
+  R["the cross-cutting concerns"]
+  R --> P0["security via an Access Token"]
+  R --> P1["service registration/discovery + circuit breakers"]
+```
+
+```mermaid
+flowchart LR
+  SVC["Order Service"] -->|"adopts"| CHS["chassis framework 2.4.0"]
+  CHS -->|"wires"| CFG["externalized config"]
+  CHS -->|"wires"| LOG["logging + health check"]
+  CHS -->|"wires"| MET["metrics counter: orders_created"]
+  CHS -->|"wires"| TRC["tracing"]
+  CHS -->|"registers"| REG["service registry"]
+```
+
+```java
+// SYSTEM DESIGN — microservice chassis: service (Order Service) -> chassis framework (shared libraries) -> cross-cutting concerns (security, config, logging, health, metrics, tracing)
+// PARTIES: SVC = Order Service (adopts the chassis) · CHS = chassis framework 2.4.0 (shared libraries) · REG = service registry (registration target)
+// DEF: concern — one cross-cutting capability the chassis wires; here 6 concerns = security + config + logging + health + metrics + tracing
+// DEF: wiring — the act of connecting one concern to a service; here 3 services x 6 concerns = 18 wirings by hand, 6 in the chassis
+// DEF: counter — a metric the chassis wires; here "counter:orders_created"
+// STATE (before):
+//    svc : { build:"none", security:"none", metrics:"none", registered:false }
+//    wirings : 0
+// DEF: adopt_chassis · CALLED BY: a developer scaffolding SVC
+// -> chassis_version : "2.4.0"
+//    step 1 · add the chassis Gradle plugin    svc.build : "none" -> "gradle-plugin:2.4.0"
+//    step 2 · chassis injects security and metrics    svc.security : "none" -> "access-token-check" · svc.metrics : "none" -> "counter:orders_created"
+//    step 3 · chassis self-registers SVC with REG    svc.registered : false -> true
+//    step 4 · count the wirings done once, not per service    wirings : 0 -> 6  BECAUSE the chassis wires the 6 concerns once and every service inherits them
+// <- outcome : svc { build:"gradle-plugin:2.4.0", security:"access-token-check", metrics:"counter:orders_created", registered:true } · wirings 6, not 18
+```
+
 ## Interview Questions
 
 ### Q1

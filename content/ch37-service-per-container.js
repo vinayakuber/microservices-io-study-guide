@@ -200,6 +200,49 @@ registerChapter({
       problems: ["01-scale-from-zero-to-millions"]
     }
   ],
+  systemDesign: {
+    pipeline: 'build pipeline → registry → cluster → container',
+    decomposition: [
+      {
+        box: 'Build pipeline — the builder',
+        role: 'build pipeline',
+        parts: [
+          'compiles the code into a container image',
+          'tags the image rsvc:1.4.2 and pushes it'
+        ]
+      },
+      {
+        box: 'Container registry — the image repository',
+        role: 'registry',
+        parts: [
+          'holds the built images',
+          'serves rsvc:1.4.2 back to the cluster'
+        ]
+      },
+      {
+        box: 'Kubernetes cluster — the scheduler',
+        role: 'cluster',
+        parts: [
+          'pulls the image and schedules containers',
+          'scales replicas from 2 to 4, cpu cap 0.5'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  BLD[\"Build pipeline\"] -->|\"push rsvc:1.4.2\"| REG[\"Container registry\"]\n  REG -->|\"serve image\"| K8S[\"Kubernetes cluster\"]\n  K8S -->|\"schedule container\"| SVC[\"restaurant-service\"]\n  SVC -->|\"replicas 2 to 4\"| POD[\"running containers\"]",
+    program: `// SYSTEM DESIGN — service per container: build pipeline -> registry -> cluster -> container
+// PARTIES: BLD = build pipeline (builder) · REG = container registry (image repository) · K8S = Kubernetes cluster (scheduler) · SVC = restaurant-service (the service instance)
+// DEF: image — a built container artifact; here rsvc:1.4.2 for restaurant-service and inv:2.0.1 for inventory-service
+// DEF: replica — one running container; here the scheduler raises 2 to 4
+// STATE (before):
+//    replicas : 2        // two containers serve traffic
+//    image : ""          // the new image is not built yet
+// DEF: scale_out · CALLED BY: BLD building, REG serving, K8S scaling
+// -> image_tag : "rsvc:1.4.2"
+//    step 1 · BLD builds the image and pushes it to REG   // image : "" -> "rsvc:1.4.2"   BECAUSE the build pipeline tags the new restaurant-service artifact
+//    step 2 · K8S pulls the image from REG   // pull : 0 -> 1   BECAUSE the registry is the single source for images
+//    step 3 · K8S schedules 2 more containers   // replicas : 2 -> 4   BECAUSE the cluster starts two more from the same image, cpu cap 0.5
+// <- outcome : replicas = 4 · restaurant-service runs 4 containers  BECAUSE the scheduler pulls rsvc:1.4.2 and scales the replica set`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Many languages, one deployment path', content: '<p><strong>Why.</strong> A microservice system is built from services written in a variety of languages, frameworks, and framework versions, and each service runs as multiple instances for throughput and availability.</p><p><strong>Claim.</strong> Without a uniform packaging unit, every service needs its own build and start procedure, so deployment cannot be reliable or fast.</p><p><strong>Grounding.</strong> The pattern forces list the variety of technologies, the need for independent deployability and scalability, and the need to build and deploy quickly.</p><p><strong>In the wild.</strong> Docker became an extremely popular way to package and deploy services because it gives every service one uniform shape.</p>' },

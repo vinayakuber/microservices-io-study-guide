@@ -216,6 +216,83 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** client → router / load balancer → service registry → service instances
+
+### client — calls only the router
+
+_Role: client_
+
+```mermaid
+flowchart TD
+  R["client — calls only the router"]
+  R --> P0["Dials the router at a well-known address"]
+  R --> P1["Never performs discovery itself"]
+```
+
+### router / load balancer — the router
+
+_Role: router / load balancer_
+
+```mermaid
+flowchart TD
+  R["router / load balancer — the router"]
+  R --> P0["Queries the registry for available instances"]
+  R --> P1["Picks one instance"]
+  R --> P2["Forwards the request to it"]
+```
+
+### service registry (Eureka) — the registry
+
+_Role: registry_
+
+```mermaid
+flowchart TD
+  R["service registry (Eureka) — the registry"]
+  R --> P0["Holds the name -&gt; instances map"]
+  R --> P1["Returns instance locations on query"]
+```
+
+### order-service instances — the instances
+
+_Role: service instances_
+
+```mermaid
+flowchart TD
+  R["order-service instances — the instances"]
+  R --> P0["Self-register on startup"]
+  R --> P1["Serve the forwarded request"]
+```
+
+```mermaid
+flowchart LR
+  CLI["client"] -->|"well-known address"| RTR["router / load balancer"]
+  RTR -->|"query order-service"| REG[("service registry Eureka")]
+  REG -->|"10.0.1.7:8080, 10.0.1.8:8080"| RTR
+  RTR -->|"forward"| SVC["order-service instance 10.0.1.7:8080"]
+```
+
+```java
+// SYSTEM DESIGN — server-side discovery as a pipeline: client -> router/load balancer -> service registry -> service instances (the client never discovers)
+// PARTIES: CLI = client (calls only the router) · RTR = router (load balancer that queries the registry and forwards) · REG = service registry (Eureka) · SVC = order-service instances
+// DEF: registry — REG's map of service name -> instances; here {"order-service" -> ["10.0.1.7:8080", "10.0.1.8:8080"]}
+// DEF: list — the instances REG returns; here ["10.0.1.7:8080", "10.0.1.8:8080"]
+// DEF: target — the instance the router forwards to; here "10.0.1.7:8080"
+// DEF: status — the forwarded call's result; here "200 OK"
+// STATE (before):
+//    registry : {"order-service" -> ["10.0.1.7:8080", "10.0.1.8:8080"]}
+//    list     : []
+//    target   : "unset"
+//    status   : "none"
+// DEF: forward_request · CALLED BY: CLI calling the router's well-known address
+// -> request : "POST http://router.example.com/orders"
+//    step 1 · RTR queries REG for "order-service"    list : [] -> ["10.0.1.7:8080", "10.0.1.8:8080"]   BECAUSE the router asks the registry for available instances
+//    step 2 · RTR picks an instance    target : "unset" -> "10.0.1.7:8080"   BECAUSE the router load-balances across the returned set
+//    step 3 · RTR forwards to the instance    status : "none" -> "200 OK"   BECAUSE the router relays the request to the chosen instance
+// <- forwarded call : "POST http://10.0.1.7:8080/orders"   (the client never resolved an instance itself)
+```
+
 ## Interview Questions
 
 ### Q1

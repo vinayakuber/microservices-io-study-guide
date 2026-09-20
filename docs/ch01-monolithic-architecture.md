@@ -264,6 +264,72 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** client → monolithic application (presentation → business logic → data access) → single relational database
+
+### the monolith — one deployable process holding every subdomain
+
+_Role: application (all three tiers in one process)_
+
+```mermaid
+flowchart TD
+  R["the monolith — one deployable process holding every subdomain"]
+  R --> P0["presentation tier — receives client requests, returns responses"]
+  R --> P1["business logic — implements business rules, mutates entities"]
+  R --> P2["data-access layer — reads and writes the single database"]
+```
+
+### the single relational database
+
+_Role: store_
+
+```mermaid
+flowchart TD
+  R["the single relational database"]
+  R --> P0["PostgreSQL 16 @ monolith-db-1 — the one engine and instance"]
+  R --> P1["holds the rows of every subdomain in one schema"]
+  R --> P2["one ACID transaction spans the Orders and Credit subdomains"]
+```
+
+### the client
+
+_Role: client_
+
+```mermaid
+flowchart TD
+  R["the client"]
+  R --> P0["sends a synchronous request to the monolith"]
+  R --> P1["reads the response — no network hops inside the app"]
+```
+
+```mermaid
+flowchart LR
+  CLI["Client"] -->|"POST /orders/PO-2001"| APP["Monolith (one process)"]
+  APP --> BL["business logic tier"]
+  BL --> DA["data-access layer"]
+  DA -->|"INSERT / query"| DB[("PostgreSQL 16 @ monolith-db-1")]
+  DB -->|"row back"| DA
+  APP -->|"response"| CLI
+```
+
+```java
+// SYSTEM DESIGN — the monolith is one process with three tiers inside it, all hitting one database: client -> presentation tier -> business logic -> data-access layer -> PostgreSQL 16 @ monolith-db-1
+// PARTIES: CLI = customer client (sends synchronous requests) · APP = the monolith (one process holding the presentation tier, business logic, and data-access layer) · DB = PostgreSQL 16 @ monolith-db-1
+// DEF: tier — one vertical layer inside the single process; here the 3 tiers "presentation", "business", "data-access"
+// DEF: entity — a business entity (a DDD aggregate) that holds state; here order entity "PO-2001"
+// DEF: order — the Order subdomain's row, keyed by purchase-order id; here "PO-2001" = {status:"DRAFT", total:0}
+// STATE (before):
+//    orders : {}   // the Order rows, keyed by id, inside the single DB
+// DEF: placeOrder · CALLED BY: CLI sending a synchronous request to APP
+// -> order_id : "PO-2001" · -> amount : 40
+//    step 1 · the presentation tier receives the request    request : "none" -> "placeOrder(PO-2001)"
+//    step 2 · the business logic mutates the entity    orders : {} -> { "PO-2001": {status:"DRAFT", total:0} }
+//    step 3 · the data-access layer writes the row    orders["PO-2001"].status : "DRAFT" -> "PLACED"
+//    step 4 · the data-access layer reads it back    GET /orders/PO-2001 -> { id:"PO-2001", status:"PLACED", total:40 }
+// <- outcome : CLI sees order "PO-2001" status "PLACED"   BECAUSE all three tiers run in one process against one DB, so the operation is local and ACID
+```
+
 ## Interview Questions
 
 ### Q1

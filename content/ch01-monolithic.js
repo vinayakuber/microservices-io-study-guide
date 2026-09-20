@@ -231,6 +231,52 @@ registerChapter({
       problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
     }
   ],
+  systemDesign: {
+    pipeline: 'client → monolithic application (presentation → business logic → data access) → single relational database',
+    decomposition: [
+      {
+        box: 'the monolith — one deployable process holding every subdomain',
+        role: 'application (all three tiers in one process)',
+        parts: [
+          'presentation tier — receives client requests, returns responses',
+          'business logic — implements business rules, mutates entities',
+          'data-access layer — reads and writes the single database'
+        ]
+      },
+      {
+        box: 'the single relational database',
+        role: 'store',
+        parts: [
+          'PostgreSQL 16 @ monolith-db-1 — the one engine and instance',
+          'holds the rows of every subdomain in one schema',
+          'one ACID transaction spans the Orders and Credit subdomains'
+        ]
+      },
+      {
+        box: 'the client',
+        role: 'client',
+        parts: [
+          'sends a synchronous request to the monolith',
+          'reads the response — no network hops inside the app'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  CLI[\"Client\"] -->|\"POST /orders/PO-2001\"| APP[\"Monolith (one process)\"]\n  APP --> BL[\"business logic tier\"]\n  BL --> DA[\"data-access layer\"]\n  DA -->|\"INSERT / query\"| DB[(\"PostgreSQL 16 @ monolith-db-1\")]\n  DB -->|\"row back\"| DA\n  APP -->|\"response\"| CLI",
+    program: `// SYSTEM DESIGN — the monolith is one process with three tiers inside it, all hitting one database: client -> presentation tier -> business logic -> data-access layer -> PostgreSQL 16 @ monolith-db-1
+// PARTIES: CLI = customer client (sends synchronous requests) · APP = the monolith (one process holding the presentation tier, business logic, and data-access layer) · DB = PostgreSQL 16 @ monolith-db-1
+// DEF: tier — one vertical layer inside the single process; here the 3 tiers "presentation", "business", "data-access"
+// DEF: entity — a business entity (a DDD aggregate) that holds state; here order entity "PO-2001"
+// DEF: order — the Order subdomain's row, keyed by purchase-order id; here "PO-2001" = {status:"DRAFT", total:0}
+// STATE (before):
+//    orders : {}   // the Order rows, keyed by id, inside the single DB
+// DEF: placeOrder · CALLED BY: CLI sending a synchronous request to APP
+// -> order_id : "PO-2001" · -> amount : 40
+//    step 1 · the presentation tier receives the request    request : "none" -> "placeOrder(PO-2001)"
+//    step 2 · the business logic mutates the entity    orders : {} -> { "PO-2001": {status:"DRAFT", total:0} }
+//    step 3 · the data-access layer writes the row    orders["PO-2001"].status : "DRAFT" -> "PLACED"
+//    step 4 · the data-access layer reads it back    GET /orders/PO-2001 -> { id:"PO-2001", status:"PLACED", total:40 }
+// <- outcome : CLI sees order "PO-2001" status "PLACED"   BECAUSE all three tiers run in one process against one DB, so the operation is local and ACID`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'All subdomains in one component', content: '<p><strong>Why.</strong> The monolithic architecture puts every subdomain into one deployable component, so no single team can evolve its slice in isolation.</p><p><strong>Claim.</strong> The single component resolves the five dark matter forces — interactions stay local and efficient, ACID is easy, and there is no runtime or design-time coupling between components.</p><p><strong>Grounding.</strong> The pattern\'s solution specifies a single deployable/executable component using a single database; all operations are local because there is a single component.</p><p><strong>In the wild.</strong> Netflix, Amazon.com and eBay each began as monoliths, and most web applications before 2012 were built this way.</p>' },

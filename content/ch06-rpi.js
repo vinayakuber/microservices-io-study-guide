@@ -224,6 +224,53 @@ registerChapter({
       problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
     }
   ],
+  systemDesign: {
+    pipeline: 'caller → client stub/proxy → transport (HTTP) → server skeleton → business logic → reply',
+    decomposition: [
+      {
+        box: 'the caller — Registration Service',
+        role: 'caller',
+        parts: [
+          'builds the request { email: "bob@example.com" }',
+          'waits synchronously for the reply'
+        ]
+      },
+      {
+        box: 'the client stub/proxy — RegistrationServiceProxy',
+        role: 'interface (client proxy)',
+        parts: [
+          'serializes the request over HTTP',
+          'hides the transport from the caller'
+        ]
+      },
+      {
+        box: 'the server — User Registration instance',
+        role: 'server',
+        parts: [
+          'runs the business logic',
+          'stores the row and returns the reply'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  CLIENT[\"caller: Registration Service\"] -->|\"call via stub\"| STUB[\"client proxy: RegistrationServiceProxy\"]\n  STUB -->|\"HTTP POST /register\"| SVC[\"server: User Registration\"]\n  SVC -->|\"reply user-14\"| CLIENT",
+    program: `// SYSTEM DESIGN — RPI as a pipeline: caller -> client stub/proxy -> transport (HTTP) -> server skeleton -> business logic -> reply
+// PARTIES: CLIENT = Registration Service (caller: builds the request and waits for the reply) · STUB = client proxy RegistrationServiceProxy (interface: hides the HTTP transport) · SVC = User Registration instance (server: runs the business logic and returns the reply)
+// DEF: request — the payload a caller sends over RPI; here { email: "bob@example.com" }
+// DEF: reply — the answer the service returns on the same connection; here "user-14"
+// DEF: proxy — the client-side stub hiding the transport; here RegistrationServiceProxy -> "http://10.0.2.9:8080/register"
+// STATE (before):
+//    request : {}       // the payload the caller sends over RPI
+//    reply   : "none"   // the answer the service returns on the same connection
+//    status  : "PENDING"  // the HTTP status of the in-flight call
+// DEF: place_registration · CALLED BY: CLIENT after the user submits an email
+// -> email : "bob@example.com" · -> service_name : "user-registration"
+//    step 1 · CLIENT calls the stub : request : {} -> { email: "bob@example.com" }
+//    step 2 · STUB serializes over HTTP : status : "PENDING" -> "IN_FLIGHT"
+//    step 3 · SVC runs the logic and stores the row : reply : "none" -> "user-14"
+//    step 4 · STUB deserializes and returns the reply : status : "IN_FLIGHT" -> "DONE"
+// <- reply : "user-14" · the caller reads its answer on the same synchronous connection
+//    alt service down : the call hangs or fails fast  BECAUSE both ends must be alive for the whole interaction`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Synchronous coupling', content: '<p><strong>Why.</strong> When a call is synchronous, both ends must be alive for the whole interaction, so a slow or dead callee stalls the caller.</p><p><strong>Claim.</strong> Synchronous communication results in tight runtime coupling between client and service.</p><p><strong>Grounding.</strong> The reference lists it as a force: both the client and service must be available for the duration of the request.</p><p><strong>In the wild.</strong> A registration call that blocks until the user service answers, holding the caller thread the entire time.</p>' },

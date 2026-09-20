@@ -166,6 +166,70 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** service instance → third-party registrar → service registry
+
+### the service instance
+
+_Role: service_
+
+```mermaid
+flowchart TD
+  R["the service instance"]
+  R --> P0["starts and stops the app"]
+  R --> P1["never talks to the registry itself"]
+```
+
+### the third-party registrar
+
+_Role: registrar_
+
+```mermaid
+flowchart TD
+  R["the third-party registrar"]
+  R --> P0["Netflix Prana sidecar"]
+  R --> P1["observes / polls the instance"]
+  R --> P2["registers on startup, unregisters on shutdown"]
+```
+
+### the service registry
+
+_Role: registry_
+
+```mermaid
+flowchart TD
+  R["the service registry"]
+  R --> P0["Eureka"]
+  R --> P1["stores the reachable endpoints"]
+  R --> P2["serves discovery lookups"]
+```
+
+```mermaid
+flowchart LR
+  SVC["service: order-service instance"] -->|"runs beside"| RGR["registrar: Netflix Prana sidecar"]
+  RGR -->|"register / unregister"| REG[("registry: Eureka")]
+```
+
+```java
+// SYSTEM DESIGN — third-party registration as a pipeline: service instance -> third-party registrar -> service registry
+// PARTIES: SVC = order-service instance (service: runs the app and never talks to the registry) · RGR = third-party registrar Netflix Prana (registrar: registers on startup, unregisters on shutdown) · REG = service registry Eureka (registry: stores the reachable endpoints)
+// DEF: instance — a runnable copy of a service at a network location; here {"host":"10.0.2.5","port":8080}
+// DEF: entry — a reachable endpoint stored in the registry; here "order-service" -> [{"host":"10.0.2.5","port":8080}]
+// DEF: registrar — the sidecar that owns register/unregister; here Netflix Prana polling every 5 s
+// STATE (before):
+//    registry : {}       // Eureka holds no entry for order-service yet
+//    process_state : "STOPPED"  // the service instance has not started
+// DEF: register_instance · CALLED BY: RGR when the service instance boots
+// -> instance : {"host":"10.0.2.5","port":8080}
+//    step 1 · SVC starts, doing nothing registry-related : process_state : "STOPPED" -> "RUNNING"
+//    step 2 · RGR polls SVC and writes the entry to REG : registry : {} -> { "order-service": [{"host":"10.0.2.5","port":8080}] }
+//    step 3 · REG stores the entry and serves discovery lookups : lookup : "none" -> "10.0.2.5:8080"
+//    step 4 · a client reads the registry and reaches SVC : request : "none" -> "GET /orders"
+// <- entry : "order-service" -> [{"host":"10.0.2.5","port":8080}] · the service never talked to the registry itself
+//    alt registrar down : no register/unregister runs and the registry drifts stale  BECAUSE the registrar sits on the discovery path
+```
+
 ## Interview Questions
 
 ### Q1

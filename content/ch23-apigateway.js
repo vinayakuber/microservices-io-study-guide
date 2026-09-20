@@ -142,6 +142,50 @@ registerChapter({
       problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
     }
   ],
+  systemDesign: {
+    pipeline: 'client → gateway → upstream services',
+    decomposition: [
+      {
+        box: 'Clients — the callers',
+        role: 'client',
+        parts: [
+          'CLI — a command-line client',
+          'MOB — the mobile client',
+          'WEB — the web client'
+        ]
+      },
+      {
+        box: 'API Gateway — the single entry point',
+        role: 'gateway',
+        parts: [
+          'request routing — looks up the route table',
+          'API composition — assembles product + price + reviews'
+        ]
+      },
+      {
+        box: 'Upstream services — the backends',
+        role: 'upstream services',
+        parts: [
+          'PROD — product service',
+          'PRI — pricing service',
+          'REV — reviews service'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  CLI[\"CLI client\"] --> GW[\"API Gateway\"]\n  MOB[\"MOB client\"] --> GW\n  WEB[\"WEB client\"] --> GW\n  GW -->|\"route /products\"| PROD[\"Product service\"]\n  GW -->|\"compose\"| RES[\"product + price + reviews\"]",
+    program: `// SYSTEM DESIGN — API gateway: client -> gateway -> upstream services, one product request composed end to end
+// PARTIES: WEB = the web client · GW = API Gateway · PROD = Product service · PRI = Pricing service · REV = Reviews service
+// DEF: route — a path-to-backend mapping in the gateway's routing table; here "/products" -> "PROD"
+// STATE (before):
+//    routes : { "/products": "PROD" }   // the gateway's routing table, one entry
+//    response : {}                      // the composed product view, empty
+// DEF: get_product · CALLED BY: WEB requesting the product page for P-9
+// -> path : "/products/P-9"
+//    step 1 · GW looks up the route table   // match : "" -> "PROD"   BECAUSE /products is registered to the product service
+//    step 2 · GW calls PROD for the product, PRI for the price, and REV for the reviews   // gathered : 0 -> 3   BECAUSE the gateway composes several upstream calls into one response
+//    step 3 · GW assembles the pieces and returns one JSON   // response : {} -> {"id":"P-9","price":39.99,"stock":3,"reviews":12}
+// <- outcome : response = {"id":"P-9","price":39.99,"stock":3,"reviews":12} · one client call, three upstream calls, one composed reply`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Clients cannot chase fine-grained APIs', content: '<p><strong>Why.</strong> Microservices give fine-grained APIs, so one page needs data from many services.</p><p><strong>Claim.</strong> A client needing the details of a product must fetch data from numerous services, over a network whose speed differs per client type.</p><p><strong>Grounding.</strong> The reference problem — how clients access the individual services — with the forces of granularity mismatch, different clients needing different data, and differing network performance.</p><p><strong>In the wild.</strong> A product details page spread over Product Info, Pricing, Order, Inventory, and Review services.</p>' },

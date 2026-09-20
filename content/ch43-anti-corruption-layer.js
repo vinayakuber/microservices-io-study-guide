@@ -174,6 +174,52 @@ registerChapter({
       problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
     }
   ],
+  systemDesign: {
+    pipeline: 'subsystem → ACL (adapter + translator) → legacy monolith',
+    decomposition: [
+      {
+        box: 'new Customer service — the subsystem that keeps its own clean model',
+        role: 'subsystem',
+        parts: [
+          'Domain model — id, dateOfBirth, status',
+          'Consumer — reads only what the ACL hands it'
+        ]
+      },
+      {
+        box: 'anti-corruption layer — the translation boundary',
+        role: 'ACL (adapter + translator)',
+        parts: [
+          'Adapter — calls the legacy API / table',
+          'Translator — maps legacy names and codes to the modern model'
+        ]
+      },
+      {
+        box: 'legacy monolith — the old system being shielded',
+        role: 'legacy monolith',
+        parts: [
+          'customer table — cust_id, cust_dob, status_cd on PostgreSQL 14 @ legacy-db-1',
+          'Legacy codes — status_cd "A" for active'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  NEW[\"new Customer service\"] -->|\"needs customer C-1042\"| ACL[\"anti-corruption layer\"]\n  ACL -->|\"adapter reads\"| LEG[(\"PostgreSQL 14 @ legacy-db-1\")]\n  LEG -->|\"cust_id, cust_dob, status_cd\"| ACL\n  ACL -->|\"translator maps A -> ACTIVE\"| NEW\n  NEW -->|\"stores\"| DM[\"domain: id, dateOfBirth, status\"]",
+    program: `// SYSTEM DESIGN — anti-corruption layer: new subsystem -> ACL (adapter + translator) -> legacy monolith
+// PARTIES: NEW = new Customer service (the clean subsystem) · ACL = anti-corruption layer (adapter that calls the legacy API + translator that maps the legacy model to the modern model) · LEG = PostgreSQL 14 @ legacy-db-1 (legacy monolith customer table)
+// DEF: adapter — the ACL half that calls the legacy API/table; here SELECT of customer "C-1042"
+// DEF: translator — the ACL half that maps legacy names to the new model; here "cust_dob" -> "dateOfBirth"
+// DEF: domain — the new service own model; here { "id":"C-1042", "dateOfBirth":"1987-04-03", "status":"ACTIVE" }
+// DEF: legacy — the monolith model; here { "cust_id":"C-1042", "cust_dob":"1987-04-03", "status_cd":"A" }
+// STATE (before):
+//    legacy : {}     // the monolith record, fetched by the adapter
+//    domain : {}     // the new model, empty before translation
+// DEF: translate · CALLED BY: NEW when it needs customer 1042 in its own vocabulary
+// -> customer_id : "C-1042"
+//    step 1 · the adapter reads the legacy row    legacy : {} -> { "cust_id":"C-1042", "cust_dob":"1987-04-03", "status_cd":"A" }   // SELECT from PostgreSQL 14 @ legacy-db-1
+//    step 2 · the translator renames cust_dob    domain.dateOfBirth : "" -> "1987-04-03"   BECAUSE the legacy field is mapped to the modern name
+//    step 3 · the translator maps the code to a word    domain.status : "" -> "ACTIVE"   // legacy code "A" means active
+//    step 4 · the adapter returns the clean model    domain : {} -> { "id":"C-1042", "dateOfBirth":"1987-04-03", "status":"ACTIVE" }   // NEW stores only its own model
+// <- output : domain = { "id":"C-1042", "dateOfBirth":"1987-04-03", "status":"ACTIVE" } · the service reads no legacy name   BECAUSE the ACL translates before NEW sees it`
+  },
   concepts: {
     cards: [
       {

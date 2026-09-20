@@ -206,6 +206,49 @@ registerChapter({
       problems: ["01-scale-from-zero-to-millions"]
     }
   ],
+  systemDesign: {
+    pipeline: 'build pipeline → image (AMI) → IaaS → VM instances',
+    decomposition: [
+      {
+        box: 'Build pipeline — the baker',
+        role: 'build pipeline',
+        parts: [
+          'bakes JDK 17 + OS into one machine image',
+          'publishes the AMI catalog:2.3.0'
+        ]
+      },
+      {
+        box: 'EC2 IaaS — the provisioner',
+        role: 'IaaS',
+        parts: [
+          'provisions a new EC2 instance per service instance',
+          'boots the AMI on each VM'
+        ]
+      },
+      {
+        box: 'Auto-scaling group + load balancer',
+        role: 'VM instances',
+        parts: [
+          'ASG scales between min 2 and max 6',
+          'ELB routes to the healthy instances i-1, i-2, i-3'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  BLD[\"Build pipeline\"] -->|\"publish AMI catalog:2.3.0\"| IaaS[\"EC2 IaaS\"]\n  IaaS -->|\"provision EC2 instance\"| ASG[\"Auto-scaling group\"]\n  ASG -->|\"boot VM\"| VM[\"instances i-1, i-2, i-3\"]\n  VM -->|\"route\"| ELB[\"Load balancer\"]",
+    program: `// SYSTEM DESIGN — service per VM: build pipeline -> image (AMI) -> IaaS -> VM instances
+// PARTIES: BLD = build pipeline (builder) · REG = AMI catalog (image repository) · IaaS = EC2 infrastructure service (provisions VMs) · ASG = auto-scaling group (scheduler) · ELB = load balancer (routing)
+// DEF: image — a baked machine artifact; here AMI catalog:2.3.0 with JDK 17 + OS
+// DEF: instance — one EC2 VM running the service; here i-1, i-2, i-3
+// STATE (before):
+//    instances : { "i-1":"UP", "i-2":"UP", "i-3":"UP" }   // three VMs behind the ELB
+//    capacity : 3        // current running count
+// DEF: scale_vm · CALLED BY: BLD baking, IaaS provisioning, ASG scaling
+// -> image_name : "catalog:2.3.0"
+//    step 1 · BLD bakes the AMI with JDK 17 + OS   // image : "" -> "catalog:2.3.0"   BECAUSE the build pipeline packages the runtime into one artifact
+//    step 2 · IaaS provisions a fourth EC2 instance   // instances : { "i-1":"UP", "i-2":"UP", "i-3":"UP" } -> { "i-1":"UP", "i-2":"UP", "i-3":"UP", "i-4":"STARTING" }   BECAUSE the ASG raises capacity from 3 toward its max 6
+//    step 3 · ELB adds the new VM to rotation   // capacity : 3 -> 4   BECAUSE the load balancer registers i-4
+// <- outcome : instances = 4 · min 2, max 6  BECAUSE the ASG scales VM instances from the same AMI catalog:2.3.0`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'How to package services that must scale and isolate', content: '<p><strong>Why.</strong> Services are written in a variety of languages, frameworks, and versions, and each service runs as multiple instances that must be independently deployable and scalable.</p><p><strong>Claim.</strong> Each instance must be isolated from the others and constrained in the CPU and memory it consumes, while the whole thing must be deployed reliably and cost-effectively.</p><p><strong>Grounding.</strong> The pattern forces are identical to those of the container pattern: variety of technologies, multiple instances, isolation, and cost-effective deployment.</p><p><strong>In the wild.</strong> These forces are what drive teams toward a per-VM or per-container packaging choice.</p>' },

@@ -164,6 +164,70 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** service instance → self-registrar → service registry
+
+### order-service instance — the service instance
+
+_Role: service instance_
+
+```mermaid
+flowchart TD
+  R["order-service instance — the service instance"]
+  R --> P0["Registers its own host and IP on startup"]
+  R --> P1["Renews the lease on a heartbeat timer"]
+  R --> P2["Unregisters itself on shutdown"]
+```
+
+### self-registrar (in-process chassis code) — the registrar
+
+_Role: self-registrar_
+
+```mermaid
+flowchart TD
+  R["self-registrar (in-process chassis code) — the registrar"]
+  R --> P0["Writes the instance row on boot"]
+  R --> P1["Pushes the ttl out on each heartbeat"]
+```
+
+### service registry (Eureka) — the registry
+
+_Role: registry_
+
+```mermaid
+flowchart TD
+  R["service registry (Eureka) — the registry"]
+  R --> P0["Holds name -&gt; instance rows"]
+  R --> P1["Evicts entries whose lease lapses"]
+```
+
+```mermaid
+flowchart LR
+  SVC["order-service instance 10.0.1.7"] -->|"register self"| REG[("service registry Eureka")]
+  SVC -->|"heartbeat: ttl 30 -> 60"| REG
+  REG -->|"serves the row back"| D["discovery lookup"]
+```
+
+```java
+// SYSTEM DESIGN — self-registration as a pipeline: service instance -> self-registrar (startup register + heartbeat lease) -> service registry
+// PARTIES: SVC = order-service instance (registers itself and renews) · REG = service registry (Eureka)
+// DEF: registrar — the in-process code inside SVC that registers and renews; here it writes {"host":"10.0.1.7","port":8080}
+// DEF: lease — the ttl the registry keeps an entry alive; here 30 pushed to 60 by a heartbeat
+// DEF: state — the instance's own modeled state; here "AVAILABLE"
+// STATE (before):
+//    registry : {"order-service" -> []}
+//    state    : "DOWN"
+//    lease    : 0
+// DEF: register_and_renew · CALLED BY: SVC booting on host 10.0.1.7
+// -> boot : {"host":"10.0.1.7","port":8080}
+//    step 1 · SVC registers itself    registry : {"order-service" -> []} -> {"order-service" -> [{"host":"10.0.1.7","port":8080}]}   BECAUSE the instance writes its own row at startup
+//    step 2 · SVC marks itself available    state : "DOWN" -> "AVAILABLE"   BECAUSE the registrar flips the self-state after a successful register
+//    step 3 · SVC renews the lease    lease : 0 -> 60   BECAUSE the heartbeat timer pushes the ttl out before it lapses
+//    step 4 · discovery reads the row back    lookup "order-service" -> returns [{"host":"10.0.1.7","port":8080}]   BECAUSE the registry serves the row the instance wrote
+// <- registry row : "order-service" -> [{"host":"10.0.1.7","port":8080}]   (written by SVC, read by discovery)
+```
+
 ## Interview Questions
 
 ### Q1

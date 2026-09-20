@@ -199,6 +199,81 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** command → event store (append) → projector/event handler → read model → query
+
+### Order Service command side — appends events
+
+_Role: command side / event store_
+
+```mermaid
+flowchart TD
+  R["Order Service command side — appends events"]
+  R --> P0["append — one atomic write per state change"]
+  R --> P1["event store — EventStoreDB 24 @ orders-events-1"]
+  R --> P2["delivers each saved event to subscribers like a broker"]
+```
+
+### projector / event handler
+
+_Role: projector/event handler_
+
+```mermaid
+flowchart TD
+  R["projector / event handler"]
+  R --> P0["consume — receives each saved event"]
+  R --> P1["fold — apply() of each event into the read model"]
+```
+
+### read model database
+
+_Role: read model DB_
+
+```mermaid
+flowchart TD
+  R["read model database"]
+  R --> P0["PostgreSQL 16 @ orders-view-1"]
+  R --> P1["holds the precomputed current state the projector folded"]
+```
+
+### query side
+
+_Role: query side_
+
+```mermaid
+flowchart TD
+  R["query side"]
+  R --> P0["reads the current state directly"]
+  R --> P1["no replay at query time"]
+```
+
+```mermaid
+flowchart LR
+  CMD["command: approve_order"] -->|"append E2"| ES[("event store: EventStoreDB 24 @ orders-events-1")]
+  ES -->|"deliver event"| PH["projector / event handler"]
+  PH -->|"fold into read model"| RM[("read model DB: PostgreSQL 16 @ orders-view-1")]
+  RM -->|"query current state"| QR["query side / reader"]
+```
+
+```java
+// SYSTEM DESIGN — event sourcing as a pipeline: command -> event store (append) -> projector/event handler -> read model -> query
+// PARTIES: CMD = Order Service command side (writer) · ES = EventStoreDB 24 @ orders-events-1 (append-only event store) · PH = projector/event handler (consumer) · RM = read model database (PostgreSQL 16 @ orders-view-1) · QR = query side (reader)
+// DEF: event — one state-changing fact appended to the store; here E2 = OrderApprovedEvent("C-100")
+// DEF: view — the read model the projector folds events into; here { orderState:"APPROVED", customerId:"C-100" }
+// DEF: fold — apply() of one event onto the view; here E1 sets "CREATED", E2 sets "APPROVED"
+// STATE (before):
+//    events : [ E1:OrderCreated("C-100",125.00) ]
+//    view   : { orderState:"CREATED", customerId:"C-100" }
+// DEF: approve_order · CALLED BY: CMD processing command "approve_order"
+// -> command : "approve_order"
+//    step 1 · CMD appends E2    events : [ E1:OrderCreated("C-100",125.00) ] -> [ E1:OrderCreated("C-100",125.00), E2:OrderApproved("C-100") ]  BECAUSE one append is one atomic write
+//    step 2 · ES delivers E2 to PH    delivered : "none" -> "E2:OrderApproved"
+//    step 3 · PH folds E2 into the view    view : { orderState:"CREATED", customerId:"C-100" } -> { orderState:"APPROVED", customerId:"C-100" }
+//    step 4 · QR reads the current state    read : "none" -> { orderState:"APPROVED", customerId:"C-100" }  (query, no replay)
+// <- outcome : QR returns orderState "APPROVED"  BECAUSE CMD wrote E2 to the event store, ES delivered it, PH folded it into the view, and QR read the view back
+```
+
 ## Interview Questions
 
 ### Q1

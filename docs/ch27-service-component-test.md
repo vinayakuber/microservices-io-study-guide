@@ -212,6 +212,70 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** test harness → service under test (in-process) → stubbed dependencies
+
+### test harness
+
+_Role: test harness_
+
+```mermaid
+flowchart TD
+  R["test harness"]
+  R --> P0["drives the service in-process (no network)"]
+  R --> P1["asserts the response against the double's canned reply"]
+```
+
+### Order Service — the service under test
+
+_Role: service under test (in-process)_
+
+```mermaid
+flowchart TD
+  R["Order Service — the service under test"]
+  R --> P0["real wiring: its controller and outbound call run for real"]
+  R --> P1["in-memory database instead of the production store"]
+```
+
+### Kitchen Service double
+
+_Role: stubbed dependency_
+
+```mermaid
+flowchart TD
+  R["Kitchen Service double"]
+  R --> P0["returns the canned ticket &quot;T-88&quot;"]
+  R --> P1["stands in for the real Kitchen Service"]
+```
+
+```mermaid
+flowchart LR
+  T["test harness"] -->|"in-process call"| O["Order Service (under test)"]
+  O -->|"createTicket"| D["Kitchen Service double"]
+  D -->|"returns T-88"| O
+  O -->|"order + ticket"| T
+```
+
+```java
+// SYSTEM DESIGN — service component test: test harness -> service under test (Order Service, in-process) -> stubbed dependency (Kitchen Service double)
+// PARTIES: TST = test harness (drives the service in-process) · SVC = Order Service (service under test, real wiring) · DBLE = Kitchen Service double (stubbed dependency)
+// DEF: dep — the dependency the service invokes; here "KitchenService.createTicket" stubbed by DBLE
+// DEF: ticket — the canned reply the double returns; here "T-88"
+// DEF: order — the service's own output; here {"id":"ORD-4007","state":"PENDING","ticket":"T-88"}
+// STATE (before):
+//    order : { id:"", state:"PENDING", ticket:"" }
+//    double : { createTicket:"" }
+//    calls : []
+// DEF: run_component_test · CALLED BY: TST exercising SVC in isolation
+// -> order_id : "ORD-4007"
+//    step 1 · DBLE is primed with the canned ticket    double.createTicket : "" -> "T-88"
+//    step 2 · TST calls SVC in-process    order.id : "" -> "ORD-4007"  BECAUSE the harness drives the service directly, not over the network
+//    step 3 · SVC invokes DBLE and records the call    calls : [] -> ["KitchenService.createTicket"]
+//    step 4 · SVC reads the double's reply    order.ticket : "" -> "T-88"  BECAUSE the stubbed dependency returns the fixed ticket
+// <- outcome : order {"id":"ORD-4007","state":"PENDING","ticket":"T-88"} · calls 1 · the real Kitchen Service is never launched
+```
+
 ## Interview Questions
 
 ### Q1

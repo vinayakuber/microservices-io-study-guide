@@ -217,6 +217,60 @@ registerChapter({
       problems: ["26-payment-system", "28-stock-exchange"]
     }
   ],
+  systemDesign: {
+    pipeline: 'command → event store (append) → projector/event handler → read model → query',
+    decomposition: [
+      {
+        box: 'Order Service command side — appends events',
+        role: 'command side / event store',
+        parts: [
+          'append — one atomic write per state change',
+          'event store — EventStoreDB 24 @ orders-events-1',
+          'delivers each saved event to subscribers like a broker'
+        ]
+      },
+      {
+        box: 'projector / event handler',
+        role: 'projector/event handler',
+        parts: [
+          'consume — receives each saved event',
+          'fold — apply() of each event into the read model'
+        ]
+      },
+      {
+        box: 'read model database',
+        role: 'read model DB',
+        parts: [
+          'PostgreSQL 16 @ orders-view-1',
+          'holds the precomputed current state the projector folded'
+        ]
+      },
+      {
+        box: 'query side',
+        role: 'query side',
+        parts: [
+          'reads the current state directly',
+          'no replay at query time'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  CMD[\"command: approve_order\"] -->|\"append E2\"| ES[(\"event store: EventStoreDB 24 @ orders-events-1\")]\n  ES -->|\"deliver event\"| PH[\"projector / event handler\"]\n  PH -->|\"fold into read model\"| RM[(\"read model DB: PostgreSQL 16 @ orders-view-1\")]\n  RM -->|\"query current state\"| QR[\"query side / reader\"]",
+    program: `// SYSTEM DESIGN — event sourcing as a pipeline: command -> event store (append) -> projector/event handler -> read model -> query
+// PARTIES: CMD = Order Service command side (writer) · ES = EventStoreDB 24 @ orders-events-1 (append-only event store) · PH = projector/event handler (consumer) · RM = read model database (PostgreSQL 16 @ orders-view-1) · QR = query side (reader)
+// DEF: event — one state-changing fact appended to the store; here E2 = OrderApprovedEvent("C-100")
+// DEF: view — the read model the projector folds events into; here { orderState:"APPROVED", customerId:"C-100" }
+// DEF: fold — apply() of one event onto the view; here E1 sets "CREATED", E2 sets "APPROVED"
+// STATE (before):
+//    events : [ E1:OrderCreated("C-100",125.00) ]
+//    view   : { orderState:"CREATED", customerId:"C-100" }
+// DEF: approve_order · CALLED BY: CMD processing command "approve_order"
+// -> command : "approve_order"
+//    step 1 · CMD appends E2    events : [ E1:OrderCreated("C-100",125.00) ] -> [ E1:OrderCreated("C-100",125.00), E2:OrderApproved("C-100") ]  BECAUSE one append is one atomic write
+//    step 2 · ES delivers E2 to PH    delivered : "none" -> "E2:OrderApproved"
+//    step 3 · PH folds E2 into the view    view : { orderState:"CREATED", customerId:"C-100" } -> { orderState:"APPROVED", customerId:"C-100" }
+//    step 4 · QR reads the current state    read : "none" -> { orderState:"APPROVED", customerId:"C-100" }  (query, no replay)
+// <- outcome : QR returns orderState "APPROVED"  BECAUSE CMD wrote E2 to the event store, ES delivered it, PH folded it into the view, and QR read the view back`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Updating the database and publishing events is not atomic', content: '<p><strong>Why.</strong> A service command must update or delete aggregates in the database and send messages to a broker at the same time, or data and messages drift apart.</p><p><strong>Claim.</strong> Without a distributed transaction the two cannot be made reliable: a message sent mid-transaction may not commit, and a message sent after commit may never be sent if the service crashes first.</p><p><strong>Grounding.</strong> The pattern rules out 2PC because the database or broker may not support it, and coupling the service to both is undesirable.</p><p><strong>In the wild.</strong> A saga participant or a service publishing a domain event faces exactly this database-plus-message atomicity problem.</p>' },

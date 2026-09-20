@@ -203,6 +203,69 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** domain → subdomain (core/supporting/generic) → service
+
+### the domain — the business problem space
+
+_Role: domain_
+
+```mermaid
+flowchart TD
+  R["the domain — the business problem space"]
+  R --> P0["the business DDD models — e.g. food delivery"]
+  R --> P1["splits into multiple subdomains"]
+```
+
+### a subdomain — a distinct part of the business
+
+_Role: subdomain (core/supporting/generic)_
+
+```mermaid
+flowchart TD
+  R["a subdomain — a distinct part of the business"]
+  R --> P0["classified core (key differentiator), supporting, or generic"]
+  R --> P1["often has a key domain object — Order"]
+```
+
+### the service — one per subdomain
+
+_Role: service (owns its data)_
+
+```mermaid
+flowchart TD
+  R["the service — one per subdomain"]
+  R --> P0["owns the subdomain model and its data"]
+  R --> P1["owns its database — PostgreSQL 16 @ order-db-1"]
+  R --> P2["cohesive, loosely coupled behind an API"]
+```
+
+```mermaid
+flowchart LR
+  DOM["domain: food delivery"] --> SUB["subdomain: order management (core)"]
+  SUB --> SVC["order service"]
+  SVC --> DB[("PostgreSQL 16 @ order-db-1")]
+  DB -->|"query result"| SVC
+```
+
+```java
+// SYSTEM DESIGN — decompose by subdomain: domain (food delivery) -> subdomain (core/supporting/generic) -> service (owns its subdomain data)
+// PARTIES: DOM = the domain (the business problem space: food delivery) · SUB = subdomain (a distinct part of the business, classified core/supporting/generic) · SVC = order service (owns the order-management subdomain) · DB = PostgreSQL 16 @ order-db-1 (the order service's own database)
+// DEF: domain — the business problem space DDD splits into subdomains; here "food delivery"
+// DEF: subdomain — a distinct part of the business; here "order management" is core (the key differentiator)
+// DEF: order — the key domain object the order service owns; here "O-1" = {status:"NEW"}
+// STATE (before):
+//    orders : {}   // the Order rows the order service owns (in its own DB)
+// DEF: classify_and_map · CALLED BY: the architect turning subdomains into services
+// -> subdomain : "order management"
+//    step 1 · classify the subdomain    class : "unset" -> "core"   BECAUSE order management is the key differentiator
+//    step 2 · map it to one service    services : "none" -> "order"
+//    step 3 · the service writes its rows    orders : {} -> { "O-1": {status:"NEW"} }
+//    step 4 · a client query reads it back    GET /orders/O-1 -> { id:"O-1", status:"NEW" }
+// <- outcome : subdomain "order management" -> service "order", data owned and served · core is invested in-house, generic is bought off the shelf
+```
+
 ## Interview Questions
 
 ### Q1

@@ -223,6 +223,60 @@ registerChapter({
       problems: ["19-distributed-message-queue"]
     }
   ],
+  systemDesign: {
+    pipeline: 'source database → polling publisher (relay) → message broker → subscriber',
+    decomposition: [
+      {
+        box: 'source database (outbox table) — the source database',
+        role: 'source database',
+        parts: [
+          'Holds the outbox rows with a sent flag',
+          'Answers the unsent-row SELECT'
+        ]
+      },
+      {
+        box: 'polling publisher relay — the relay',
+        role: 'polling publisher',
+        parts: [
+          'Polls SELECT ... WHERE sent=false ORDER BY id',
+          'Publishes each row to the broker',
+          'Marks the row sent=true'
+        ]
+      },
+      {
+        box: 'message broker (RabbitMQ) — the broker',
+        role: 'broker',
+        parts: [
+          'Receives published events in id order',
+          'Holds them for subscribers'
+        ]
+      },
+      {
+        box: 'subscriber — the consumer',
+        role: 'subscriber',
+        parts: [
+          'Consumes each event off the broker'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  DB[(\"source database: outbox table\")] -->|\"SELECT sent=false ORDER BY id\"| RLY[\"polling publisher relay\"]\n  RLY -->|\"publish OrderCreated\"| BRK[(\"message broker RabbitMQ\")]\n  RLY -->|\"mark sent=true\"| DB\n  BRK -->|\"consume\"| SUB[\"subscriber\"]",
+    program: `// SYSTEM DESIGN — polling publisher as a pipeline: source database (outbox table) -> polling publisher relay -> message broker -> subscriber (consumer)
+// PARTIES: DB = PostgreSQL 16 @ orders-db-1 (outbox table) · RLY = polling publisher relay (polls, publishes, marks) · BRK = message broker (RabbitMQ) · SUB = subscriber (consumer)
+// DEF: outbox — the table of events awaiting publication; here [ (10, "OrderCreated", sent=false), (11, "PaymentAuthorized", sent=false) ]
+// DEF: list — the rows one poll selects, then publishes; here [ (10, "OrderCreated"), (11, "PaymentAuthorized") ]
+// DEF: status — a row's sent flag; here false flipped to true
+// STATE (before):
+//    outbox : [ (10, "OrderCreated", sent=false), (11, "PaymentAuthorized", sent=false) ]
+//    list   : []
+//    status : "unsent"
+// DEF: poll_once · CALLED BY: a scheduler tick every 250 ms
+// -> query : "SELECT * FROM outbox WHERE sent=false ORDER BY id ASC"
+//    step 1 · RLY fetches the unsent rows    list : [] -> [ (10, "OrderCreated"), (11, "PaymentAuthorized") ]   BECAUSE the query returns rows whose sent flag is false, ordered by id
+//    step 2 · RLY publishes row 10 to BRK    list : [ (10, "OrderCreated"), (11, "PaymentAuthorized") ] -> [ (11, "PaymentAuthorized") ]   BECAUSE each row is handed to the broker in id order
+//    step 3 · RLY marks row 10 sent    outbox : [(10,"OrderCreated",sent=false),(11,"PaymentAuthorized",sent=false)] -> [(10,"OrderCreated",sent=true),(11,"PaymentAuthorized",sent=false)]   BECAUSE sent=true makes the next poll skip the row
+//    step 4 · SUB consumes "OrderCreated"    status : "unsent" -> "delivered"   BECAUSE the subscriber reads the event off BRK
+// <- output : BRK holds [ "OrderCreated", "PaymentAuthorized" ] · SUB consumes them in id order`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'The outbox has events but no way out', content: '<p><strong>Why.</strong> The Transactional Outbox pattern leaves messages sitting in a database table, and they only matter once they reach the message broker.</p><p><strong>Claim.</strong> Something must discover the unsent outbox rows and hand each one to the broker.</p><p><strong>Grounding.</strong> The reference problem statement: how to publish messages and events in the outbox in the database to the message broker.</p><p><strong>In the wild.</strong> This is the relay half of transactional messaging; the outbox pattern creates the need for it.</p>' },

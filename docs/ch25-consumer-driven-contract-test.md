@@ -200,6 +200,70 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** consumer → contract/expectation → provider verification → provider
+
+### API Gateway — the consumer
+
+_Role: consumer_
+
+```mermaid
+flowchart TD
+  R["API Gateway — the consumer"]
+  R --> P0["OrderServiceProxy — calls GET /orders/{orderId}"]
+  R --> P1["contract suite — defines the expectation and generates the contract"]
+```
+
+### Pact broker — the contract repo
+
+_Role: contract broker/repo_
+
+```mermaid
+flowchart TD
+  R["Pact broker — the contract repo"]
+  R --> P0["stores the example request/reply contract"]
+  R --> P1["serves the contract back to the provider pipeline"]
+```
+
+### Order Service — the provider
+
+_Role: provider verification + provider_
+
+```mermaid
+flowchart TD
+  R["Order Service — the provider"]
+  R --> P0["verifies the actual response against the contract"]
+  R --> P1["keeps the promise: serves GET /orders/ORD-4007 with status 200"]
+```
+
+```mermaid
+flowchart LR
+  GW["API Gateway (consumer)"] -->|"defines expectation"| PACT["Pact broker (contract repo)"]
+  PACT -->|"serves contract"| PIPE["deployment pipeline (verifier)"]
+  PIPE -->|"invokes"| SVC["Order Service (provider)"]
+  SVC -->|"actual 200 + JSON body"| PIPE
+  PIPE -->|"verdict pass/fail"| RES["provider keeps promise"]
+```
+
+```java
+// SYSTEM DESIGN — consumer-driven contract test: consumer (API Gateway) -> contract/expectation (Pact broker) -> provider verification (deployment pipeline) -> provider (Order Service)
+// PARTIES: GW = API Gateway (consumer) · PACT = Pact broker (contract repo, holds the expectation) · PIPE = deployment pipeline (verifier, runs the suite) · SVC = Order Service (provider)
+// DEF: contract — the example request/reply pair one interaction is pinned to; here {"request":{"method":"GET","path":"/orders/ORD-4007"},"reply":{"status":200,"body":{"orderId":"ORD-4007","state":"CREATED"}}}
+// DEF: expectation — what the consumer needs the provider to keep; here GET /orders/ORD-4007 answered with status 200 and a JSON body
+// DEF: verdict — the pass/fail the verifier reaches; here "pass" when actual equals expected
+// STATE (before):
+//    contracts : {}          // PACT holds no contract yet
+//    actual : { status:0, body:{} }
+//    verdict : ""
+// DEF: pin_and_verify · CALLED BY: GW publishing its expectation, then PIPE verifying SVC
+// -> order_id : "ORD-4007"
+//    step 1 · GW defines the expectation and PACT stores it    contracts : {} -> {"gateway-orders":{"request":{"method":"GET","path":"/orders/ORD-4007"},"reply":{"status":200,"body":{"orderId":"ORD-4007","state":"CREATED"}}}}
+//    step 2 · PIPE reads the contract and invokes SVC    actual.status : 0 -> 200 · actual.body : {} -> {"orderId":"ORD-4007","state":"CREATED"}
+//    step 3 · PIPE compares actual against expected    verdict : "" -> "pass"  BECAUSE actual 200 equals expected 200 and the body matches
+// <- outcome : verdict "pass" · SVC keeps its promise  BECAUSE the provider serves GET /orders/ORD-4007 exactly as the contract pins it
+```
+
 ## Interview Questions
 
 ### Q1

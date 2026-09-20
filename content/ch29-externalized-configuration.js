@@ -128,6 +128,50 @@ registerChapter({
       problems: ["01-scale-from-zero-to-millions"]
     }
   ],
+  systemDesign: {
+    pipeline: 'service → config server → config repository (git/VCS)',
+    decomposition: [
+      {
+        box: 'Order Service — the consumer of config',
+        role: 'service',
+        parts: [
+          'pulls config at startup (DB_URL, DB_PASSWORD)',
+          'refreshes when the config changes'
+        ]
+      },
+      {
+        box: 'Spring Cloud Config server',
+        role: 'config server',
+        parts: [
+          'serves configuration over HTTP',
+          'versions each property change'
+        ]
+      },
+      {
+        box: 'git repository — the config source',
+        role: 'config repository (git/VCS)',
+        parts: [
+          'stores the property files per environment',
+          'is the versioned source of truth'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  SVC[\"Order Service\"] -->|\"pull at startup\"| CS[\"config server\"]\n  CS -->|\"serves over HTTP\"| SVC\n  CS -->|\"reads\"| GIT[(\"git repository (config source)\")]",
+    program: `// SYSTEM DESIGN — externalized configuration: service (Order Service) -> config server (Spring Cloud Config) -> config repository (git/VCS)
+// PARTIES: SVC = Order Service (config consumer, pulls at startup) · CS = Spring Cloud Config server (config server, serves over HTTP) · GIT = git repository (config repository, VCS source of truth)
+// DEF: config — the key/value settings a service reads at startup; here {"db_url":"jdbc:mysql://prod-db:3306/orders","db_password":"prod-secret"}
+// DEF: repo — the versioned property file git stores; here the file with keys "db_url" and "db_password"
+// DEF: connection — the open link built from the resolved values; here "open"
+// STATE (before):
+//    config : {}
+//    connection : ""
+// DEF: pull_and_connect · CALLED BY: the runtime launching SVC
+// -> env : {"DB_URL":"jdbc:mysql://prod-db:3306/orders","DB_PASSWORD":"prod-secret"}
+//    step 1 · SVC pulls the config from CS at startup    config : {} -> {"db_url":"jdbc:mysql://prod-db:3306/orders","db_password":"prod-secret"}
+//    step 2 · CS reads the file from GIT and serves it over HTTP    config : {"db_url":"jdbc:mysql://prod-db:3306/orders"} -> {"db_url":"jdbc:mysql://prod-db:3306/orders","db_password":"prod-secret"}  BECAUSE git stores the versioned property file
+//    step 3 · SVC opens a connection with the values    connection : "" -> "open"  BECAUSE the config now holds the URL and password the database accepts
+// <- outcome : connection "open" · the same artifact runs unchanged in every environment`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Running in many environments without modification', content: '<p><strong>Why.</strong> A service must be told how to connect to its external and third-party services — the database network location and credentials, for example.</p><p><strong>Claim.</strong> The service must run in dev, test, QA, staging, and production without modification or recompilation, even though each environment has different service instances.</p><p><strong>Grounding.</strong> These are the reference forces, nearly verbatim: a QA database vs the production database, a test credit-card account vs the production one.</p><p><strong>In the wild.</strong> Any value baked into the code forces a separate build per environment.</p>' },

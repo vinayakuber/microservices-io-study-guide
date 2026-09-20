@@ -124,6 +124,59 @@ registerChapter({
       problems: ["20-metrics-monitoring", "26-payment-system"]
     }
   ],
+  systemDesign: {
+    pipeline: 'service → audit log (store) → log aggregator → reader',
+    decomposition: [
+      {
+        box: 'Order Service — the writer',
+        role: 'service (business op + audit record)',
+        parts: [
+          'performs the business op (view/create/pay order)',
+          'writes one audit row per action'
+        ]
+      },
+      {
+        box: 'audit log store',
+        role: 'audit log (store)',
+        parts: [
+          'PostgreSQL 16 @ audit-db-1',
+          'holds rows (id, user, action, target, at)'
+        ]
+      },
+      {
+        box: 'log aggregator',
+        role: 'log aggregator',
+        parts: [
+          'collects audit rows across services',
+          'indexes them for query'
+        ]
+      },
+      {
+        box: 'reader (auditor queries)',
+        role: 'reader',
+        parts: [
+          'support/compliance/security query the log',
+          'reconstructs what a user did'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  SVC[\"Order Service\"] -->|\"INSERT audit row\"| LOG[(\"audit log store: PostgreSQL 16 @ audit-db-1\")]\n  LOG -->|\"shipped\"| AGG[\"log aggregator\"]\n  AGG -->|\"indexed\"| IDX[(\"aggregated index\")]\n  IDX -->|\"query user=alice\"| RDR[\"reader: support/compliance/security\"]",
+    program: `// SYSTEM DESIGN — audit logging pipeline: service (Order Service, business op + audit record) -> audit log (PostgreSQL 16 @ audit-db-1) -> log aggregator -> reader (support/compliance/security)
+// PARTIES: SVC = Order Service (writer, business op + audit record) · DB = PostgreSQL 16 @ audit-db-1 (audit log store) · AGG = log aggregator (collects and indexes audit rows) · RDR = support agent (reader)
+// DEF: audit — a durable row recording who did what to which target and when; here (1,"alice","view_order","PO-2001",t1)
+// DEF: action — one user action to record; here "view_order", "create_order", "pay_order"
+// DEF: answer — the reconstruction a reader builds from the rows; here 3 rows for "alice"
+// STATE (before):
+//    audit_log : []      // rows: (id, user, action, target, at), kept by DB
+//    answer : []
+// DEF: record_and_reconstruct · CALLED BY: alice acting on PO-2001, then a reader querying
+// -> action1 : ("alice","view_order","PO-2001")
+//    step 1 · SVC INSERTs the view row    audit_log : [] -> [(1,"alice","view_order","PO-2001",t1)]
+//    step 2 · SVC INSERTs the create and pay rows    audit_log : [(1,"alice","view_order","PO-2001",t1)] -> [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2),(3,"alice","pay_order","PO-2001",t3)]
+//    step 3 · AGG collects and indexes the rows    audit_log : [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2),(3,"alice","pay_order","PO-2001",t3)] -> [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2),(3,"alice","pay_order","PO-2001",t3)]
+//    step 4 · RDR queries user "alice"    answer : [] -> [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2),(3,"alice","pay_order","PO-2001",t3)]
+// <- outcome : answer 3 rows · row id=3 is the payment, so the support agent confirms "alice paid at t3"  BECAUSE the writer INSERTed rows, the aggregator indexed them, and the reader queried them back`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Who did what', content: '<p><strong>Why.</strong> After the fact, you need to know what a user has been doing.</p><p><strong>Claim.</strong> The problem is how to understand the behavior of users and the application, and troubleshoot problems.</p><p><strong>Grounding.</strong> The reference force: it is useful to know what actions a user recently performed — for customer support, compliance, and security.</p><p><strong>In the wild.</strong> A support agent needs to reconstruct a user\'s recent actions to answer a complaint.</p>' },

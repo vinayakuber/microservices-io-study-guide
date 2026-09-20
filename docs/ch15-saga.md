@@ -243,6 +243,84 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** orchestrator → participant services → event/message broker
+
+### saga orchestrator — the orchestrator
+
+_Role: orchestrator_
+
+```mermaid
+flowchart TD
+  R["saga orchestrator — the orchestrator"]
+  R --> P0["Orders each participant to act"]
+  R --> P1["Tracks the saga state"]
+  R --> P2["Triggers compensations on failure"]
+```
+
+### order service — the participant
+
+_Role: participant service_
+
+```mermaid
+flowchart TD
+  R["order service — the participant"]
+  R --> P0["Executes its step"]
+  R --> P1["Publishes its outcome event"]
+```
+
+### customer service — the participant
+
+_Role: participant service_
+
+```mermaid
+flowchart TD
+  R["customer service — the participant"]
+  R --> P0["Reserves credit for the order"]
+  R --> P1["Publishes CreditReserved"]
+```
+
+### event / message broker (RabbitMQ) — the broker
+
+_Role: broker_
+
+```mermaid
+flowchart TD
+  R["event / message broker (RabbitMQ) — the broker"]
+  R --> P0["Carries step results back to the orchestrator"]
+```
+
+```mermaid
+flowchart LR
+  ORCH["saga orchestrator"] -->|"reserve credit 100.00"| CS["customer service"]
+  CS -->|"CreditReserved"| BRK[("message broker RabbitMQ")]
+  BRK -->|"step outcome"| ORCH
+  ORCH -->|"create ticket"| KIT["kitchen service"]
+  ORD["order service"] -->|"OrderCreated"| ORCH
+```
+
+```java
+// SYSTEM DESIGN — saga (orchestrated) as a pipeline: orchestrator -> participant services -> event/message broker (each step executes + records state, compensations on failure)
+// PARTIES: ORCH = saga orchestrator (orders steps, tracks state, compensates) · ORD = order service (participant) · CS = customer service (participant) · KIT = kitchen service (participant) · BRK = message broker (RabbitMQ)
+// DEF: orders — ORD's datastore; here PostgreSQL 16 @ orders-db-1, row ("PO-77", "PENDING")
+// DEF: customers — CS's datastore; here PostgreSQL 16 @ customers-db-1, row ("CUST-7", credit 500.00)
+// DEF: events — the emitted event stream; here [ "OrderCreated", "CreditReserved", "ticket_created" ]
+// DEF: state — the saga's state; here "NEW" -> "COMPLETED"
+// STATE (before):
+//    orders    : [ ("PO-77", "PENDING") ]
+//    customers : [ ("CUST-7", credit 500.00) ]
+//    events    : []
+//    state     : "NEW"
+// DEF: run_saga · CALLED BY: ORCH receiving "OrderCreated" for PO-77
+// -> command : "reserve credit 100.00 for CUST-7"
+//    step 1 · ORCH orders CS to reserve credit    customers : [("CUST-7", credit 500.00)] -> [("CUST-7", credit 400.00)]   BECAUSE CS debits 100.00 for the reservation
+//    step 2 · CS publishes CreditReserved    events : [] -> [ "OrderCreated", "CreditReserved" ]   BECAUSE the participant publishes its outcome back to the orchestrator
+//    step 3 · ORCH orders KIT to create the ticket    events : ["OrderCreated","CreditReserved"] -> ["OrderCreated","CreditReserved","ticket_created"]   BECAUSE the next participant acts on the reserved credit
+//    step 4 · saga completes    state : "NEW" -> "COMPLETED"   BECAUSE every step succeeded with no compensation needed
+// <- outcome : state "COMPLETED" for saga SAGA-1 · credit debited 100.00 from CUST-7
+```
+
 ## Interview Questions
 
 ### Q1

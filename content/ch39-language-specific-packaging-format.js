@@ -202,6 +202,49 @@ registerChapter({
       problems: ["01-scale-from-zero-to-millions"]
     }
   ],
+  systemDesign: {
+    pipeline: 'build pipeline → package → machine (runtime) → JVM process',
+    decomposition: [
+      {
+        box: 'Deployment pipeline — the builder',
+        role: 'build pipeline',
+        parts: [
+          'compiles the service into one runnable JAR',
+          'produces restaurant-service-3.1.0.jar'
+        ]
+      },
+      {
+        box: 'Machine — the runtime host',
+        role: 'machine (runtime)',
+        parts: [
+          'installs JDK 17 and Tomcat 10',
+          'boots the packaged service'
+        ]
+      },
+      {
+        box: 'JVM process — the running service',
+        role: 'JVM process',
+        parts: [
+          'loads the JAR and serves traffic',
+          'runs as jvm-8121'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  BLD[\"Deployment pipeline\"] -->|\"build JAR\"| PKG[\"restaurant-service-3.1.0.jar\"]\n  PKG -->|\"deploy\"| MACH[\"machine: JDK 17 + Tomcat 10\"]\n  MACH -->|\"launch\"| JVM[\"JVM process jvm-8121\"]",
+    program: `// SYSTEM DESIGN — language-specific packaging: build pipeline -> package -> machine (runtime) -> JVM process
+// PARTIES: BLD = deployment pipeline (builder) · PKG = restaurant-service-3.1.0.jar (the package) · MACH = machine (server host) · JVM = JVM process jvm-8121 (the runtime)
+// DEF: package — the language-specific artifact; here restaurant-service-3.1.0.jar (a JAR)
+// DEF: runtime — the software the package needs; here JDK 17 plus Tomcat 10
+// STATE (before):
+//    runtime : {}        // nothing installed yet
+//    process : ""        // no JVM process yet
+// DEF: deploy_jar · CALLED BY: BLD building, MACH provisioning, JVM serving
+// -> artifact : "restaurant-service-3.1.0.jar"
+//    step 1 · BLD produces the JAR   // package : "" -> "restaurant-service-3.1.0.jar"   BECAUSE the build pipeline compiles the service into one runnable JAR
+//    step 2 · MACH installs JDK 17 and Tomcat 10   // runtime : {} -> { "jdk":17, "tomcat":10 }   BECAUSE a JAR needs the JDK and a web container to run
+//    step 3 · the JVM starts and serves   // process : "" -> "jvm-8121"   BECAUSE the machine launches the packaged service
+// <- outcome : process = "jvm-8121" · restaurant-service serves  BECAUSE the JAR plus JDK 17 plus Tomcat 10 boot one JVM process`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'A package that needs a pre-installed runtime', content: '<p><strong>Why.</strong> A production environment must let developers create, update, and configure services, keep the desired number of instances running, monitor them, and route requests to them.</p><p><strong>Claim.</strong> With a language-specific package, what is deployed is the package itself, and the machine must be configured with the runtime before the service can run.</p><p><strong>Grounding.</strong> The book walks through deploying the Spring Boot Restaurant Service: install the JDK, and for a WAR install Apache Tomcat, then copy the package and start the service.</p><p><strong>In the wild.</strong> Each service instance then runs as a JVM process on the configured machine.</p>' },

@@ -222,6 +222,61 @@ registerChapter({
       problems: ["26-payment-system", "22-hotel-reservation"]
     }
   ],
+  systemDesign: {
+    pipeline: 'client → aggregate root (domain objects) → repository → database',
+    decomposition: [
+      {
+        box: 'client — calls the aggregate',
+        role: 'client',
+        parts: [
+          'Sends a command to the aggregate',
+          'Treats the aggregate as one unit'
+        ]
+      },
+      {
+        box: 'order aggregate root (order + line items) — the aggregate',
+        role: 'aggregate root',
+        parts: [
+          'Enforces invariants on the order',
+          'Adds the line item and recomputes the total'
+        ]
+      },
+      {
+        box: 'repository — the repository',
+        role: 'repository',
+        parts: [
+          'Loads the aggregate',
+          'Persists the aggregate after the command'
+        ]
+      },
+      {
+        box: 'PostgreSQL 16 @ orders-db-1 — the database',
+        role: 'database',
+        parts: [
+          'Stores the aggregate as one consistency boundary'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  CLI[\"client\"] -->|\"add CHAIR-1 to PO-77\"| AG[\"order aggregate root\"]\n  AG -->|\"load / save\"| REPO[\"repository\"]\n  REPO -->|\"SELECT / UPDATE\"| DB[(\"PostgreSQL 16 @ orders-db-1\")]",
+    program: `// SYSTEM DESIGN — aggregate as a pipeline: client -> aggregate root (domain objects) -> repository -> database (one unit of consistency per command)
+// PARTIES: CLI = client (calls the aggregate) · AG = order aggregate root (order + line items) · REPO = repository · DB = PostgreSQL 16 @ orders-db-1
+// DEF: orders — the aggregate's stored form; here ("PO-77", total 35.00), ("PO-2001", total 125.00)
+// DEF: items — the order's line items; here [ {"BOOK-1", 25.00}, {"BOOK-2", 10.00} ]
+// DEF: total — the order's running total; here 35.00 -> 60.00
+// DEF: status — the command's outcome; here "none" -> "saved"
+// STATE (before):
+//    orders : [ ("PO-77", total 35.00), ("PO-2001", total 125.00) ]
+//    items  : [ {"BOOK-1", 25.00} ]
+//    total  : 35.00
+//    status : "none"
+// DEF: add_item · CALLED BY: CLI adding CHAIR-1 to PO-77
+// -> command : {"order_id":"PO-77","item":"CHAIR-1","price":25.00}
+//    step 1 · REPO loads the aggregate    status : "none" -> "loaded"   BECAUSE the repository reads order PO-77 and its line items from DB
+//    step 2 · AG adds CHAIR-1    items : [{"BOOK-1",25.00}] -> [{"BOOK-1",25.00},{"CHAIR-1",25.00}]   BECAUSE the aggregate root updates its line items as one unit
+//    step 3 · AG recomputes the total    total : 35.00 -> 60.00   BECAUSE the new total is the sum of all line items
+//    step 4 · REPO saves the aggregate    orders : [("PO-77",total 35.00)] -> [("PO-77",total 60.00)]   BECAUSE the repository persists the changed aggregate
+// <- outcome : status "saved" · order PO-77 total 35.00 -> 60.00 (one consistency boundary)`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'A graph of objects is hard to keep consistent', content: '<p><strong>Why.</strong> Business objects come in clusters, like an Order with its line items, whose values must stay in sync.</p><p><strong>Claim.</strong> Related objects need one boundary so that every change keeps them consistent with each other.</p><p><strong>Grounding.</strong> The pattern comes from Domain-Driven Design and models a graph of objects that can be treated as a unit.</p><p><strong>In the wild.</strong> An Order and its line items, where the total must equal the sum of the lines.</p>' },

@@ -224,6 +224,54 @@ registerChapter({
       problems: ["01-scale-from-zero-to-millions"]
     }
   ],
+  systemDesign: {
+    pipeline: 'client → service registry → service instances (client load-balances)',
+    decomposition: [
+      {
+        box: 'order-service client — the client',
+        role: 'client',
+        parts: [
+          'Queries the registry for a service name',
+          'Selects one instance from the returned set',
+          'Load-balances across the instances'
+        ]
+      },
+      {
+        box: 'service registry (Eureka) — the store of locations',
+        role: 'service registry',
+        parts: [
+          'Keeps the name -> instances map',
+          'Returns instance locations on query'
+        ]
+      },
+      {
+        box: 'order-service instances — the targets',
+        role: 'service instances',
+        parts: [
+          'Self-register on startup',
+          'Serve the direct request'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  CLI[\"order-service client\"] -->|\"query order-service\"| REG[(\"service registry Eureka\")]\n  REG -->|\"returns 10.0.1.7:8080, 10.0.1.8:8080\"| CLI\n  CLI -->|\"direct call, client load-balances\"| SVC[\"order-service instance 10.0.1.7:8080\"]",
+    program: `// SYSTEM DESIGN — client-side discovery as a pipeline: client -> service registry -> service instances (the client load-balances and calls one instance directly, no router)
+// PARTIES: CLI = order-service client (queries the registry, load-balances, and calls an instance directly) · REG = service registry (Eureka) · SVC = order-service instances (self-register and serve requests)
+// DEF: registry — REG's map of service name -> instances; here {"order-service" -> ["10.0.1.7:8080", "10.0.1.8:8080"]}
+// DEF: list — the instances REG returns for one name; here ["10.0.1.7:8080", "10.0.1.8:8080"]
+// DEF: target — the one instance location the client picks; here "10.0.1.7:8080"
+// DEF: status — the outcome of the direct call; here "200 OK"
+// STATE (before):
+//    registry : {"order-service" -> ["10.0.1.7:8080", "10.0.1.8:8080"]}
+//    list     : []
+//    target   : "none"
+//    status   : "none"
+// DEF: resolve_and_call · CALLED BY: CLI placing an order
+// -> request : "POST /orders"
+//    step 1 · CLI queries REG for "order-service"    list : [] -> ["10.0.1.7:8080", "10.0.1.8:8080"]   BECAUSE REG returns every known instance for the name
+//    step 2 · CLI load-balances across the set    target : "none" -> "10.0.1.7:8080"   BECAUSE the client picks one instance from the returned list
+//    step 3 · CLI calls the instance directly    status : "none" -> "200 OK"   BECAUSE the request goes straight to the chosen instance, no router
+// <- call : "POST http://10.0.1.7:8080/orders"   (2 hops: CLI->REG then CLI->SVC)`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Dynamic instances break fixed locations', content: '<p><strong>Why.</strong> Services call each other, but in containers and VMs the instance count and their locations change constantly, so any fixed host:port breaks.</p><p><strong>Claim.</strong> A client needs a mechanism to reach a dynamically changing set of ephemeral service instances.</p><p><strong>Grounding.</strong> Richardson\'s forces: VMs and containers get dynamic IPs, and an EC2 Autoscaling Group varies the number of instances with load.</p><p><strong>In the wild.</strong> A monolith used language-level calls; a traditional deployment used fixed well-known locations — neither survives an autoscaled container fleet.</p>' },

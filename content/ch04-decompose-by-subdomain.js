@@ -217,6 +217,51 @@ registerChapter({
       problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
     }
   ],
+  systemDesign: {
+    pipeline: 'domain → subdomain (core/supporting/generic) → service',
+    decomposition: [
+      {
+        box: 'the domain — the business problem space',
+        role: 'domain',
+        parts: [
+          'the business DDD models — e.g. food delivery',
+          'splits into multiple subdomains'
+        ]
+      },
+      {
+        box: 'a subdomain — a distinct part of the business',
+        role: 'subdomain (core/supporting/generic)',
+        parts: [
+          'classified core (key differentiator), supporting, or generic',
+          'often has a key domain object — Order'
+        ]
+      },
+      {
+        box: 'the service — one per subdomain',
+        role: 'service (owns its data)',
+        parts: [
+          'owns the subdomain model and its data',
+          'owns its database — PostgreSQL 16 @ order-db-1',
+          'cohesive, loosely coupled behind an API'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  DOM[\"domain: food delivery\"] --> SUB[\"subdomain: order management (core)\"]\n  SUB --> SVC[\"order service\"]\n  SVC --> DB[(\"PostgreSQL 16 @ order-db-1\")]\n  DB -->|\"query result\"| SVC",
+    program: `// SYSTEM DESIGN — decompose by subdomain: domain (food delivery) -> subdomain (core/supporting/generic) -> service (owns its subdomain data)
+// PARTIES: DOM = the domain (the business problem space: food delivery) · SUB = subdomain (a distinct part of the business, classified core/supporting/generic) · SVC = order service (owns the order-management subdomain) · DB = PostgreSQL 16 @ order-db-1 (the order service's own database)
+// DEF: domain — the business problem space DDD splits into subdomains; here "food delivery"
+// DEF: subdomain — a distinct part of the business; here "order management" is core (the key differentiator)
+// DEF: order — the key domain object the order service owns; here "O-1" = {status:"NEW"}
+// STATE (before):
+//    orders : {}   // the Order rows the order service owns (in its own DB)
+// DEF: classify_and_map · CALLED BY: the architect turning subdomains into services
+// -> subdomain : "order management"
+//    step 1 · classify the subdomain    class : "unset" -> "core"   BECAUSE order management is the key differentiator
+//    step 2 · map it to one service    services : "none" -> "order"
+//    step 3 · the service writes its rows    orders : {} -> { "O-1": {status:"NEW"} }
+//    step 4 · a client query reads it back    GET /orders/O-1 -> { id:"O-1", status:"NEW" }
+// <- outcome : subdomain "order management" -> service "order", data owned and served · core is invested in-house, generic is bought off the shelf`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'The same decomposition question, a DDD lens', content: '<p><strong>Why.</strong> Decomposing into services is still unsolved, but now the business is modeled the way DDD describes it — as a domain of subdomains.</p><p><strong>Claim.</strong> The benefits of microservices still require careful functional decomposition; SRP and CCP still apply to the resulting services.</p><p><strong>Grounding.</strong> The context is the same as decompose-by-business-capability: small 6-10 person teams, one or more services each, benefits not automatic.</p><p><strong>In the wild.</strong> A service must stay small enough to be developed by a two-pizza team and be testable.</p>' },

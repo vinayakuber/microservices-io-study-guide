@@ -152,6 +152,52 @@ registerChapter({
       problems: ["03-framework-for-system-design-interviews"]
     }
   ],
+  systemDesign: {
+    pipeline: 'test harness → service under test (in-process) → stubbed dependencies',
+    decomposition: [
+      {
+        box: 'test harness',
+        role: 'test harness',
+        parts: [
+          'drives the service in-process (no network)',
+          'asserts the response against the double\'s canned reply'
+        ]
+      },
+      {
+        box: 'Order Service — the service under test',
+        role: 'service under test (in-process)',
+        parts: [
+          'real wiring: its controller and outbound call run for real',
+          'in-memory database instead of the production store'
+        ]
+      },
+      {
+        box: 'Kitchen Service double',
+        role: 'stubbed dependency',
+        parts: [
+          'returns the canned ticket "T-88"',
+          'stands in for the real Kitchen Service'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  T[\"test harness\"] -->|\"in-process call\"| O[\"Order Service (under test)\"]\n  O -->|\"createTicket\"| D[\"Kitchen Service double\"]\n  D -->|\"returns T-88\"| O\n  O -->|\"order + ticket\"| T",
+    program: `// SYSTEM DESIGN — service component test: test harness -> service under test (Order Service, in-process) -> stubbed dependency (Kitchen Service double)
+// PARTIES: TST = test harness (drives the service in-process) · SVC = Order Service (service under test, real wiring) · DBLE = Kitchen Service double (stubbed dependency)
+// DEF: dep — the dependency the service invokes; here "KitchenService.createTicket" stubbed by DBLE
+// DEF: ticket — the canned reply the double returns; here "T-88"
+// DEF: order — the service's own output; here {"id":"ORD-4007","state":"PENDING","ticket":"T-88"}
+// STATE (before):
+//    order : { id:"", state:"PENDING", ticket:"" }
+//    double : { createTicket:"" }
+//    calls : []
+// DEF: run_component_test · CALLED BY: TST exercising SVC in isolation
+// -> order_id : "ORD-4007"
+//    step 1 · DBLE is primed with the canned ticket    double.createTicket : "" -> "T-88"
+//    step 2 · TST calls SVC in-process    order.id : "" -> "ORD-4007"  BECAUSE the harness drives the service directly, not over the network
+//    step 3 · SVC invokes DBLE and records the call    calls : [] -> ["KitchenService.createTicket"]
+//    step 4 · SVC reads the double's reply    order.ticket : "" -> "T-88"  BECAUSE the stubbed dependency returns the fixed ticket
+// <- outcome : order {"id":"ORD-4007","state":"PENDING","ticket":"T-88"} · calls 1 · the real Kitchen Service is never launched`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'A service is never alone', content: '<p><strong>Why.</strong> In a microservice architecture the application consists of numerous services, and services often invoke other services.</p><p><strong>Claim.</strong> You must write automated tests that verify that a service behaves correctly — which means covering its outbound calls.</p><p><strong>Grounding.</strong> The pattern\'s context states the services-and-dependencies shape directly.</p><p><strong>In the wild.</strong> Order Service invokes Kitchen Service, so an order\'s correct behavior depends on that call.</p>' },

@@ -218,6 +218,70 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** caller → client stub/proxy → transport (HTTP) → server skeleton → business logic → reply
+
+### the caller — Registration Service
+
+_Role: caller_
+
+```mermaid
+flowchart TD
+  R["the caller — Registration Service"]
+  R --> P0["builds the request { email: &quot;bob@example.com&quot; }"]
+  R --> P1["waits synchronously for the reply"]
+```
+
+### the client stub/proxy — RegistrationServiceProxy
+
+_Role: interface (client proxy)_
+
+```mermaid
+flowchart TD
+  R["the client stub/proxy — RegistrationServiceProxy"]
+  R --> P0["serializes the request over HTTP"]
+  R --> P1["hides the transport from the caller"]
+```
+
+### the server — User Registration instance
+
+_Role: server_
+
+```mermaid
+flowchart TD
+  R["the server — User Registration instance"]
+  R --> P0["runs the business logic"]
+  R --> P1["stores the row and returns the reply"]
+```
+
+```mermaid
+flowchart LR
+  CLIENT["caller: Registration Service"] -->|"call via stub"| STUB["client proxy: RegistrationServiceProxy"]
+  STUB -->|"HTTP POST /register"| SVC["server: User Registration"]
+  SVC -->|"reply user-14"| CLIENT
+```
+
+```java
+// SYSTEM DESIGN — RPI as a pipeline: caller -> client stub/proxy -> transport (HTTP) -> server skeleton -> business logic -> reply
+// PARTIES: CLIENT = Registration Service (caller: builds the request and waits for the reply) · STUB = client proxy RegistrationServiceProxy (interface: hides the HTTP transport) · SVC = User Registration instance (server: runs the business logic and returns the reply)
+// DEF: request — the payload a caller sends over RPI; here { email: "bob@example.com" }
+// DEF: reply — the answer the service returns on the same connection; here "user-14"
+// DEF: proxy — the client-side stub hiding the transport; here RegistrationServiceProxy -> "http://10.0.2.9:8080/register"
+// STATE (before):
+//    request : {}       // the payload the caller sends over RPI
+//    reply   : "none"   // the answer the service returns on the same connection
+//    status  : "PENDING"  // the HTTP status of the in-flight call
+// DEF: place_registration · CALLED BY: CLIENT after the user submits an email
+// -> email : "bob@example.com" · -> service_name : "user-registration"
+//    step 1 · CLIENT calls the stub : request : {} -> { email: "bob@example.com" }
+//    step 2 · STUB serializes over HTTP : status : "PENDING" -> "IN_FLIGHT"
+//    step 3 · SVC runs the logic and stores the row : reply : "none" -> "user-14"
+//    step 4 · STUB deserializes and returns the reply : status : "IN_FLIGHT" -> "DONE"
+// <- reply : "user-14" · the caller reads its answer on the same synchronous connection
+//    alt service down : the call hangs or fails fast  BECAUSE both ends must be alive for the whole interaction
+```
+
 ## Interview Questions
 
 ### Q1

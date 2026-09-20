@@ -146,6 +146,72 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** legacy monolith → strangler façade/router → new microservices
+
+### legacy monolith — the running system that still serves unmigrated paths
+
+_Role: legacy monolith_
+
+```mermaid
+flowchart TD
+  R["legacy monolith — the running system that still serves unmigrated paths"]
+  R --> P0["checkout + accounts — features not yet moved"]
+  R --> P1["Serves — any path the route table still points at it"]
+```
+
+### strangler façade / router — fronts both systems and decides per request
+
+_Role: router_
+
+```mermaid
+flowchart TD
+  R["strangler façade / router — fronts both systems and decides per request"]
+  R --> P0["Route by path — looks up each path in the route table"]
+  R --> P1["Incrementally replace — moves one feature at a time"]
+```
+
+### new microservices — the growing strangler application
+
+_Role: new microservices_
+
+```mermaid
+flowchart TD
+  R["new microservices — the growing strangler application"]
+  R --> P0["Migrated features — catalog, search re-implemented"]
+  R --> P1["New features — recommendations, wishlist with no monolith twin"]
+```
+
+```mermaid
+flowchart LR
+  RTR["strangler router"] -->|"path /catalog"| NEW["new microservices"]
+  RTR -->|"path /orders (fall back)"| MONO["legacy monolith"]
+  RTR -->|"lookup"| T[("route_table")]
+  NEW -->|"serves"| RSP["catalog items"]
+  MONO -->|"serves"| RSP2["checkout + accounts"]
+```
+
+```java
+// SYSTEM DESIGN — strangler application: legacy monolith -> strangler façade/router -> new microservices
+// PARTIES: RTR = strangler router (façade: looks up each request path in the path-to-backend map) · NEW = new microservices (serve the migrated paths) · MONO = legacy monolith (serves the unmigrated paths)
+// DEF: route — one mapping from a request path to the system that serves it; here "/catalog" -> "NEW"
+// DEF: route_table — the full path-to-backend map the router holds; here { "/catalog":"NEW", "/orders":"MONO" }
+// DEF: feature — one slice of functionality being moved out of the monolith; here "catalog"
+// DEF: fallback — sending an unmigrated path to the monolith; here "/orders" -> "MONO"
+// STATE (before):
+//    route_table : { "/catalog":"NEW", "/orders":"MONO" }
+//    migrated : {}
+// DEF: route_request · CALLED BY: RTR on each incoming request
+// -> request : { "path":"/catalog" }
+//    step 1 · the router reads the path from the request    path : "" -> "/catalog"   BECAUSE the façade fronts both systems
+//    step 2 · the router looks up "/catalog" in the route table    matched : "" -> "NEW"   // the path was already migrated
+//    step 3 · the router forwards to the matched backend    target : "" -> "NEW"   // NEW serves the catalog
+//    step 4 · the strangler records a migrated feature    migrated : {} -> { "catalog": true }   BECAUSE the strangler replaces the monolith one feature at a time
+// <- response : "catalog items" from NEW · MONO never receives this request   BECAUSE the route table sends migrated paths to the new services
+//    alt path "/orders" : matched : "NEW" -> "MONO" · target : "" -> "MONO" — the monolith still serves it, unchanged (fall back)
+```
+
 ## Interview Questions
 
 ### Q1

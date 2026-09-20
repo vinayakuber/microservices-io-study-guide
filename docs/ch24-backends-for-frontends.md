@@ -195,6 +195,67 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** client → per-client gateway → upstream services
+
+### Clients — two device shapes
+
+_Role: client_
+
+```mermaid
+flowchart TD
+  R["Clients — two device shapes"]
+  R --> P0["WEB — desktop client needing 5 fields"]
+  R --> P1["MOB — mobile client needing 2 fields"]
+```
+
+### Per-client gateways — the BFFs
+
+_Role: per-client gateway_
+
+```mermaid
+flowchart TD
+  R["Per-client gateways — the BFFs"]
+  R --> P0["GW-W — web gateway, owned by the public API team"]
+  R --> P1["GW-M — mobile gateway, owned by the mobile team"]
+```
+
+### Upstream services + shared library
+
+_Role: upstream services_
+
+```mermaid
+flowchart TD
+  R["Upstream services + shared library"]
+  R --> P0["PROD — product service"]
+  R --> P1["LIB — shared library with verify_access_token"]
+```
+
+```mermaid
+flowchart LR
+  WEB["WEB desktop client"] --> GWW["GW-W web gateway"]
+  MOB["MOB mobile client"] --> GWM["GW-M mobile gateway"]
+  GWW --> PROD["Product service"]
+  GWM --> PROD
+  GWW --> LIB["Shared library verify_access_token"]
+  GWM --> LIB
+```
+
+```java
+// SYSTEM DESIGN — BFF: client -> per-client gateway -> upstream services, one product fetched for two devices
+// PARTIES: WEB = the desktop client · MOB = the mobile client · GWW = web gateway (public API team) · GWM = mobile gateway (mobile team) · PROD = Product service
+// DEF: api_shape — the fields a gateway tailors for one client; here WEB gets 5 fields and MOB gets 2
+// STATE (before):
+//    response : {}                      // the tailored response, empty
+// DEF: fetch_product · CALLED BY: GWW then GWM, each for its own client
+// -> path : "/products/P-9"
+//    step 1 · GWW calls PROD and keeps 5 fields for the desktop   // response : {} -> {"5 fields"}   BECAUSE the web API team tailors the response to the desktop UI
+//    step 2 · GWM calls the SAME PROD and keeps only 2 fields for mobile   // response : {"5 fields"} -> {"2 fields"}   BECAUSE the mobile team trims it for a small screen
+//    step 3 · both gateways verify the access token via the shared library   // checks : 0 -> 2   BECAUSE verify_access_token is shared, not duplicated
+// <- outcome : WEB gets 5 fields, MOB gets 2 · one upstream service, two tailored API shapes, no duplicated auth logic
+```
+
 ## Interview Questions
 
 ### Q1

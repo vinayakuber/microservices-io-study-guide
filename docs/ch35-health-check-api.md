@@ -191,6 +191,67 @@ n0["<b>1. Health check reports failure</b><br/>SVC2 DOWN"]:::start
 ```
 
 
+## System Design Interview
+
+**The pipeline:** service instance → /health endpoint → health-check client → routing/alert
+
+### Order Service — the instance under check
+
+_Role: service instance_
+
+```mermaid
+flowchart TD
+  R["Order Service — the instance under check"]
+  R --> P0["exposes GET /health"]
+  R --> P1["probes its db, disk, and app dependencies"]
+```
+
+### Monitoring service — the health-check client
+
+_Role: health-check client_
+
+```mermaid
+flowchart TD
+  R["Monitoring service — the health-check client"]
+  R --> P0["polls /health every 30s"]
+  R --> P1["marks the instance UP or DOWN"]
+```
+
+### Load balancer + registry — routing/alert
+
+_Role: routing/alert_
+
+```mermaid
+flowchart TD
+  R["Load balancer + registry — routing/alert"]
+  R --> P0["LB stops routing to a DOWN instance"]
+  R --> P1["REG de-registers the unhealthy instance"]
+```
+
+```mermaid
+flowchart LR
+  SVC["Order Service"] -->|"GET /health"| MON["Monitoring service"]
+  MON -->|"probe"| DB["PostgreSQL 16 @ orders-db-1"]
+  DB -->|"UP or DOWN"| MON
+  MON -->|"mark DOWN"| LB["Load balancer + service registry"]
+```
+
+```java
+// SYSTEM DESIGN — health check: service instance -> /health endpoint -> health-check client -> routing/alert
+// PARTIES: SVC = Order Service (instance under check) · MON = monitoring service (health-check client) · DB = PostgreSQL 16 @ orders-db-1 (the checked database) · LB = load balancer (routing) · REG = service registry (registration)
+// DEF: health — the answer /health returns; here "UP" when db, disk, and app all pass
+// DEF: check — one probe against a dependency; here "db", "disk", "app"
+// STATE (before):
+//    status : { "db":"UP", "disk":"UP", "app":"UP" }   // all three probes green
+//    alerts : 0        // nothing raised yet
+// DEF: run_check · CALLED BY: MON polling /health every 30s
+// -> endpoint : "/health"
+//    step 1 · SVC probes db, disk, and app   // probes : 0 -> 3   BECAUSE /health checks all three dependencies in one call
+//    step 2 · the db probe fails   // status : { "db":"UP","disk":"UP","app":"UP" } -> { "db":"DOWN","disk":"UP","app":"UP" }   BECAUSE PostgreSQL 16 @ orders-db-1 stops answering
+//    step 3 · MON marks the instance DOWN and LB reroutes   // alerts : 0 -> 1   BECAUSE a failed check flips the instance from UP to DOWN
+// <- outcome : status.db = "DOWN" · LB stops sending traffic  BECAUSE /health reported the db check failed
+```
+
 ## Interview Questions
 
 ### Q1

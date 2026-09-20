@@ -215,6 +215,54 @@ registerChapter({
       problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
     }
   ],
+  systemDesign: {
+    pipeline: 'caller → breaker proxy → downstream service',
+    decomposition: [
+      {
+        box: 'the caller',
+        role: 'caller',
+        parts: [
+          'makes remote calls through the breaker',
+          'gets a fail-fast verdict while the breaker is OPEN'
+        ]
+      },
+      {
+        box: 'the breaker proxy',
+        role: 'breaker',
+        parts: [
+          'failure counter (trips at threshold 4)',
+          'timeout timer (250 ms)',
+          'state machine CLOSED / OPEN / HALF-OPEN'
+        ]
+      },
+      {
+        box: 'the downstream service',
+        role: 'server',
+        parts: [
+          'answers calls while healthy',
+          'times out when degraded'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  CLIENT[\"caller: client\"] -->|\"call\"| PROXY[\"breaker: circuit breaker proxy\"]\n  PROXY -->|\"forward CLOSED / fail fast OPEN\"| SVC[\"server: downstream service\"]",
+    program: `// SYSTEM DESIGN — the circuit breaker as a pipeline: caller -> breaker proxy -> downstream service
+// PARTIES: CLIENT = client (caller: makes remote calls through the breaker) · PROXY = circuit breaker proxy (breaker: trips after a threshold of failures, fails fast, lets test requests through) · SVC = downstream service (server: answers the call)
+// DEF: breaker — the stateful switch between the caller and the service; here { state:"CLOSED", consecutive_failures:0, threshold:4, timeout_ms:250 }
+// DEF: failure — a call that ended in error or timeout; here "charge-card-4"
+// STATE (before):
+//    breaker : { state:"CLOSED", consecutive_failures:0, threshold:4, timeout_ms:250 }
+//    remote_calls : 0
+//    consecutive_failures : 0
+//    verdict : "UNSET"
+// DEF: call · CALLED BY: CLIENT, a request that keeps timing out
+// -> request : "charge-card-4"
+//    step 1 · CLIENT calls through the proxy : remote_calls : 0 -> 1
+//    step 2 · SVC times out and the proxy records a failure : consecutive_failures : 0 -> 4
+//    step 3 · PROXY reads the counter against the threshold : breaker.state : "CLOSED" -> "OPEN"
+//    step 4 · PROXY fails fast : verdict : "UNSET" -> "OPEN"
+// <- verdict : "OPEN" · further calls fail immediately without touching SVC
+//    alt after timeout : PROXY lets one test request through  BECAUSE a half-open breaker probes the service before resuming`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Cascading failure', content: '<p><strong>Why.</strong> A slow or dead service makes callers wait, and waiting callers burn their own capacity.</p><p><strong>Claim.</strong> Threads are consumed while waiting for an unresponsive service, causing resource exhaustion that cascades failure across the application.</p><p><strong>Grounding.</strong> The context warns that precious resources such as threads are consumed, leading to resource exhaustion and cascading failure.</p><p><strong>In the wild.</strong> One dead checkout service saturates every upstream service that calls it, taking the whole site down.</p>' },

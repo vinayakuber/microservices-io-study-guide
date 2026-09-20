@@ -220,6 +220,69 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** business capability → service → autonomous team
+
+### a business capability — e.g. product catalog
+
+_Role: business capability_
+
+```mermaid
+flowchart TD
+  R["a business capability — e.g. product catalog"]
+  R --> P0["something the business does to generate value"]
+  R --> P1["maps to a business object — Product"]
+```
+
+### the service — e.g. the catalog service
+
+_Role: service (owns its data)_
+
+```mermaid
+flowchart TD
+  R["the service — e.g. the catalog service"]
+  R --> P0["owns the capability business object and its data"]
+  R --> P1["owns its database — PostgreSQL 16 @ catalog-db-1"]
+  R --> P2["hides its implementation behind an API"]
+```
+
+### the autonomous team
+
+_Role: team (owns the service)_
+
+```mermaid
+flowchart TD
+  R["the autonomous team"]
+  R --> P0["a two-pizza team of 6-10 people"]
+  R --> P1["develops, tests and deploys the service alone"]
+```
+
+```mermaid
+flowchart LR
+  CAP["business capability: product catalog"] --> SVC["catalog service"]
+  SVC --> DB[("PostgreSQL 16 @ catalog-db-1")]
+  SVC --> TEAM["two-pizza team (6-10)"]
+  DB -->|"query result"| SVC
+```
+
+```java
+// SYSTEM DESIGN — decompose by business capability: business capability (Product) -> service (catalog, owns its data) -> autonomous two-pizza team (owns the service)
+// PARTIES: CAP = business capability (Product — what the business does to generate value) · SVC = catalog service (owns the Product data) · DB = PostgreSQL 16 @ catalog-db-1 (the catalog service's own database) · TEAM = autonomous two-pizza team (6-10 people owning the service)
+// DEF: capability — something the business does to generate value; here "product catalog" manages business object "Product"
+// DEF: service — a cohesive, loosely coupled unit that owns one capability and its data; here "catalog"
+// DEF: product — the business object the catalog capability manages; here "P-1" = {name:"Widget"}
+// STATE (before):
+//    products : {}   // the Product rows the catalog service owns (in DB)
+// DEF: serve_product · CALLED BY: a client query "GET /products/P-1" routed to the owning capability
+// -> product_id : "P-1"
+//    step 1 · CAP routes the query to the owning service    route : "unknown" -> "catalog"
+//    step 2 · SVC creates the row in its own DB    products : {} -> { "P-1": {name:"Widget"} }
+//    step 3 · SVC reads it back to answer    GET /products/P-1 -> { id:"P-1", name:"Widget" }
+//    step 4 · TEAM ships the change alone    deploy : "lockstep" -> "single-service"   BECAUSE one team owns one service
+// <- outcome : client sees "P-1" name "Widget" · one capability, one service, one team
+```
+
 ## Interview Questions
 
 ### Q1

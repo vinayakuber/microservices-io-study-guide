@@ -180,6 +180,73 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** service → sidecar proxy (data plane) → control plane
+
+### Order Service — the business service whose traffic the mesh mediates
+
+_Role: service_
+
+```mermaid
+flowchart TD
+  R["Order Service — the business service whose traffic the mesh mediates"]
+  R --> P0["Application code — sends queries and receives replies"]
+  R --> P1["Traffic — every in/out call is routed through the sidecar proxy"]
+```
+
+### sidecar proxy — the per-service data plane
+
+_Role: data plane_
+
+```mermaid
+flowchart TD
+  R["sidecar proxy — the per-service data plane"]
+  R --> P0["Interceptor — sees each call before it leaves the service"]
+  R --> P1["mTLS — encrypts service-to-service traffic with a distributed cert"]
+  R --> P2["Retry / circuit-breaker — retries and trips circuits on failures"]
+  R --> P3["Metrics — counts requests and answers health pings"]
+```
+
+### control plane — the mesh brain that pushes policy to every proxy
+
+_Role: control plane_
+
+```mermaid
+flowchart TD
+  R["control plane — the mesh brain that pushes policy to every proxy"]
+  R --> P0["Route config — distributes route rules to the proxies"]
+  R --> P1["Cert distribution — hands each proxy its mTLS identity"]
+```
+
+```mermaid
+flowchart LR
+  SVC["Order Service"] -->|"SELECT * FROM orders"| PX["sidecar proxy (data plane)"]
+  PX -->|"mTLS + route lookup"| DB[("PostgreSQL 16 @ orders-db-1")]
+  CP["control plane"] -->|"pushes route config"| PX
+  CP -->|"distributes cert cert-7f21"| PX
+  PX -->|"reports metrics"| MON["monitoring service"]
+```
+
+```java
+// SYSTEM DESIGN — service mesh: service -> sidecar proxy (data plane) -> control plane
+// PARTIES: SVC = Order Service (business service) · PROXY = sidecar proxy (data plane: intercepts traffic, mTLS, retries/circuit-break, metrics) · CP = control plane (route-config distributor + certificate authority) · DB = PostgreSQL 16 @ orders-db-1 (the proxied backend)
+// DEF: route — one control-plane rule mapping a target host to its backend; here "db:5432" -> "orders-db-1"
+// DEF: trace — one shared id stamped on a request so its hops can be reassembled; here "trc-9f2a"
+// DEF: cert — the mTLS identity the control plane distributes to each proxy; here "cert-7f21"
+// DEF: mTLS — mutual TLS the proxy applies to service-to-service calls; here cert "cert-7f21"
+// STATE (before):
+//    request : {}                                 // the outbound call, not yet seen by the proxy
+//    route_table : { "db:5432": "orders-db-1" }    // routes pushed by the control plane
+// DEF: mediate_one_call · CALLED BY: the Order Service sending a query
+// -> call : "SELECT * FROM orders" · -> target : "db:5432"
+//    step 1 · the proxy intercepts the call    request : {} -> {"call":"SELECT * FROM orders","to":"db:5432"}   BECAUSE the mesh mediates ALL traffic in and out
+//    step 2 · the proxy records the trace id    trace_id : "" -> "trc-9f2a"   // the data plane stamps a unique id
+//    step 3 · the proxy reads the route and applies mTLS    sent : 0 -> 1   // cert "cert-7f21" encrypts the hop to the route "orders-db-1"
+//    step 4 · the control plane pushes fresh routes    route_table : { "db:5432":"orders-db-1" } -> { "db:5432":"orders-db-1", "brk:9092":"broker-1" }   BECAUSE CP distributes config
+// <- call : "SELECT * FROM orders" delivered to "db:5432" · trace_id "trc-9f2a"   BECAUSE the sidecar sits between the service and the network, and the response is routed back to SVC
+```
+
 ## Interview Questions
 
 ### Q1

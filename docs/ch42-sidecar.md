@@ -179,6 +179,76 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** application container → sidecar container → shared resources
+
+### application container — the Order Service that owns the business logic
+
+_Role: application container_
+
+```mermaid
+flowchart TD
+  R["application container — the Order Service that owns the business logic"]
+  R --> P0["Order Service — runs the business code"]
+  R --> P1["Sends calls — outbound traffic passes through the sidecar"]
+```
+
+### sidecar container — the concern-carrying twin
+
+_Role: sidecar container_
+
+```mermaid
+flowchart TD
+  R["sidecar container — the concern-carrying twin"]
+  R --> P0["Proxy — intercepts outbound traffic and stamps a trace id"]
+  R --> P1["Log-shipper — forwards the logs from the shared volume"]
+  R --> P2["Config-reloader — watches and reloads config"]
+  R --> P3["Shares the pod — mounts the same volume and network namespace"]
+```
+
+### shared resources — what both containers share
+
+_Role: shared resources_
+
+```mermaid
+flowchart TD
+  R["shared resources — what both containers share"]
+  R --> P0["Network namespace — one IP for app and sidecar"]
+  R --> P1["Volume — shared-logs mounted by both"]
+```
+
+```mermaid
+flowchart LR
+  POD["Kubernetes pod"] -->|"starts"| APP["application container order-service"]
+  POD -->|"starts alongside"| SIDE["sidecar container order-sidecar"]
+  APP -->|"SELECT * FROM orders"| SIDE
+  SIDE -->|"stamps trc-77c1"| DB[("PostgreSQL 16 @ orders-db-1")]
+  APP -->|"mounts"| VOL[("volume shared-logs")]
+  SIDE -->|"mounts"| VOL
+  APP -->|"shares"| NS["network namespace pod-net-7"]
+  SIDE -->|"shares"| NS
+```
+
+```java
+// SYSTEM DESIGN — sidecar: application container -> sidecar container -> shared resources
+// PARTIES: APP = application container (Order Service "order-service") · SIDE = sidecar container (proxy/log-shipper/config-reloader "order-sidecar") · SHARED = shared resources (the pod network namespace + the volume both containers mount)
+// DEF: sidecar — the container that carries the cross-cutting concerns alongside the app; here "order-sidecar"
+// DEF: concern — one cross-cutting job moved out of the service; here "tracing"
+// DEF: namespace — the shared network both containers live in; here "pod-net-7"
+// DEF: volume — the shared disk both containers mount; here "shared-logs"
+// STATE (before):
+//    containers : {}     // containers started in the pod, none yet
+//    concerns : []       // cross-cutting concerns, not yet attached
+// DEF: colocate_sidecar · CALLED BY: the pod at deploy time
+// -> service : "order-service" · -> sidecar : "order-sidecar"
+//    step 1 · the pod starts the app container    containers : {} -> {"order-service"}   BECAUSE the service runs as its own container
+//    step 2 · the pod starts the sidecar container    containers : {"order-service"} -> {"order-service","order-sidecar"}   // the sidecar runs alongside, sharing the pod
+//    step 3 · the sidecar attaches the concerns    concerns : [] -> ["tracing","metrics"]   // the app reads none of this; SIDE records it
+//    step 4 · both mount the shared volume and share the namespace    mounts : 0 -> 2   // volume "shared-logs" and net "pod-net-7"
+// <- containers : 2 in the pod · the sidecar reads the shared volume "shared-logs" and writes its own metrics   BECAUSE a sidecar shares the host, network, and volume with the service
+```
+
 ## Interview Questions
 
 ### Q1

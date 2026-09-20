@@ -203,6 +203,62 @@ registerChapter({
       problems: ["01-scale-from-zero-to-millions"]
     }
   ],
+  systemDesign: {
+    pipeline: 'client request → API gateway → function runtime → function',
+    decomposition: [
+      {
+        box: 'client — the HTTP caller that sends the request',
+        role: 'client',
+        parts: [
+          'Browser / app — issues GET /restaurants/42',
+          'Waits — for the HTTP response to come back'
+        ]
+      },
+      {
+        box: 'API gateway — the HTTP entry that maps requests to functions',
+        role: 'gateway',
+        parts: [
+          'Request transform — turns HTTP into an event object',
+          'Invoke — calls the function with the event',
+          'Response — builds the HTTP reply from the result'
+        ]
+      },
+      {
+        box: 'function runtime — the serverless infrastructure (AWS Lambda)',
+        role: 'function runtime',
+        parts: [
+          'Load function — unpacks the uploaded ZIP restaurant.zip',
+          'Cold start — launches instance i-1 when none is idle',
+          'Scale to zero — frees idle instances when traffic stops'
+        ]
+      },
+      {
+        box: 'the function — the stateless handler that runs the code',
+        role: 'function',
+        parts: [
+          'index.handler — the named entrypoint',
+          'Stateless — runs only in response to an event'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  C[\"client\"] -->|\"GET /restaurants/42\"| GW[\"API Gateway\"]\n  GW -->|\"event object\"| RT[\"function runtime (Lambda)\"]\n  RT -->|\"loads restaurant.zip\"| FN[\"function index.handler\"]\n  RT -->|\"cold start\"| I[\"instance i-1\"]\n  FN -->|\"result\"| GW\n  GW -->|\"status 200\"| C",
+    program: `// SYSTEM DESIGN — serverless: client request -> API gateway -> function runtime -> function
+// PARTIES: CLIENT = the HTTP caller (client) · GW = API Gateway (transforms HTTP into an event, builds the response) · RT = function runtime (AWS Lambda: loads the ZIP, cold-start, scales to zero) · FN = the function (index.handler running the uploaded code)
+// DEF: event — the payload the runtime passes to the handler; here {"method":"GET","path":"/restaurants/42"}
+// DEF: handler — the named entrypoint invoked per event; here "index.handler"
+// DEF: zip — the packaged code the developer uploaded; here "restaurant.zip"
+// DEF: cold_start — launching a fresh instance when none is idle; here instance "i-1" boots
+// STATE (before):
+//    request : {}     // the inbound HTTP request, not yet transformed
+//    instances : {}   // idle function instances, none yet
+// DEF: route_one_request · CALLED BY: CLIENT calling GET /restaurants/42
+// -> method : "GET" · -> path : "/restaurants/42"
+//    step 1 · GW transforms the HTTP request into an event    request : {} -> {"method":"GET","path":"/restaurants/42"}   BECAUSE the gateway turns HTTP into an event object
+//    step 2 · RT loads the ZIP and cold-starts an instance    instances : {} -> {"i-1"}   // the runtime launches one when none are idle
+//    step 3 · RT invokes the handler with the event    runs : 0 -> 1   // handler "index.handler" runs the event
+//    step 4 · GW creates the response from the result    response : "" -> "200"   // the gateway returns an HTTP response
+// <- response : "200" · one HTTP call became one event, one run, and one reply   BECAUSE the gateway and runtime hide every server`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Managing servers is undifferentiated heavy lifting', content: '<p><strong>Why.</strong> Services must be packaged and deployed, but someone must own operating systems, virtual machines, and other low-level infrastructure.</p><p><strong>Claim.</strong> That low-level infrastructure management is undifferentiated heavy lifting that distracts from the service code.</p><p><strong>Grounding.</strong> The solution says the infrastructure hides any concept of servers, and neither you nor anyone else in your organization is responsible for managing low-level infrastructure.</p><p><strong>In the wild.</strong> Teams instead focus on their code while the provider runs the underlying machines.</p>' },

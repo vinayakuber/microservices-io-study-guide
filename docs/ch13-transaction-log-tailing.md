@@ -173,6 +173,82 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** database transaction log → log tailer/miner → message broker → subscriber
+
+### source database (transaction log) — the source database
+
+_Role: source database_
+
+```mermaid
+flowchart TD
+  R["source database (transaction log) — the source database"]
+  R --> P0["Appends every committed change to the log"]
+  R --> P1["Exposes the log to the tailer"]
+```
+
+### log tailer / miner — the tailer
+
+_Role: log tailer_
+
+```mermaid
+flowchart TD
+  R["log tailer / miner — the tailer"]
+  R --> P0["Tails the transaction log"]
+  R --> P1["Converts log records into domain events"]
+  R --> P2["Publishes each event to the broker"]
+```
+
+### message broker (RabbitMQ) — the broker
+
+_Role: broker_
+
+```mermaid
+flowchart TD
+  R["message broker (RabbitMQ) — the broker"]
+  R --> P0["Receives the events in commit order"]
+  R --> P1["Holds them for subscribers"]
+```
+
+### subscriber — the consumer
+
+_Role: subscriber_
+
+```mermaid
+flowchart TD
+  R["subscriber — the consumer"]
+  R --> P0["Consumes each event off the broker"]
+```
+
+```mermaid
+flowchart LR
+  DB[("source database: transaction log")] -->|"tail binlog/WAL"| TLR["log tailer / miner"]
+  TLR -->|"publish OrderCreated"| BRK[("message broker RabbitMQ")]
+  BRK -->|"consume"| CNS["subscriber"]
+```
+
+```java
+// SYSTEM DESIGN — transaction log tailing as a pipeline: database transaction log -> log tailer/miner -> message broker -> subscriber (consumer)
+// PARTIES: DB = MySQL 8 @ orders-db-1 (source database) · TLR = log tailer (transaction log miner) · BRK = message broker (RabbitMQ) · CNS = subscriber (consumer)
+// DEF: binlog — the source database's transaction log; here [ (tx 91, "INSERT orders PO-77"), (tx 92, "UPDATE orders") ]
+// DEF: event — a domain event the tailer emits from a log record; here {"type":"OrderCreated","order_id":"PO-77"}
+// DEF: position — where the tailer has read to; here 0 advanced to 92 (LSN / binlog offset)
+// DEF: status — whether an event reached the subscriber; here "pending" -> "delivered"
+// STATE (before):
+//    binlog   : [ (tx 91, "INSERT orders PO-77"), (tx 92, "UPDATE orders") ]
+//    position : 0
+//    event    : "none"
+//    status   : "pending"
+// DEF: tail_and_publish · CALLED BY: TLR reading the log continuously
+// -> log record : (tx 91, "INSERT orders PO-77")
+//    step 1 · TLR reads the next record    position : 0 -> 91   BECAUSE the tailer advances past the last-read offset
+//    step 2 · TLR emits a domain event    event : "none" -> {"type":"OrderCreated","order_id":"PO-77"}   BECAUSE the INSERT maps to a domain event
+//    step 3 · TLR publishes the event to BRK    status : "pending" -> "published"   BECAUSE the event is handed to the broker in commit order
+//    step 4 · CNS consumes "OrderCreated"    status : "published" -> "delivered"   BECAUSE the subscriber reads the event off BRK
+// <- output : BRK holds [ "OrderCreated" ] · CNS consumes it (no app-level write needed to publish)
+```
+
 ## Interview Questions
 
 ### Q1

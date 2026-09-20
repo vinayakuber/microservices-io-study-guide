@@ -220,6 +220,61 @@ registerChapter({
       problems: ["03-framework-for-system-design-interviews"]
     }
   ],
+  systemDesign: {
+    pipeline: 'client → domain service → entities/value objects → repository → database',
+    decomposition: [
+      {
+        box: 'OrderService — the domain service',
+        role: 'domain service',
+        parts: [
+          'createOrder() — delegates to the Order.create() factory',
+          'reviseOrder()/cancelOrder() — routes commands to the aggregate',
+          'holds no business state (behavior only)'
+        ]
+      },
+      {
+        box: 'Order aggregate + DeliveryInformation — entities/value objects',
+        role: 'entities/value objects',
+        parts: [
+          'Order — entity with state (orderId, lineItems) and behavior create()/revise()/cancel()',
+          'DeliveryInformation — state-only value object (deliveryTime, deliveryAddress)',
+          'business rules — guard the CREATED -> CANCELLED transition and recompute the total'
+        ]
+      },
+      {
+        box: 'OrderRepository — the repository',
+        role: 'repository',
+        parts: [
+          'findOrderById() — loads the aggregate',
+          'save() — persists the aggregate back'
+        ]
+      },
+      {
+        box: 'PostgreSQL 16 @ orders-db-1 — the database',
+        role: 'database',
+        parts: [
+          'stores the aggregate rows',
+          'single source of truth for orders'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  C[\"client\"] -->|\"createOrder()\"| SVC[\"OrderService (domain service)\"]\n  SVC -->|\"delegate\"| ORD[\"Order aggregate: create()/revise()/cancel()\"]\n  ORD -->|\"holds\"| VO[\"DeliveryInformation (value object)\"]\n  SVC -->|\"findOrderById / save\"| REPO[\"OrderRepository\"]\n  REPO -->|\"SQL\"| DB[(\"PostgreSQL 16 @ orders-db-1\")]",
+    program: `// SYSTEM DESIGN — domain model as a pipeline: client -> domain service (OrderService) -> entities/value objects (Order + DeliveryInformation) -> repository (OrderRepository) -> database (PostgreSQL 16 @ orders-db-1)
+// PARTIES: CLI = client · SVC = OrderService (domain service: behavior only) · ORD = Order aggregate (entity: state + behavior) · VO = DeliveryInformation (state-only value object) · REPO = OrderRepository (repository) · DB = PostgreSQL 16 @ orders-db-1
+// DEF: entity — a class with both state and behavior; here Order holds orderId "PO-100" + lineItems and methods create()/revise()/cancel()
+// DEF: value_object — a class with state only; here DeliveryInformation holds deliveryTime "2026-09-21 09:00" + deliveryAddress "12 Main St"
+// DEF: rule — an invariant the aggregate enforces; here cancel() is legal only from status "CREATED"
+// STATE (before):
+//    order : { orderId:"PO-100", status:"CREATED", lineItems:[{sku:"S1", qty:2, unit:25.00}], total:50.00 }
+//    store : {}
+// DEF: revise_order · CALLED BY: CLI via SVC.reviseOrder("PO-100", 5)
+// -> order_id : "PO-100" · -> new_qty : 5
+//    step 1 · SVC delegates to the aggregate    REPO.findOrderById -> order : { status:"CREATED" } loaded
+//    step 2 · ORD.revise mutates its own line and re-derives the total    order.lineItems[0].qty : 2 -> 5 · order.total : 50.00 -> 125.00  BECAUSE 5 x 25.00 = 125.00
+//    step 3 · REPO.save persists the aggregate    store : {} -> { "PO-100" : { status:"CREATED", total:125.00 } }
+//    step 4 · a later read    findOrderById("PO-100") -> store["PO-100"] : { status:"CREATED", total:125.00 } returned
+// <- outcome : DB row "PO-100" holds total 125.00 and is read back  BECAUSE the service wrote via the repository and the repository writes to the database`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Complex logic outgrows a script per request', content: '<p><strong>Why.</strong> The procedural style separates behavior (a service class) from state (a data class), so as rules multiply the logic spreads across scripts with nothing tying each change to the data it touches.</p><p><strong>Claim.</strong> When business logic becomes complex, procedural transaction scripts become a nightmare to maintain — they grow continually, the same way a monolith keeps growing.</p><p><strong>Grounding.</strong> The book warns that unless you are writing an extremely simple application, you should resist procedural code and apply the Domain model pattern instead.</p><p><strong>In the wild.</strong> A single OrderService holding create, revise and cancel scripts accumulates every edge case, so each new rule means editing a shared script.</p>' },

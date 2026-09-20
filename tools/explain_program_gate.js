@@ -15,6 +15,12 @@
 //       "server process", "component") with no role noun, engine, @instance, or
 //       parenthetical is a tautology — it names the container, not the concept
 //       (the "what is Zipkin / where does RabbitMQ sit" gap).
+//   R16 (chapter-level) every chapter with a program must carry a systemDesign
+//       section that names the pipeline roles (writer→transport→collector→
+//       aggregator→reader, or the chapter's declared equivalent), decomposes
+//       each major component into its internals, and draws the wiring as a
+//       mermaid diagram + an annotated program. Naming a component is not
+//       defining it; defining it is not wiring it.
 //   R14 (chapter-level) every chapter with a program must cover BOTH a write
 //       path (data created/stored) AND a read path (data queried/served back).
 //       A write-only chapter hides how its store is consumed; a read-only
@@ -45,7 +51,9 @@ const failures = [];
 let programs = 0;
 
 for (const ch of CHAPTERS) {
-  for (const s of (ch.flow || [])) {
+  const sections = (ch.flow || []).slice();
+  if (ch.systemDesign && ch.systemDesign.program) sections.push({ section: 'System Design Interview', program: ch.systemDesign.program });
+  for (const s of sections) {
     const p = s.program;
     if (!p || !String(p).trim()) continue;
     programs++;
@@ -230,7 +238,7 @@ for (const ch of CHAPTERS) {
   // (created/stored) AND read back (queried/served). Enforces "both paths in
   // every chapter": a write-only chapter hides how its store is consumed; a
   // read-only chapter hides how its store was populated.
-  const rwBlocks = (ch.flow || []).filter(s => s.program && String(s.program).trim());
+  const rwBlocks = sections.filter(s => s.program && String(s.program).trim());
   if (rwBlocks.length) {
     let hasWrite = false, hasRead = false;
     for (const b of rwBlocks) {
@@ -242,6 +250,27 @@ for (const ch of CHAPTERS) {
     if (!hasWrite) r14.push('R14 no write path (no block creates/stores: mint/open/insert/publish/store)');
     if (!hasRead) r14.push('R14 no read path (no block queries/serves back: query/search/read/return)');
     if (r14.length) failures.push({ id: ch.id, section: '(whole chapter)', probs: r14 });
+  }
+
+  // R16: system-design decomposition (chapter-level) — a chapter with a program
+  // must carry a systemDesign section that names the pipeline roles, decomposes
+  // each major component into its internals, draws the wiring as a mermaid
+  // diagram, and annotates the wiring with the explain-program markers. Naming
+  // a component is not defining it; defining it is not wiring it.
+  if ((ch.flow || []).some(s => s.program && String(s.program).trim())) {
+    const sd = ch.systemDesign;
+    const r16 = [];
+    if (!sd) {
+      r16.push('R16 missing systemDesign section (decompose components + draw the wiring)');
+    } else {
+      if (!sd.pipeline) r16.push('R16 systemDesign.pipeline missing (name the writer→transport→collector→aggregator→reader roles)');
+      const dec = Array.isArray(sd.decomposition) ? sd.decomposition : [];
+      if (!dec.length || !dec.some(d => Array.isArray(d.parts) && d.parts.length >= 2)) r16.push('R16 no component decomposition into internals (>=2 parts)');
+      const w = String(sd.wiring || '');
+      if (!/(flowchart|graph)\b/i.test(w) || !/-->|---/.test(w)) r16.push('R16 no wiring mermaid diagram (a connected flowchart)');
+      if (!sd.program || !String(sd.program).trim()) r16.push('R16 systemDesign.program missing (annotate the wiring)');
+    }
+    if (r16.length) failures.push({ id: ch.id, section: '(system design)', probs: r16 });
   }
 }
 

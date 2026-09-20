@@ -218,6 +218,62 @@ registerChapter({
       problems: ["01-scale-from-zero-to-millions"]
     }
   ],
+  systemDesign: {
+    pipeline: 'client → router / load balancer → service registry → service instances',
+    decomposition: [
+      {
+        box: 'client — calls only the router',
+        role: 'client',
+        parts: [
+          'Dials the router at a well-known address',
+          'Never performs discovery itself'
+        ]
+      },
+      {
+        box: 'router / load balancer — the router',
+        role: 'router / load balancer',
+        parts: [
+          'Queries the registry for available instances',
+          'Picks one instance',
+          'Forwards the request to it'
+        ]
+      },
+      {
+        box: 'service registry (Eureka) — the registry',
+        role: 'registry',
+        parts: [
+          'Holds the name -> instances map',
+          'Returns instance locations on query'
+        ]
+      },
+      {
+        box: 'order-service instances — the instances',
+        role: 'service instances',
+        parts: [
+          'Self-register on startup',
+          'Serve the forwarded request'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  CLI[\"client\"] -->|\"well-known address\"| RTR[\"router / load balancer\"]\n  RTR -->|\"query order-service\"| REG[(\"service registry Eureka\")]\n  REG -->|\"10.0.1.7:8080, 10.0.1.8:8080\"| RTR\n  RTR -->|\"forward\"| SVC[\"order-service instance 10.0.1.7:8080\"]",
+    program: `// SYSTEM DESIGN — server-side discovery as a pipeline: client -> router/load balancer -> service registry -> service instances (the client never discovers)
+// PARTIES: CLI = client (calls only the router) · RTR = router (load balancer that queries the registry and forwards) · REG = service registry (Eureka) · SVC = order-service instances
+// DEF: registry — REG's map of service name -> instances; here {"order-service" -> ["10.0.1.7:8080", "10.0.1.8:8080"]}
+// DEF: list — the instances REG returns; here ["10.0.1.7:8080", "10.0.1.8:8080"]
+// DEF: target — the instance the router forwards to; here "10.0.1.7:8080"
+// DEF: status — the forwarded call's result; here "200 OK"
+// STATE (before):
+//    registry : {"order-service" -> ["10.0.1.7:8080", "10.0.1.8:8080"]}
+//    list     : []
+//    target   : "unset"
+//    status   : "none"
+// DEF: forward_request · CALLED BY: CLI calling the router's well-known address
+// -> request : "POST http://router.example.com/orders"
+//    step 1 · RTR queries REG for "order-service"    list : [] -> ["10.0.1.7:8080", "10.0.1.8:8080"]   BECAUSE the router asks the registry for available instances
+//    step 2 · RTR picks an instance    target : "unset" -> "10.0.1.7:8080"   BECAUSE the router load-balances across the returned set
+//    step 3 · RTR forwards to the instance    status : "none" -> "200 OK"   BECAUSE the router relays the request to the chosen instance
+// <- forwarded call : "POST http://10.0.1.7:8080/orders"   (the client never resolved an instance itself)`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'The client cannot track instances', content: '<p><strong>Why.</strong> Instances appear and disappear under dynamic IPs, so a client that must pick an instance directly cannot keep up.</p><p><strong>Claim.</strong> The client needs a stable, well-known address to call, behind which the changing set of instances is hidden.</p><p><strong>Grounding.</strong> Richardson\'s context mirrors client-side discovery: dynamic IPs and load-varying instance counts break fixed locations.</p><p><strong>In the wild.</strong> Rather than teaching every client the registry, the application teaches it one router address.</p>' },

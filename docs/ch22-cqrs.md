@@ -208,6 +208,68 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** command side → event store → projections → query side
+
+### Order Service — command side
+
+_Role: command side_
+
+```mermaid
+flowchart TD
+  R["Order Service — command side"]
+  R --> P0["createOrder handler — appends order_created to the event stream"]
+  R --> P1["updateOrder handler — appends order_updated for the total change"]
+```
+
+### Event store — the write model
+
+_Role: event store_
+
+```mermaid
+flowchart TD
+  R["Event store — the write model"]
+  R --> P0["EventStoreDB 24 @ orders-events-1 — append-only source of truth"]
+  R --> P1["publishes each event to the broker BRK"]
+```
+
+### Order History Service — query side
+
+_Role: projections + query side_
+
+```mermaid
+flowchart TD
+  R["Order History Service — query side"]
+  R --> P0["projector — folds events into the view model"]
+  R --> P1["MongoDB 7 @ orders-view-1 — serves the history queries"]
+```
+
+```mermaid
+flowchart LR
+  SVC["Order Service (command side)"] -->|"append order_updated"| ES["EventStoreDB 24 @ orders-events-1"]
+  ES -->|"publishes"| BRK["Broker"]
+  BRK -->|"events"| OH["Order History Service (query side)"]
+  OH -->|"folds into"| VDB["MongoDB 7 @ orders-view-1"]
+  VDB -->|"serves"| Q["history queries"]
+```
+
+```java
+// SYSTEM DESIGN — CQRS: command side -> event store -> projections -> query side, one order updated end to end
+// PARTIES: SVC = Order Service (command side) · ES = EventStoreDB 24 @ orders-events-1 · OH = Order History Service (query side) · VDB = MongoDB 7 @ orders-view-1
+// DEF: event — an append-only fact in the write model; here order_created {"orderId":"O-101","total":120.00} then order_updated {"total":95.00}
+// DEF: projection — a read model the query side folds events into; here the order total, 120.00 -> 95.00
+// STATE (before):
+//    events : []                        // the event stream for order O-101, empty
+//    view : { "O-101": { "total": 120.00 } }   // the read model before the update
+// DEF: update_order · CALLED BY: SVC when the customer changes order O-101
+// -> order_id : "O-101"
+//    step 1 · SVC appends order_updated to the event store   // events : [] -> ["order_created","order_updated"]   BECAUSE the command side writes events, not tables
+//    step 2 · ES publishes the event to the broker, OH folds it in   // view["O-101"].total : 120.00 -> 95.00   BECAUSE the projector subtracts the change from the old total
+//    step 3 · VDB stores the updated view and serves the query   // query : 0 -> 1   BECAUSE the query side reads its own materialized view
+// <- outcome : view["O-101"].total = 95.00 · a command wrote once, a projection read once, the write and read models stay separate
+```
+
 ## Interview Questions
 
 ### Q1

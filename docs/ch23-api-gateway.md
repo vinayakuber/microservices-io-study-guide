@@ -196,6 +196,69 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** client → gateway → upstream services
+
+### Clients — the callers
+
+_Role: client_
+
+```mermaid
+flowchart TD
+  R["Clients — the callers"]
+  R --> P0["CLI — a command-line client"]
+  R --> P1["MOB — the mobile client"]
+  R --> P2["WEB — the web client"]
+```
+
+### API Gateway — the single entry point
+
+_Role: gateway_
+
+```mermaid
+flowchart TD
+  R["API Gateway — the single entry point"]
+  R --> P0["request routing — looks up the route table"]
+  R --> P1["API composition — assembles product + price + reviews"]
+```
+
+### Upstream services — the backends
+
+_Role: upstream services_
+
+```mermaid
+flowchart TD
+  R["Upstream services — the backends"]
+  R --> P0["PROD — product service"]
+  R --> P1["PRI — pricing service"]
+  R --> P2["REV — reviews service"]
+```
+
+```mermaid
+flowchart LR
+  CLI["CLI client"] --> GW["API Gateway"]
+  MOB["MOB client"] --> GW
+  WEB["WEB client"] --> GW
+  GW -->|"route /products"| PROD["Product service"]
+  GW -->|"compose"| RES["product + price + reviews"]
+```
+
+```java
+// SYSTEM DESIGN — API gateway: client -> gateway -> upstream services, one product request composed end to end
+// PARTIES: WEB = the web client · GW = API Gateway · PROD = Product service · PRI = Pricing service · REV = Reviews service
+// DEF: route — a path-to-backend mapping in the gateway's routing table; here "/products" -> "PROD"
+// STATE (before):
+//    routes : { "/products": "PROD" }   // the gateway's routing table, one entry
+//    response : {}                      // the composed product view, empty
+// DEF: get_product · CALLED BY: WEB requesting the product page for P-9
+// -> path : "/products/P-9"
+//    step 1 · GW looks up the route table   // match : "" -> "PROD"   BECAUSE /products is registered to the product service
+//    step 2 · GW calls PROD for the product, PRI for the price, and REV for the reviews   // gathered : 0 -> 3   BECAUSE the gateway composes several upstream calls into one response
+//    step 3 · GW assembles the pieces and returns one JSON   // response : {} -> {"id":"P-9","price":39.99,"stock":3,"reviews":12}
+// <- outcome : response = {"id":"P-9","price":39.99,"stock":3,"reviews":12} · one client call, three upstream calls, one composed reply
+```
+
 ## Interview Questions
 
 ### Q1

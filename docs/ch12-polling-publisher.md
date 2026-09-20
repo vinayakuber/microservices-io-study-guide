@@ -162,6 +162,81 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** source database → polling publisher (relay) → message broker → subscriber
+
+### source database (outbox table) — the source database
+
+_Role: source database_
+
+```mermaid
+flowchart TD
+  R["source database (outbox table) — the source database"]
+  R --> P0["Holds the outbox rows with a sent flag"]
+  R --> P1["Answers the unsent-row SELECT"]
+```
+
+### polling publisher relay — the relay
+
+_Role: polling publisher_
+
+```mermaid
+flowchart TD
+  R["polling publisher relay — the relay"]
+  R --> P0["Polls SELECT ... WHERE sent=false ORDER BY id"]
+  R --> P1["Publishes each row to the broker"]
+  R --> P2["Marks the row sent=true"]
+```
+
+### message broker (RabbitMQ) — the broker
+
+_Role: broker_
+
+```mermaid
+flowchart TD
+  R["message broker (RabbitMQ) — the broker"]
+  R --> P0["Receives published events in id order"]
+  R --> P1["Holds them for subscribers"]
+```
+
+### subscriber — the consumer
+
+_Role: subscriber_
+
+```mermaid
+flowchart TD
+  R["subscriber — the consumer"]
+  R --> P0["Consumes each event off the broker"]
+```
+
+```mermaid
+flowchart LR
+  DB[("source database: outbox table")] -->|"SELECT sent=false ORDER BY id"| RLY["polling publisher relay"]
+  RLY -->|"publish OrderCreated"| BRK[("message broker RabbitMQ")]
+  RLY -->|"mark sent=true"| DB
+  BRK -->|"consume"| SUB["subscriber"]
+```
+
+```java
+// SYSTEM DESIGN — polling publisher as a pipeline: source database (outbox table) -> polling publisher relay -> message broker -> subscriber (consumer)
+// PARTIES: DB = PostgreSQL 16 @ orders-db-1 (outbox table) · RLY = polling publisher relay (polls, publishes, marks) · BRK = message broker (RabbitMQ) · SUB = subscriber (consumer)
+// DEF: outbox — the table of events awaiting publication; here [ (10, "OrderCreated", sent=false), (11, "PaymentAuthorized", sent=false) ]
+// DEF: list — the rows one poll selects, then publishes; here [ (10, "OrderCreated"), (11, "PaymentAuthorized") ]
+// DEF: status — a row's sent flag; here false flipped to true
+// STATE (before):
+//    outbox : [ (10, "OrderCreated", sent=false), (11, "PaymentAuthorized", sent=false) ]
+//    list   : []
+//    status : "unsent"
+// DEF: poll_once · CALLED BY: a scheduler tick every 250 ms
+// -> query : "SELECT * FROM outbox WHERE sent=false ORDER BY id ASC"
+//    step 1 · RLY fetches the unsent rows    list : [] -> [ (10, "OrderCreated"), (11, "PaymentAuthorized") ]   BECAUSE the query returns rows whose sent flag is false, ordered by id
+//    step 2 · RLY publishes row 10 to BRK    list : [ (10, "OrderCreated"), (11, "PaymentAuthorized") ] -> [ (11, "PaymentAuthorized") ]   BECAUSE each row is handed to the broker in id order
+//    step 3 · RLY marks row 10 sent    outbox : [(10,"OrderCreated",sent=false),(11,"PaymentAuthorized",sent=false)] -> [(10,"OrderCreated",sent=true),(11,"PaymentAuthorized",sent=false)]   BECAUSE sent=true makes the next poll skip the row
+//    step 4 · SUB consumes "OrderCreated"    status : "unsent" -> "delivered"   BECAUSE the subscriber reads the event off BRK
+// <- output : BRK holds [ "OrderCreated", "PaymentAuthorized" ] · SUB consumes them in id order
+```
+
 ## Interview Questions
 
 ### Q1

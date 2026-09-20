@@ -184,6 +184,53 @@ registerChapter({
       problems: ["01-scale-from-zero-to-millions"]
     }
   ],
+  systemDesign: {
+    pipeline: 'service instance → self-registrar → service registry',
+    decomposition: [
+      {
+        box: 'order-service instance — the service instance',
+        role: 'service instance',
+        parts: [
+          'Registers its own host and IP on startup',
+          'Renews the lease on a heartbeat timer',
+          'Unregisters itself on shutdown'
+        ]
+      },
+      {
+        box: 'self-registrar (in-process chassis code) — the registrar',
+        role: 'self-registrar',
+        parts: [
+          'Writes the instance row on boot',
+          'Pushes the ttl out on each heartbeat'
+        ]
+      },
+      {
+        box: 'service registry (Eureka) — the registry',
+        role: 'registry',
+        parts: [
+          'Holds name -> instance rows',
+          'Evicts entries whose lease lapses'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  SVC[\"order-service instance 10.0.1.7\"] -->|\"register self\"| REG[(\"service registry Eureka\")]\n  SVC -->|\"heartbeat: ttl 30 -> 60\"| REG\n  REG -->|\"serves the row back\"| D[\"discovery lookup\"]",
+    program: `// SYSTEM DESIGN — self-registration as a pipeline: service instance -> self-registrar (startup register + heartbeat lease) -> service registry
+// PARTIES: SVC = order-service instance (registers itself and renews) · REG = service registry (Eureka)
+// DEF: registrar — the in-process code inside SVC that registers and renews; here it writes {"host":"10.0.1.7","port":8080}
+// DEF: lease — the ttl the registry keeps an entry alive; here 30 pushed to 60 by a heartbeat
+// DEF: state — the instance's own modeled state; here "AVAILABLE"
+// STATE (before):
+//    registry : {"order-service" -> []}
+//    state    : "DOWN"
+//    lease    : 0
+// DEF: register_and_renew · CALLED BY: SVC booting on host 10.0.1.7
+// -> boot : {"host":"10.0.1.7","port":8080}
+//    step 1 · SVC registers itself    registry : {"order-service" -> []} -> {"order-service" -> [{"host":"10.0.1.7","port":8080}]}   BECAUSE the instance writes its own row at startup
+//    step 2 · SVC marks itself available    state : "DOWN" -> "AVAILABLE"   BECAUSE the registrar flips the self-state after a successful register
+//    step 3 · SVC renews the lease    lease : 0 -> 60   BECAUSE the heartbeat timer pushes the ttl out before it lapses
+//    step 4 · discovery reads the row back    lookup "order-service" -> returns [{"host":"10.0.1.7","port":8080}]   BECAUSE the registry serves the row the instance wrote
+// <- registry row : "order-service" -> [{"host":"10.0.1.7","port":8080}]   (written by SVC, read by discovery)`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'The registry must know who is alive', content: '<p><strong>Why.</strong> Discovery only works if the registry has an accurate, current list of instances, and that list changes every time an instance starts, stops, crashes, or degrades.</p><p><strong>Claim.</strong> Instances must be registered on startup, unregistered on shutdown, and removed when they crash or can no longer handle requests.</p><p><strong>Grounding.</strong> Richardson\'s three forces for registration apply to self-registration too: startup, shutdown, crash, and running-but-incapable instances.</p><p><strong>In the wild.</strong> A stale entry means a client-side or server-side lookup can route a request to an instance that will never answer.</p>' },

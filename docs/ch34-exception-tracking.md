@@ -203,6 +203,67 @@ n0["<b>1. Issue crosses threshold</b><br/>FP-77A3 count 2, state OPEN, threshold
 ```
 
 
+## System Design Interview
+
+**The pipeline:** service → exception tracker (collect/dedup/aggregate) → developer reader
+
+### Order Service — the thrower
+
+_Role: service (source)_
+
+```mermaid
+flowchart TD
+  R["Order Service — the thrower"]
+  R --> P0["throws the exception EX-1001 with msg &quot;customer is null&quot;"]
+  R --> P1["reports the stack trace SVC.doGet line 42"]
+```
+
+### Exception tracking service — collect, dedup, aggregate
+
+_Role: exception tracker_
+
+```mermaid
+flowchart TD
+  R["Exception tracking service — collect, dedup, aggregate"]
+  R --> P0["normalizes each throw into a fingerprint"]
+  R --> P1["PostgreSQL 16 @ exc-db-1 — folds repeats by fingerprint and bumps the count"]
+```
+
+### Developer — the reader
+
+_Role: reader_
+
+```mermaid
+flowchart TD
+  R["Developer — the reader"]
+  R --> P0["sees one deduplicated issue, not a flood"]
+  R --> P1["triages the issue FP-77A3 against a threshold of 1"]
+```
+
+```mermaid
+flowchart LR
+  SVC["Order Service"] -->|"throw EX-1001"| TRK["Exception tracking service"]
+  TRK -->|"fold into fingerprint FP-77A3"| DB["PostgreSQL 16 @ exc-db-1"]
+  DB -->|"issue count 2"| DEV["Developer reader"]
+```
+
+```java
+// SYSTEM DESIGN — exception tracking: service -> exception tracker (collect/dedup/aggregate) -> developer reader
+// PARTIES: SVC = Order Service (source service) · TRK = exception tracking service (collector + dedup aggregator) · DB = PostgreSQL 16 @ exc-db-1 (the exception store) · DEV = developer (reader)
+// DEF: exception — one thrown error; here EX-1001 "customer is null" from stack SVC.doGet line 42
+// DEF: fingerprint — a normalized signature that groups repeats; here "FP-77A3"
+// DEF: issue — one distinct fingerprint with its count; here "FP-77A3" count 2
+// STATE (before):
+//    issues : {}        // the store holds no fingerprint yet
+//    reported : 0       // nothing triaged yet
+// DEF: track · CALLED BY: SVC throwing, TRK folding, DEV reading
+// -> exception_id : "EX-1001"
+//    step 1 · SVC throws, TRK normalizes the stack   // fingerprint : "" -> "FP-77A3"   BECAUSE msg "customer is null" and stack SVC.doGet line 42 hash to one signature
+//    step 2 · TRK folds the repeat into the store   // issues : {} -> { "FP-77A3": { count:2 } }   BECAUSE EX-7001 was already seen with the same fingerprint, so dedup bumps the count to 2
+//    step 3 · TRK reports the issue to the developer   // reported : 0 -> 1   BECAUSE count 2 crosses the threshold of 1
+// <- outcome : issues["FP-77A3"].count = 2 · DEV sees one deduplicated issue  BECAUSE the tracker folded EX-1001 and EX-7001 into the same fingerprint
+```
+
 ## Interview Questions
 
 ### Q1

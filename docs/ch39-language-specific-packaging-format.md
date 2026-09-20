@@ -180,6 +180,66 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** build pipeline → package → machine (runtime) → JVM process
+
+### Deployment pipeline — the builder
+
+_Role: build pipeline_
+
+```mermaid
+flowchart TD
+  R["Deployment pipeline — the builder"]
+  R --> P0["compiles the service into one runnable JAR"]
+  R --> P1["produces restaurant-service-3.1.0.jar"]
+```
+
+### Machine — the runtime host
+
+_Role: machine (runtime)_
+
+```mermaid
+flowchart TD
+  R["Machine — the runtime host"]
+  R --> P0["installs JDK 17 and Tomcat 10"]
+  R --> P1["boots the packaged service"]
+```
+
+### JVM process — the running service
+
+_Role: JVM process_
+
+```mermaid
+flowchart TD
+  R["JVM process — the running service"]
+  R --> P0["loads the JAR and serves traffic"]
+  R --> P1["runs as jvm-8121"]
+```
+
+```mermaid
+flowchart LR
+  BLD["Deployment pipeline"] -->|"build JAR"| PKG["restaurant-service-3.1.0.jar"]
+  PKG -->|"deploy"| MACH["machine: JDK 17 + Tomcat 10"]
+  MACH -->|"launch"| JVM["JVM process jvm-8121"]
+```
+
+```java
+// SYSTEM DESIGN — language-specific packaging: build pipeline -> package -> machine (runtime) -> JVM process
+// PARTIES: BLD = deployment pipeline (builder) · PKG = restaurant-service-3.1.0.jar (the package) · MACH = machine (server host) · JVM = JVM process jvm-8121 (the runtime)
+// DEF: package — the language-specific artifact; here restaurant-service-3.1.0.jar (a JAR)
+// DEF: runtime — the software the package needs; here JDK 17 plus Tomcat 10
+// STATE (before):
+//    runtime : {}        // nothing installed yet
+//    process : ""        // no JVM process yet
+// DEF: deploy_jar · CALLED BY: BLD building, MACH provisioning, JVM serving
+// -> artifact : "restaurant-service-3.1.0.jar"
+//    step 1 · BLD produces the JAR   // package : "" -> "restaurant-service-3.1.0.jar"   BECAUSE the build pipeline compiles the service into one runnable JAR
+//    step 2 · MACH installs JDK 17 and Tomcat 10   // runtime : {} -> { "jdk":17, "tomcat":10 }   BECAUSE a JAR needs the JDK and a web container to run
+//    step 3 · the JVM starts and serves   // process : "" -> "jvm-8121"   BECAUSE the machine launches the packaged service
+// <- outcome : process = "jvm-8121" · restaurant-service serves  BECAUSE the JAR plus JDK 17 plus Tomcat 10 boot one JVM process
+```
+
 ## Interview Questions
 
 ### Q1

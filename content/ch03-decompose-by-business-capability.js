@@ -220,6 +220,51 @@ registerChapter({
       problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
     }
   ],
+  systemDesign: {
+    pipeline: 'business capability → service → autonomous team',
+    decomposition: [
+      {
+        box: 'a business capability — e.g. product catalog',
+        role: 'business capability',
+        parts: [
+          'something the business does to generate value',
+          'maps to a business object — Product'
+        ]
+      },
+      {
+        box: 'the service — e.g. the catalog service',
+        role: 'service (owns its data)',
+        parts: [
+          'owns the capability business object and its data',
+          'owns its database — PostgreSQL 16 @ catalog-db-1',
+          'hides its implementation behind an API'
+        ]
+      },
+      {
+        box: 'the autonomous team',
+        role: 'team (owns the service)',
+        parts: [
+          'a two-pizza team of 6-10 people',
+          'develops, tests and deploys the service alone'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  CAP[\"business capability: product catalog\"] --> SVC[\"catalog service\"]\n  SVC --> DB[(\"PostgreSQL 16 @ catalog-db-1\")]\n  SVC --> TEAM[\"two-pizza team (6-10)\"]\n  DB -->|\"query result\"| SVC",
+    program: `// SYSTEM DESIGN — decompose by business capability: business capability (Product) -> service (catalog, owns its data) -> autonomous two-pizza team (owns the service)
+// PARTIES: CAP = business capability (Product — what the business does to generate value) · SVC = catalog service (owns the Product data) · DB = PostgreSQL 16 @ catalog-db-1 (the catalog service's own database) · TEAM = autonomous two-pizza team (6-10 people owning the service)
+// DEF: capability — something the business does to generate value; here "product catalog" manages business object "Product"
+// DEF: service — a cohesive, loosely coupled unit that owns one capability and its data; here "catalog"
+// DEF: product — the business object the catalog capability manages; here "P-1" = {name:"Widget"}
+// STATE (before):
+//    products : {}   // the Product rows the catalog service owns (in DB)
+// DEF: serve_product · CALLED BY: a client query "GET /products/P-1" routed to the owning capability
+// -> product_id : "P-1"
+//    step 1 · CAP routes the query to the owning service    route : "unknown" -> "catalog"
+//    step 2 · SVC creates the row in its own DB    products : {} -> { "P-1": {name:"Widget"} }
+//    step 3 · SVC reads it back to answer    GET /products/P-1 -> { id:"P-1", name:"Widget" }
+//    step 4 · TEAM ships the change alone    deploy : "lockstep" -> "single-service"   BECAUSE one team owns one service
+// <- outcome : client sees "P-1" name "Widget" · one capability, one service, one team`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Microservice benefits are not automatic', content: '<p><strong>Why.</strong> You get faster delivery only if you decompose the application into the right services; the benefits are not guaranteed by adopting microservices.</p><p><strong>Claim.</strong> Careful functional decomposition into cohesive services is what actually enables independent deployment and small autonomous teams.</p><p><strong>Grounding.</strong> The context states the two benefits are achieved only by careful functional decomposition, and applies SRP and CCP to service design.</p><p><strong>In the wild.</strong> A change that touches several services forces coordination across several teams, which slows development.</p>' },

@@ -212,6 +212,55 @@ registerChapter({
       problems: ["19-distributed-message-queue", "26-payment-system"]
     }
   ],
+  systemDesign: {
+    pipeline: 'aggregate (publisher) → event broker (transport) → subscriber/consumer',
+    decomposition: [
+      {
+        box: 'Order aggregate (in Order Service) — the publisher',
+        role: 'aggregate/publisher',
+        parts: [
+          'change state — flips order state "NEW" -> "PLACED"',
+          'emit DomainEvent — produces "OrderPlaced" { order_id:"PO-2001" }',
+          'Transactional Outbox — writes the event row in the same DB transaction',
+          'Relay — polls the outbox after commit and publishes to the broker'
+        ]
+      },
+      {
+        box: 'message broker — the transport',
+        role: 'broker/transport',
+        parts: [
+          'carries "OrderPlaced" from the publisher to every subscriber',
+          'decouples the aggregate from the consumers'
+        ]
+      },
+      {
+        box: 'CQRS view updater — the subscriber/consumer',
+        role: 'subscriber/consumer',
+        parts: [
+          'consume — receives "OrderPlaced" off the broker',
+          'react — updates its read model order_count 0 -> 1'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  AG[\"Order aggregate (publisher)\"] -->|\"emit OrderPlaced\"| OB[(\"Transactional outbox (PostgreSQL 16 @ orders-db-1)\")]\n  OB -->|\"relay publishes after commit\"| BRK[\"message broker (transport)\"]\n  BRK -->|\"deliver\"| SUB[\"subscriber: CQRS view updater\"]\n  SUB -->|\"order_count 0 -> 1\"| V[(\"read model\")]",
+    program: `// SYSTEM DESIGN — domain event as a pipeline: aggregate (publisher) -> event broker (transport) -> subscriber (consumer)
+// PARTIES: AG = Order aggregate (publisher, inside Order Service) · DB = PostgreSQL 16 @ orders-db-1 (holds the outbox table) · BRK = message broker (event transport) · SUB = CQRS view updater (subscriber/consumer)
+// DEF: DomainEvent — the fact the aggregate emits when created or updated; here {type:"OrderPlaced", order_id:"PO-2001"}
+// DEF: outbox — the table the event is written to in the SAME transaction as the data change; here row {event:"OrderPlaced", order_id:"PO-2001", sent:false}
+// DEF: relay — the publisher process that polls the outbox after commit and publishes unsent rows; here it sends row "OrderPlaced"
+// DEF: view — the subscriber's read model it updates per event; here {order_count:0}
+// STATE (before):
+//    order  : { id:"PO-2001", state:"NEW" }
+//    outbox : []
+//    view   : { order_count : 0 }
+// DEF: place_order_and_publish · CALLED BY: AG handling command "place_order"
+// -> command : "place_order"
+//    step 1 · AG changes state    order : { id:"PO-2001", state:"NEW" } -> { id:"PO-2001", state:"PLACED" }
+//    step 2 · AG emits the event and DB writes the outbox row in the SAME transaction    outbox : [] -> [{event:"OrderPlaced", order_id:"PO-2001", sent:false}]
+//    step 3 · COMMIT makes both durable, then the relay publishes    outbox : [{sent:false}] -> [{sent:true}]  BECAUSE the relay polls the outbox and ships the row to BRK
+//    step 4 · SUB consumes the event and reacts    view : { order_count : 0 } -> { order_count : 1 }  BECAUSE one more order was placed
+// <- outcome : BRK delivered "OrderPlaced" { order_id:"PO-2001" } and SUB's view now reads order_count 1  BECAUSE the publisher wrote the outbox row atomically with the data change and the relay shipped it to the broker`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'A service changes data, but others need to know', content: '<p><strong>Why.</strong> A service often needs to publish events when it updates its data.</p><p><strong>Claim.</strong> Those events might be needed to update a CQRS view, or to let the service participate in a choreography-based saga that uses events for coordination.</p><p><strong>Grounding.</strong> Without a publish step, an update stays local and the consumers never learn of it.</p><p><strong>In the wild.</strong> A placed order that a read model must count, or a saga step that the next service must run.</p>' },

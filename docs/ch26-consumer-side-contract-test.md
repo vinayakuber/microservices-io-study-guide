@@ -193,6 +193,68 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** consumer → mock provider (contract) → provider service
+
+### OrderServiceProxy — the consumer under test
+
+_Role: consumer (test)_
+
+```mermaid
+flowchart TD
+  R["OrderServiceProxy — the consumer under test"]
+  R --> P0["builds the request: GET /orders/ORD-4007 + Accept header"]
+  R --> P1["parses the reply into orderId and state"]
+```
+
+### mock provider stub
+
+_Role: mock provider (contract)_
+
+```mermaid
+flowchart TD
+  R["mock provider stub"]
+  R --> P0["returns the canned reply: status 200 + JSON body"]
+  R --> P1["stands in for the real Order Service during the test"]
+```
+
+### Order Service — the real provider
+
+_Role: provider service_
+
+```mermaid
+flowchart TD
+  R["Order Service — the real provider"]
+  R --> P0["owns the real contract: GET /orders/{orderId}"]
+  R --> P1["answers the well-formed request in production"]
+```
+
+```mermaid
+flowchart LR
+  CLI["OrderServiceProxy (consumer under test)"] -->|"sends GET /orders/ORD-4007"| STUB["mock provider stub (contract)"]
+  STUB -->|"canned reply 200 + JSON body"| CLI
+  CLI -->|"same request in production"| SVC["Order Service (real provider)"]
+```
+
+```java
+// SYSTEM DESIGN — consumer-side contract test: consumer (OrderServiceProxy) -> mock provider (contract stub) -> provider service (real Order Service)
+// PARTIES: CLI = OrderServiceProxy (consumer under test) · STUB = mock provider stub (contract double) · SVC = Order Service (the real provider service)
+// DEF: contract — the shape the client must speak; here GET /orders/ORD-4007 answered with status 200 and body {"orderId":"ORD-4007","state":"CREATED"}
+// DEF: request — the outbound message the client forms; here {"method":"GET","path":"/orders/ORD-4007","headers":{"Accept":"application/json"}}
+// DEF: reply — the incoming message the client parses; here {"status":200,"body":{"orderId":"ORD-4007","state":"CREATED"}}
+// STATE (before):
+//    request : { method:"", path:"", headers:{} }
+//    reply : { status:0, body:{} }
+//    verdict : ""
+// DEF: exercise_client · CALLED BY: the client-side test driving CLI against STUB
+// -> order_id : "ORD-4007"
+//    step 1 · CLI forms the request    request : { method:"", path:"" } -> { method:"GET", path:"/orders/ORD-4007" }
+//    step 2 · STUB returns the canned reply    reply : { status:0, body:{} } -> { status:200, body:{"orderId":"ORD-4007","state":"CREATED"} }
+//    step 3 · CLI parses the reply    verdict : "" -> "pass"  BECAUSE the client read status 200 and decoded orderId and state
+// <- outcome : verdict "pass" · the client can communicate  BECAUSE it sent a well-formed request and consumed the stub's reply, which mirrors SVC's real contract
+```
+
 ## Interview Questions
 
 ### Q1

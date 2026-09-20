@@ -222,6 +222,59 @@ registerChapter({
       problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
     }
   ],
+  systemDesign: {
+    pipeline: 'client → API gateway → microservices → service databases',
+    decomposition: [
+      {
+        box: 'the client',
+        role: 'client',
+        parts: [
+          'sends a request to the API gateway',
+          'reads the composed response'
+        ]
+      },
+      {
+        box: 'the API gateway',
+        role: 'gateway (the entry point)',
+        parts: [
+          'routes the request to one or more services',
+          'composes the responses into one page'
+        ]
+      },
+      {
+        box: 'each microservice — e.g. the order service',
+        role: 'service',
+        parts: [
+          'own business logic — implements one or more subdomains',
+          'own database — PostgreSQL 16 @ order-db-1',
+          'communicates over HTTP or messaging'
+        ]
+      },
+      {
+        box: 'the service database',
+        role: 'store',
+        parts: [
+          'PostgreSQL 16 @ order-db-1 — one engine and instance per service',
+          'no single ACID commit spans two services'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  CLI[\"Client\"] -->|\"GET /orders/PO-2001\"| GW[\"API gateway\"]\n  GW -->|\"route\"| SVC[\"order service\"]\n  SVC -->|\"own business logic\"| BL[\"business logic\"]\n  BL -->|\"write / read\"| DB[(\"PostgreSQL 16 @ order-db-1\")]\n  DB -->|\"rows back\"| BL\n  GW -->|\"compose one page\"| CLI",
+    program: `// SYSTEM DESIGN — microservices: client -> API gateway -> microservices (own business logic + own database) -> service databases; a distributed command becomes a saga of local transactions
+// PARTIES: CLI = customer client · GW = API gateway (the entry point, routes and composes) · SVC = order service (owns the Order subdomain) · DB = PostgreSQL 16 @ order-db-1 (the order service's own database)
+// DEF: service — an independently deployable, loosely coupled unit owning one or more subdomains; here "order" owns the Order subdomain
+// DEF: local — a transaction confined to one service and its own database; here local txn "T1" = {service:"order", state:"NEW"}
+// DEF: order — the Order subdomain's row, keyed by purchase-order id; here "PO-2001" = {status:"DRAFT"}
+// STATE (before):
+//    orders : {}   // the Order rows the order service owns (in its own DB)
+// DEF: placeOrder · CALLED BY: GW routing a client request to the order service
+// -> order_id : "PO-2001" · -> amount : 40
+//    step 1 · GW routes the request to SVC    route : "none" -> "order"
+//    step 2 · SVC writes the order in its own DB    orders : {} -> { "PO-2001": {status:"DRAFT"} }
+//    step 3 · SVC commits the local txn T1    local : "NEW" -> "DONE"   BECAUSE each service commits against its OWN database
+//    step 4 · GW reads the result and composes    GET /orders/PO-2001 -> { id:"PO-2001", status:"PLACED" }
+// <- outcome : one page composed from local results · a multi-service command runs as a saga of 3 local transactions, not one ACID commit   BECAUSE no single database spans the services`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Distributed operations replace local ones', content: '<p><strong>Why.</strong> Splitting the application into services means some operations now span multiple services instead of running locally in one component.</p><p><strong>Claim.</strong> Some distributed operations are complex and hard to troubleshoot, potentially inefficient, and may need eventually consistent (non-ACID) transaction management.</p><p><strong>Grounding.</strong> The resulting-context drawbacks name complex, inefficient interactions and the need for non-ACID transactions because loose coupling requires each service to have its own database.</p><p><strong>In the wild.</strong> Amazon.com\'s website application calls 100-150 services to build a single web page.</p>' },

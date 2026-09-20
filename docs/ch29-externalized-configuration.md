@@ -150,6 +150,67 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** service → config server → config repository (git/VCS)
+
+### Order Service — the consumer of config
+
+_Role: service_
+
+```mermaid
+flowchart TD
+  R["Order Service — the consumer of config"]
+  R --> P0["pulls config at startup (DB_URL, DB_PASSWORD)"]
+  R --> P1["refreshes when the config changes"]
+```
+
+### Spring Cloud Config server
+
+_Role: config server_
+
+```mermaid
+flowchart TD
+  R["Spring Cloud Config server"]
+  R --> P0["serves configuration over HTTP"]
+  R --> P1["versions each property change"]
+```
+
+### git repository — the config source
+
+_Role: config repository (git/VCS)_
+
+```mermaid
+flowchart TD
+  R["git repository — the config source"]
+  R --> P0["stores the property files per environment"]
+  R --> P1["is the versioned source of truth"]
+```
+
+```mermaid
+flowchart LR
+  SVC["Order Service"] -->|"pull at startup"| CS["config server"]
+  CS -->|"serves over HTTP"| SVC
+  CS -->|"reads"| GIT[("git repository (config source)")]
+```
+
+```java
+// SYSTEM DESIGN — externalized configuration: service (Order Service) -> config server (Spring Cloud Config) -> config repository (git/VCS)
+// PARTIES: SVC = Order Service (config consumer, pulls at startup) · CS = Spring Cloud Config server (config server, serves over HTTP) · GIT = git repository (config repository, VCS source of truth)
+// DEF: config — the key/value settings a service reads at startup; here {"db_url":"jdbc:mysql://prod-db:3306/orders","db_password":"prod-secret"}
+// DEF: repo — the versioned property file git stores; here the file with keys "db_url" and "db_password"
+// DEF: connection — the open link built from the resolved values; here "open"
+// STATE (before):
+//    config : {}
+//    connection : ""
+// DEF: pull_and_connect · CALLED BY: the runtime launching SVC
+// -> env : {"DB_URL":"jdbc:mysql://prod-db:3306/orders","DB_PASSWORD":"prod-secret"}
+//    step 1 · SVC pulls the config from CS at startup    config : {} -> {"db_url":"jdbc:mysql://prod-db:3306/orders","db_password":"prod-secret"}
+//    step 2 · CS reads the file from GIT and serves it over HTTP    config : {"db_url":"jdbc:mysql://prod-db:3306/orders"} -> {"db_url":"jdbc:mysql://prod-db:3306/orders","db_password":"prod-secret"}  BECAUSE git stores the versioned property file
+//    step 3 · SVC opens a connection with the values    connection : "" -> "open"  BECAUSE the config now holds the URL and password the database accepts
+// <- outcome : connection "open" · the same artifact runs unchanged in every environment
+```
+
 ## Interview Questions
 
 ### Q1

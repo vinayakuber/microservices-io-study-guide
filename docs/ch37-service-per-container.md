@@ -195,6 +195,67 @@ n0["<b>1. Deploy test times the service</b><br/>same service 1.4.2, two packagin
 ```
 
 
+## System Design Interview
+
+**The pipeline:** build pipeline → registry → cluster → container
+
+### Build pipeline — the builder
+
+_Role: build pipeline_
+
+```mermaid
+flowchart TD
+  R["Build pipeline — the builder"]
+  R --> P0["compiles the code into a container image"]
+  R --> P1["tags the image rsvc:1.4.2 and pushes it"]
+```
+
+### Container registry — the image repository
+
+_Role: registry_
+
+```mermaid
+flowchart TD
+  R["Container registry — the image repository"]
+  R --> P0["holds the built images"]
+  R --> P1["serves rsvc:1.4.2 back to the cluster"]
+```
+
+### Kubernetes cluster — the scheduler
+
+_Role: cluster_
+
+```mermaid
+flowchart TD
+  R["Kubernetes cluster — the scheduler"]
+  R --> P0["pulls the image and schedules containers"]
+  R --> P1["scales replicas from 2 to 4, cpu cap 0.5"]
+```
+
+```mermaid
+flowchart LR
+  BLD["Build pipeline"] -->|"push rsvc:1.4.2"| REG["Container registry"]
+  REG -->|"serve image"| K8S["Kubernetes cluster"]
+  K8S -->|"schedule container"| SVC["restaurant-service"]
+  SVC -->|"replicas 2 to 4"| POD["running containers"]
+```
+
+```java
+// SYSTEM DESIGN — service per container: build pipeline -> registry -> cluster -> container
+// PARTIES: BLD = build pipeline (builder) · REG = container registry (image repository) · K8S = Kubernetes cluster (scheduler) · SVC = restaurant-service (the service instance)
+// DEF: image — a built container artifact; here rsvc:1.4.2 for restaurant-service and inv:2.0.1 for inventory-service
+// DEF: replica — one running container; here the scheduler raises 2 to 4
+// STATE (before):
+//    replicas : 2        // two containers serve traffic
+//    image : ""          // the new image is not built yet
+// DEF: scale_out · CALLED BY: BLD building, REG serving, K8S scaling
+// -> image_tag : "rsvc:1.4.2"
+//    step 1 · BLD builds the image and pushes it to REG   // image : "" -> "rsvc:1.4.2"   BECAUSE the build pipeline tags the new restaurant-service artifact
+//    step 2 · K8S pulls the image from REG   // pull : 0 -> 1   BECAUSE the registry is the single source for images
+//    step 3 · K8S schedules 2 more containers   // replicas : 2 -> 4   BECAUSE the cluster starts two more from the same image, cpu cap 0.5
+// <- outcome : replicas = 4 · restaurant-service runs 4 containers  BECAUSE the scheduler pulls rsvc:1.4.2 and scales the replica set
+```
+
 ## Interview Questions
 
 ### Q1

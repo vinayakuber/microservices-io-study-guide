@@ -203,6 +203,83 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** client → domain service → entities/value objects → repository → database
+
+### OrderService — the domain service
+
+_Role: domain service_
+
+```mermaid
+flowchart TD
+  R["OrderService — the domain service"]
+  R --> P0["createOrder() — delegates to the Order.create() factory"]
+  R --> P1["reviseOrder()/cancelOrder() — routes commands to the aggregate"]
+  R --> P2["holds no business state (behavior only)"]
+```
+
+### Order aggregate + DeliveryInformation — entities/value objects
+
+_Role: entities/value objects_
+
+```mermaid
+flowchart TD
+  R["Order aggregate + DeliveryInformation — entities/value objects"]
+  R --> P0["Order — entity with state (orderId, lineItems) and behavior create()/revise()/cancel()"]
+  R --> P1["DeliveryInformation — state-only value object (deliveryTime, deliveryAddress)"]
+  R --> P2["business rules — guard the CREATED -&gt; CANCELLED transition and recompute the total"]
+```
+
+### OrderRepository — the repository
+
+_Role: repository_
+
+```mermaid
+flowchart TD
+  R["OrderRepository — the repository"]
+  R --> P0["findOrderById() — loads the aggregate"]
+  R --> P1["save() — persists the aggregate back"]
+```
+
+### PostgreSQL 16 @ orders-db-1 — the database
+
+_Role: database_
+
+```mermaid
+flowchart TD
+  R["PostgreSQL 16 @ orders-db-1 — the database"]
+  R --> P0["stores the aggregate rows"]
+  R --> P1["single source of truth for orders"]
+```
+
+```mermaid
+flowchart LR
+  C["client"] -->|"createOrder()"| SVC["OrderService (domain service)"]
+  SVC -->|"delegate"| ORD["Order aggregate: create()/revise()/cancel()"]
+  ORD -->|"holds"| VO["DeliveryInformation (value object)"]
+  SVC -->|"findOrderById / save"| REPO["OrderRepository"]
+  REPO -->|"SQL"| DB[("PostgreSQL 16 @ orders-db-1")]
+```
+
+```java
+// SYSTEM DESIGN — domain model as a pipeline: client -> domain service (OrderService) -> entities/value objects (Order + DeliveryInformation) -> repository (OrderRepository) -> database (PostgreSQL 16 @ orders-db-1)
+// PARTIES: CLI = client · SVC = OrderService (domain service: behavior only) · ORD = Order aggregate (entity: state + behavior) · VO = DeliveryInformation (state-only value object) · REPO = OrderRepository (repository) · DB = PostgreSQL 16 @ orders-db-1
+// DEF: entity — a class with both state and behavior; here Order holds orderId "PO-100" + lineItems and methods create()/revise()/cancel()
+// DEF: value_object — a class with state only; here DeliveryInformation holds deliveryTime "2026-09-21 09:00" + deliveryAddress "12 Main St"
+// DEF: rule — an invariant the aggregate enforces; here cancel() is legal only from status "CREATED"
+// STATE (before):
+//    order : { orderId:"PO-100", status:"CREATED", lineItems:[{sku:"S1", qty:2, unit:25.00}], total:50.00 }
+//    store : {}
+// DEF: revise_order · CALLED BY: CLI via SVC.reviseOrder("PO-100", 5)
+// -> order_id : "PO-100" · -> new_qty : 5
+//    step 1 · SVC delegates to the aggregate    REPO.findOrderById -> order : { status:"CREATED" } loaded
+//    step 2 · ORD.revise mutates its own line and re-derives the total    order.lineItems[0].qty : 2 -> 5 · order.total : 50.00 -> 125.00  BECAUSE 5 x 25.00 = 125.00
+//    step 3 · REPO.save persists the aggregate    store : {} -> { "PO-100" : { status:"CREATED", total:125.00 } }
+//    step 4 · a later read    findOrderById("PO-100") -> store["PO-100"] : { status:"CREATED", total:125.00 } returned
+// <- outcome : DB row "PO-100" holds total 125.00 and is read back  BECAUSE the service wrote via the repository and the repository writes to the database
+```
+
 ## Interview Questions
 
 ### Q1

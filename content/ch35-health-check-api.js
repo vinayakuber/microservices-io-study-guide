@@ -195,6 +195,49 @@ registerChapter({
       problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
     }
   ],
+  systemDesign: {
+    pipeline: 'service instance → /health endpoint → health-check client → routing/alert',
+    decomposition: [
+      {
+        box: 'Order Service — the instance under check',
+        role: 'service instance',
+        parts: [
+          'exposes GET /health',
+          'probes its db, disk, and app dependencies'
+        ]
+      },
+      {
+        box: 'Monitoring service — the health-check client',
+        role: 'health-check client',
+        parts: [
+          'polls /health every 30s',
+          'marks the instance UP or DOWN'
+        ]
+      },
+      {
+        box: 'Load balancer + registry — routing/alert',
+        role: 'routing/alert',
+        parts: [
+          'LB stops routing to a DOWN instance',
+          'REG de-registers the unhealthy instance'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  SVC[\"Order Service\"] -->|\"GET /health\"| MON[\"Monitoring service\"]\n  MON -->|\"probe\"| DB[\"PostgreSQL 16 @ orders-db-1\"]\n  DB -->|\"UP or DOWN\"| MON\n  MON -->|\"mark DOWN\"| LB[\"Load balancer + service registry\"]",
+    program: `// SYSTEM DESIGN — health check: service instance -> /health endpoint -> health-check client -> routing/alert
+// PARTIES: SVC = Order Service (instance under check) · MON = monitoring service (health-check client) · DB = PostgreSQL 16 @ orders-db-1 (the checked database) · LB = load balancer (routing) · REG = service registry (registration)
+// DEF: health — the answer /health returns; here "UP" when db, disk, and app all pass
+// DEF: check — one probe against a dependency; here "db", "disk", "app"
+// STATE (before):
+//    status : { "db":"UP", "disk":"UP", "app":"UP" }   // all three probes green
+//    alerts : 0        // nothing raised yet
+// DEF: run_check · CALLED BY: MON polling /health every 30s
+// -> endpoint : "/health"
+//    step 1 · SVC probes db, disk, and app   // probes : 0 -> 3   BECAUSE /health checks all three dependencies in one call
+//    step 2 · the db probe fails   // status : { "db":"UP","disk":"UP","app":"UP" } -> { "db":"DOWN","disk":"UP","app":"UP" }   BECAUSE PostgreSQL 16 @ orders-db-1 stops answering
+//    step 3 · MON marks the instance DOWN and LB reroutes   // alerts : 0 -> 1   BECAUSE a failed check flips the instance from UP to DOWN
+// <- outcome : status.db = "DOWN" · LB stops sending traffic  BECAUSE /health reported the db check failed`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Running but unable to serve', content: '<p><strong>Why.</strong> A service instance can be incapable of handling requests yet still be running, for example when it has run out of database connections.</p><p><strong>Claim.</strong> Being alive is not the same as being healthy, so a process check alone is not enough to detect the failure.</p><p><strong>Grounding.</strong> The pattern exists to answer how to detect that a running service instance is unable to handle requests.</p><p><strong>In the wild.</strong> When this state is missed, a monitoring system fails to alert and a load balancer keeps routing to the broken instance.</p>' },

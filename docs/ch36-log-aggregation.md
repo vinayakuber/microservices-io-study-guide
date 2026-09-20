@@ -190,6 +190,68 @@ n0["<b>1. New line indexed</b><br/>ERROR order-service REQ-3001 customer lookup 
 ```
 
 
+## System Design Interview
+
+**The pipeline:** writer → transport → collector → aggregator/store → reader
+
+### Three services — the writers
+
+_Role: writer_
+
+```mermaid
+flowchart TD
+  R["Three services — the writers"]
+  R --> P0["Order Service — writes a log line tagged REQ-3001"]
+  R --> P1["Customer Service and Payment Service — write their own lines for REQ-3001"]
+```
+
+### Central logging service — collector + aggregator/store
+
+_Role: collector / aggregator/store_
+
+```mermaid
+flowchart TD
+  R["Central logging service — collector + aggregator/store"]
+  R --> P0["collects the lines shipped by each service"]
+  R --> P1["indexes them by request id into {&quot;REQ-3001&quot;:[1,2,3]}"]
+```
+
+### Developer — the reader
+
+_Role: reader_
+
+```mermaid
+flowchart TD
+  R["Developer — the reader"]
+  R --> P0["searches REQ-3001"]
+  R --> P1["reads the 3 correlated lines from the index"]
+```
+
+```mermaid
+flowchart LR
+  SVC1["Order Service"] -->|"ship log"| LOG["Central logging service"]
+  SVC2["Customer Service"] -->|"ship log"| LOG
+  SVC3["Payment Service"] -->|"ship log"| LOG
+  LOG -->|"index by request id"| IDX["aggregated index REQ-3001"]
+  IDX -->|"search"| DEV["Developer reader"]
+```
+
+```java
+// SYSTEM DESIGN — log aggregation: writer -> transport -> collector -> aggregator/store -> reader
+// PARTIES: SVC1 = Order Service (writer) · SVC2 = Customer Service (writer) · SVC3 = Payment Service (writer) · LOG = central logging service (collector + aggregator) · DEV = developer (reader)
+// DEF: log — one service log line; here { "request_id":"REQ-3001", "level":"ERROR" }
+// DEF: index — a store mapping a request id to the services that logged it; here { "REQ-3001":[1,2,3] }
+// STATE (before):
+//    index : {}        // no request correlated yet
+//    entries : []      // no log lines stored yet
+// DEF: aggregate_logs · CALLED BY: SVC1 writing, LOG indexing, DEV searching REQ-3001
+// -> request_id : "REQ-3001"
+//    step 1 · SVC1, SVC2, SVC3 each ship a log line   // entries : [] -> [3 lines]   BECAUSE all three services tag their lines with REQ-3001
+//    step 2 · LOG indexes each line by request id   // index : {} -> { "REQ-3001":[1,2,3] }   BECAUSE the collector keys the store by request id
+//    step 3 · DEV searches the index   // found : 0 -> 3   BECAUSE the reader queries the index and gets all three lines back
+// <- outcome : index["REQ-3001"] = [1,2,3] · DEV reads 3 correlated lines  BECAUSE transport moved each write into one aggregated store
+```
+
 ## Interview Questions
 
 ### Q1

@@ -221,6 +221,67 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** sender/producer → message channel (broker) → receiver/consumer
+
+### the sender — e.g. Order Service
+
+_Role: writer (producer)_
+
+```mermaid
+flowchart TD
+  R["the sender — e.g. Order Service"]
+  R --> P0["builds the message — OrderCreated(PO-2001)"]
+  R --> P1["sends it to the channel and returns at once"]
+```
+
+### the message channel — the broker
+
+_Role: transport_
+
+```mermaid
+flowchart TD
+  R["the message channel — the broker"]
+  R --> P0["RabbitMQ broker holding the queue"]
+  R --> P1["buffers messages until the consumer is ready"]
+```
+
+### the receiver — e.g. Kitchen consumer
+
+_Role: reader (consumer)_
+
+```mermaid
+flowchart TD
+  R["the receiver — e.g. Kitchen consumer"]
+  R --> P0["subscribes to the channel"]
+  R --> P1["handles each message — starts cooking"]
+```
+
+```mermaid
+flowchart LR
+  PUB["sender: Order Service"] -->|"publish message"| BRK["transport: RabbitMQ queue orders"]
+  BRK -->|"deliver copy"| CON["receiver: Kitchen consumer"]
+```
+
+```java
+// SYSTEM DESIGN — messaging as a pipeline: sender/producer (builds the message, sends it) -> transport (RabbitMQ channel) -> receiver/consumer (subscribes, handles the message)
+// PARTIES: PUB = Order Service (producer/writer: builds the message and publishes it) · BRK = RabbitMQ broker (transport: the message channel) · CON = Kitchen consumer (reader: subscribes and handles messages)
+// DEF: message — the payload a sender writes to a channel; here "OrderCreated(PO-2001)"
+// DEF: channel — the named conduit through which messages flow from sender to receiver; here the RabbitMQ queue "orders"
+// DEF: inbox — a consumer's subscription mailbox the broker delivers one copy into; here "kitchen_inbox"
+// STATE (before):
+//    channel : []   // the RabbitMQ queue "orders" (transport)
+//    inbox   : []   // CON's subscription mailbox
+// DEF: publish_consume · CALLED BY: PUB after creating order "PO-2001"
+// -> order_id : "PO-2001" · -> event : "OrderCreated"
+//    step 1 · PUB builds the message    message : "none" -> "OrderCreated(PO-2001)"
+//    step 2 · PUB publishes to the channel    channel : [] -> [ "OrderCreated(PO-2001)" ]
+//    step 3 · BRK delivers a copy to CON's inbox    inbox : [] -> [ "OrderCreated(PO-2001)" ]
+//    step 4 · CON consumes and handles it    kitchen : {} -> { "PO-2001": "COOKING" }   BECAUSE the receiver reads the channel and handles the message
+// <- outcome : CON handled "OrderCreated(PO-2001)" · PUB returned at once, no reply   BECAUSE sender and receiver never run at the same instant
+```
+
 ## Interview Questions
 
 ### Q1

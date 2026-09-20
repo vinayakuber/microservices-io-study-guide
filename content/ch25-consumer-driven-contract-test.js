@@ -150,6 +150,51 @@ registerChapter({
       problems: ["03-framework-for-system-design-interviews"]
     }
   ],
+  systemDesign: {
+    pipeline: 'consumer → contract/expectation → provider verification → provider',
+    decomposition: [
+      {
+        box: 'API Gateway — the consumer',
+        role: 'consumer',
+        parts: [
+          'OrderServiceProxy — calls GET /orders/{orderId}',
+          'contract suite — defines the expectation and generates the contract'
+        ]
+      },
+      {
+        box: 'Pact broker — the contract repo',
+        role: 'contract broker/repo',
+        parts: [
+          'stores the example request/reply contract',
+          'serves the contract back to the provider pipeline'
+        ]
+      },
+      {
+        box: 'Order Service — the provider',
+        role: 'provider verification + provider',
+        parts: [
+          'verifies the actual response against the contract',
+          'keeps the promise: serves GET /orders/ORD-4007 with status 200'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  GW[\"API Gateway (consumer)\"] -->|\"defines expectation\"| PACT[\"Pact broker (contract repo)\"]\n  PACT -->|\"serves contract\"| PIPE[\"deployment pipeline (verifier)\"]\n  PIPE -->|\"invokes\"| SVC[\"Order Service (provider)\"]\n  SVC -->|\"actual 200 + JSON body\"| PIPE\n  PIPE -->|\"verdict pass/fail\"| RES[\"provider keeps promise\"]",
+    program: `// SYSTEM DESIGN — consumer-driven contract test: consumer (API Gateway) -> contract/expectation (Pact broker) -> provider verification (deployment pipeline) -> provider (Order Service)
+// PARTIES: GW = API Gateway (consumer) · PACT = Pact broker (contract repo, holds the expectation) · PIPE = deployment pipeline (verifier, runs the suite) · SVC = Order Service (provider)
+// DEF: contract — the example request/reply pair one interaction is pinned to; here {"request":{"method":"GET","path":"/orders/ORD-4007"},"reply":{"status":200,"body":{"orderId":"ORD-4007","state":"CREATED"}}}
+// DEF: expectation — what the consumer needs the provider to keep; here GET /orders/ORD-4007 answered with status 200 and a JSON body
+// DEF: verdict — the pass/fail the verifier reaches; here "pass" when actual equals expected
+// STATE (before):
+//    contracts : {}          // PACT holds no contract yet
+//    actual : { status:0, body:{} }
+//    verdict : ""
+// DEF: pin_and_verify · CALLED BY: GW publishing its expectation, then PIPE verifying SVC
+// -> order_id : "ORD-4007"
+//    step 1 · GW defines the expectation and PACT stores it    contracts : {} -> {"gateway-orders":{"request":{"method":"GET","path":"/orders/ORD-4007"},"reply":{"status":200,"body":{"orderId":"ORD-4007","state":"CREATED"}}}}
+//    step 2 · PIPE reads the contract and invokes SVC    actual.status : 0 -> 200 · actual.body : {} -> {"orderId":"ORD-4007","state":"CREATED"}
+//    step 3 · PIPE compares actual against expected    verdict : "" -> "pass"  BECAUSE actual 200 equals expected 200 and the body matches
+// <- outcome : verdict "pass" · SVC keeps its promise  BECAUSE the provider serves GET /orders/ORD-4007 exactly as the contract pins it`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Two services, one implicit agreement', content: '<p><strong>Why.</strong> Every interaction between a pair of services is an agreement — an event message structure and channel, a REST endpoint, or a command and reply format — but nothing pins that agreement down.</p><p><strong>Claim.</strong> You need confidence that the services you consume have stable APIs, and that you do not unintentionally break your own API.</p><p><strong>Grounding.</strong> Order Service and Order History Service must agree on event structure and channel; the API gateway and the services must agree on REST endpoints.</p><p><strong>In the wild.</strong> A change to GET /orders/{orderId} that breaks the API Gateway\'s OrderServiceProxy is a broken contract.</p>' },

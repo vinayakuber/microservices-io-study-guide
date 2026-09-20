@@ -244,6 +244,63 @@ registerChapter({
       problems: ["26-payment-system", "19-distributed-message-queue"]
     }
   ],
+  systemDesign: {
+    pipeline: 'application tx → outbox table → relay publisher → broker',
+    decomposition: [
+      {
+        box: 'order service (application) — the application',
+        role: 'application',
+        parts: [
+          'Writes the order row',
+          'Writes the outbox event row in the same tx'
+        ]
+      },
+      {
+        box: 'orders + outbox table (PostgreSQL 16 @ orders-db-1) — the database',
+        role: 'database',
+        parts: [
+          'Keeps business rows and outbox rows in one instance',
+          'Commits both writes atomically'
+        ]
+      },
+      {
+        box: 'relay publisher — the relay',
+        role: 'relay',
+        parts: [
+          'Reads outbox rows not yet relayed',
+          'Publishes them to the broker',
+          'Marks each row relayed'
+        ]
+      },
+      {
+        box: 'message broker (RabbitMQ) — the broker',
+        role: 'broker',
+        parts: [
+          'Holds published events',
+          'Delivers them to subscribers'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  SVC[\"order service (application)\"] -->|\"BEGIN ... write order + outbox ... COMMIT\"| DB[(\"PostgreSQL 16 @ orders-db-1\")]\n  DB -->|\"SELECT outbox sent=false\"| RLY[\"relay publisher\"]\n  RLY -->|\"publish OrderPlaced\"| BRK[(\"message broker RabbitMQ\")]\n  RLY -->|\"mark sent=true\"| DB\n  BRK -->|\"consume\"| CNS[\"subscriber\"]",
+    program: `// SYSTEM DESIGN — transactional outbox as a pipeline: application tx -> outbox table (same database) -> relay publisher -> broker (reliable, no dual-write)
+// PARTIES: SVC = order service (application) · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox in one instance) · RLY = relay publisher · BRK = message broker (RabbitMQ) · CNS = subscriber
+// DEF: orders — the business table; here [ ("PO-77", "PENDING"), ("PO-2001", "APPROVED") ]
+// DEF: outbox — the event table written in the same tx; here [ (1, "OrderPlaced", "PO-77"), (2, "PaymentAuthorized", "PO-2001") ]
+// DEF: event — an event the relay publishes from an outbox row; here {"type":"OrderPlaced","order_id":"PO-77"}
+// DEF: status — a row's relay flag; here "unsent" -> "sent"
+// STATE (before):
+//    orders : [ ("PO-77", "PENDING"), ("PO-2001", "APPROVED") ]
+//    outbox : []
+//    event  : "none"
+//    status : "unsent"
+// DEF: place_order · CALLED BY: SVC handling POST /orders
+// -> request : {"order_id":"PO-77"}
+//    step 1 · SVC writes order and outbox row atomically    outbox : [] -> [ (1, "OrderPlaced", "PO-77") ]   BECAUSE both writes share one database transaction
+//    step 2 · SVC commits the transaction    orders : [("PO-77","PENDING"),("PO-2001","APPROVED")] -> [("PO-77","PENDING"),("PO-2001","APPROVED")]   BECAUSE the order and event become visible together, never half-written
+//    step 3 · RLY publishes the outbox row    event : "none" -> {"type":"OrderPlaced","order_id":"PO-77"}   BECAUSE the relay reads the row and hands it to BRK
+//    step 4 · RLY marks the row relayed    status : "unsent" -> "sent"   BECAUSE the flag stops the row being republished
+// <- outcome : BRK holds [ "OrderPlaced" ] · the order and event never diverge (same tx)`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'The write and the message drift apart', content: '<p><strong>Why.</strong> A service command must update aggregates in the database AND send events to a broker, but 2PC across the two is not viable and coupling the service to both is undesirable.</p><p><strong>Claim.</strong> Without atomicity, a committed database change can lose its event (crash before send) or an event can escape a transaction that rolls back.</p><p><strong>Grounding.</strong> The reference: sending a message mid-transaction is unreliable because there is no guarantee the transaction commits, and sending after commit has no guarantee the service will not crash first.</p><p><strong>In the wild.</strong> Any saga participant or domain-event publisher hits this: it must change state and publish in one step.</p>' },

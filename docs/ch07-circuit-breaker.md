@@ -210,6 +210,70 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** caller → breaker proxy → downstream service
+
+### the caller
+
+_Role: caller_
+
+```mermaid
+flowchart TD
+  R["the caller"]
+  R --> P0["makes remote calls through the breaker"]
+  R --> P1["gets a fail-fast verdict while the breaker is OPEN"]
+```
+
+### the breaker proxy
+
+_Role: breaker_
+
+```mermaid
+flowchart TD
+  R["the breaker proxy"]
+  R --> P0["failure counter (trips at threshold 4)"]
+  R --> P1["timeout timer (250 ms)"]
+  R --> P2["state machine CLOSED / OPEN / HALF-OPEN"]
+```
+
+### the downstream service
+
+_Role: server_
+
+```mermaid
+flowchart TD
+  R["the downstream service"]
+  R --> P0["answers calls while healthy"]
+  R --> P1["times out when degraded"]
+```
+
+```mermaid
+flowchart LR
+  CLIENT["caller: client"] -->|"call"| PROXY["breaker: circuit breaker proxy"]
+  PROXY -->|"forward CLOSED / fail fast OPEN"| SVC["server: downstream service"]
+```
+
+```java
+// SYSTEM DESIGN — the circuit breaker as a pipeline: caller -> breaker proxy -> downstream service
+// PARTIES: CLIENT = client (caller: makes remote calls through the breaker) · PROXY = circuit breaker proxy (breaker: trips after a threshold of failures, fails fast, lets test requests through) · SVC = downstream service (server: answers the call)
+// DEF: breaker — the stateful switch between the caller and the service; here { state:"CLOSED", consecutive_failures:0, threshold:4, timeout_ms:250 }
+// DEF: failure — a call that ended in error or timeout; here "charge-card-4"
+// STATE (before):
+//    breaker : { state:"CLOSED", consecutive_failures:0, threshold:4, timeout_ms:250 }
+//    remote_calls : 0
+//    consecutive_failures : 0
+//    verdict : "UNSET"
+// DEF: call · CALLED BY: CLIENT, a request that keeps timing out
+// -> request : "charge-card-4"
+//    step 1 · CLIENT calls through the proxy : remote_calls : 0 -> 1
+//    step 2 · SVC times out and the proxy records a failure : consecutive_failures : 0 -> 4
+//    step 3 · PROXY reads the counter against the threshold : breaker.state : "CLOSED" -> "OPEN"
+//    step 4 · PROXY fails fast : verdict : "UNSET" -> "OPEN"
+// <- verdict : "OPEN" · further calls fail immediately without touching SVC
+//    alt after timeout : PROXY lets one test request through  BECAUSE a half-open breaker probes the service before resuming
+```
+
 ## Interview Questions
 
 ### Q1

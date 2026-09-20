@@ -224,6 +224,82 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** client → API gateway → microservices → service databases
+
+### the client
+
+_Role: client_
+
+```mermaid
+flowchart TD
+  R["the client"]
+  R --> P0["sends a request to the API gateway"]
+  R --> P1["reads the composed response"]
+```
+
+### the API gateway
+
+_Role: gateway (the entry point)_
+
+```mermaid
+flowchart TD
+  R["the API gateway"]
+  R --> P0["routes the request to one or more services"]
+  R --> P1["composes the responses into one page"]
+```
+
+### each microservice — e.g. the order service
+
+_Role: service_
+
+```mermaid
+flowchart TD
+  R["each microservice — e.g. the order service"]
+  R --> P0["own business logic — implements one or more subdomains"]
+  R --> P1["own database — PostgreSQL 16 @ order-db-1"]
+  R --> P2["communicates over HTTP or messaging"]
+```
+
+### the service database
+
+_Role: store_
+
+```mermaid
+flowchart TD
+  R["the service database"]
+  R --> P0["PostgreSQL 16 @ order-db-1 — one engine and instance per service"]
+  R --> P1["no single ACID commit spans two services"]
+```
+
+```mermaid
+flowchart LR
+  CLI["Client"] -->|"GET /orders/PO-2001"| GW["API gateway"]
+  GW -->|"route"| SVC["order service"]
+  SVC -->|"own business logic"| BL["business logic"]
+  BL -->|"write / read"| DB[("PostgreSQL 16 @ order-db-1")]
+  DB -->|"rows back"| BL
+  GW -->|"compose one page"| CLI
+```
+
+```java
+// SYSTEM DESIGN — microservices: client -> API gateway -> microservices (own business logic + own database) -> service databases; a distributed command becomes a saga of local transactions
+// PARTIES: CLI = customer client · GW = API gateway (the entry point, routes and composes) · SVC = order service (owns the Order subdomain) · DB = PostgreSQL 16 @ order-db-1 (the order service's own database)
+// DEF: service — an independently deployable, loosely coupled unit owning one or more subdomains; here "order" owns the Order subdomain
+// DEF: local — a transaction confined to one service and its own database; here local txn "T1" = {service:"order", state:"NEW"}
+// DEF: order — the Order subdomain's row, keyed by purchase-order id; here "PO-2001" = {status:"DRAFT"}
+// STATE (before):
+//    orders : {}   // the Order rows the order service owns (in its own DB)
+// DEF: placeOrder · CALLED BY: GW routing a client request to the order service
+// -> order_id : "PO-2001" · -> amount : 40
+//    step 1 · GW routes the request to SVC    route : "none" -> "order"
+//    step 2 · SVC writes the order in its own DB    orders : {} -> { "PO-2001": {status:"DRAFT"} }
+//    step 3 · SVC commits the local txn T1    local : "NEW" -> "DONE"   BECAUSE each service commits against its OWN database
+//    step 4 · GW reads the result and composes    GET /orders/PO-2001 -> { id:"PO-2001", status:"PLACED" }
+// <- outcome : one page composed from local results · a multi-service command runs as a saga of 3 local transactions, not one ACID commit   BECAUSE no single database spans the services
+```
+
 ## Interview Questions
 
 ### Q1

@@ -260,6 +260,62 @@ registerChapter({
       problems: ["26-payment-system", "22-hotel-reservation", "19-distributed-message-queue"]
     }
   ],
+  systemDesign: {
+    pipeline: 'orchestrator → participant services → event/message broker',
+    decomposition: [
+      {
+        box: 'saga orchestrator — the orchestrator',
+        role: 'orchestrator',
+        parts: [
+          'Orders each participant to act',
+          'Tracks the saga state',
+          'Triggers compensations on failure'
+        ]
+      },
+      {
+        box: 'order service — the participant',
+        role: 'participant service',
+        parts: [
+          'Executes its step',
+          'Publishes its outcome event'
+        ]
+      },
+      {
+        box: 'customer service — the participant',
+        role: 'participant service',
+        parts: [
+          'Reserves credit for the order',
+          'Publishes CreditReserved'
+        ]
+      },
+      {
+        box: 'event / message broker (RabbitMQ) — the broker',
+        role: 'broker',
+        parts: [
+          'Carries step results back to the orchestrator'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  ORCH[\"saga orchestrator\"] -->|\"reserve credit 100.00\"| CS[\"customer service\"]\n  CS -->|\"CreditReserved\"| BRK[(\"message broker RabbitMQ\")]\n  BRK -->|\"step outcome\"| ORCH\n  ORCH -->|\"create ticket\"| KIT[\"kitchen service\"]\n  ORD[\"order service\"] -->|\"OrderCreated\"| ORCH",
+    program: `// SYSTEM DESIGN — saga (orchestrated) as a pipeline: orchestrator -> participant services -> event/message broker (each step executes + records state, compensations on failure)
+// PARTIES: ORCH = saga orchestrator (orders steps, tracks state, compensates) · ORD = order service (participant) · CS = customer service (participant) · KIT = kitchen service (participant) · BRK = message broker (RabbitMQ)
+// DEF: orders — ORD's datastore; here PostgreSQL 16 @ orders-db-1, row ("PO-77", "PENDING")
+// DEF: customers — CS's datastore; here PostgreSQL 16 @ customers-db-1, row ("CUST-7", credit 500.00)
+// DEF: events — the emitted event stream; here [ "OrderCreated", "CreditReserved", "ticket_created" ]
+// DEF: state — the saga's state; here "NEW" -> "COMPLETED"
+// STATE (before):
+//    orders    : [ ("PO-77", "PENDING") ]
+//    customers : [ ("CUST-7", credit 500.00) ]
+//    events    : []
+//    state     : "NEW"
+// DEF: run_saga · CALLED BY: ORCH receiving "OrderCreated" for PO-77
+// -> command : "reserve credit 100.00 for CUST-7"
+//    step 1 · ORCH orders CS to reserve credit    customers : [("CUST-7", credit 500.00)] -> [("CUST-7", credit 400.00)]   BECAUSE CS debits 100.00 for the reservation
+//    step 2 · CS publishes CreditReserved    events : [] -> [ "OrderCreated", "CreditReserved" ]   BECAUSE the participant publishes its outcome back to the orchestrator
+//    step 3 · ORCH orders KIT to create the ticket    events : ["OrderCreated","CreditReserved"] -> ["OrderCreated","CreditReserved","ticket_created"]   BECAUSE the next participant acts on the reserved credit
+//    step 4 · saga completes    state : "NEW" -> "COMPLETED"   BECAUSE every step succeeded with no compensation needed
+// <- outcome : state "COMPLETED" for saga SAGA-1 · credit debited 100.00 from CUST-7`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'A transaction spans multiple services', content: '<p><strong>Why.</strong> Database per Service gives each service its own database, but a business transaction like creating an order also checks a credit limit that lives in another service.</p><p><strong>Claim.</strong> You need a mechanism to implement transactions that span multiple services, because a local ACID transaction cannot reach across databases and 2PC is not an option.</p><p><strong>Grounding.</strong> Orders and Customers are in different databases owned by different services, so the application cannot simply use a local ACID transaction.</p><p><strong>In the wild.</strong> An e-commerce store where a new order must not exceed the credit limit of the customer.</p>' },

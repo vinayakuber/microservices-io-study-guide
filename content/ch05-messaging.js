@@ -238,6 +238,51 @@ registerChapter({
       problems: ["19-distributed-message-queue", "10-notification-system"]
     }
   ],
+  systemDesign: {
+    pipeline: 'sender/producer → message channel (broker) → receiver/consumer',
+    decomposition: [
+      {
+        box: 'the sender — e.g. Order Service',
+        role: 'writer (producer)',
+        parts: [
+          'builds the message — OrderCreated(PO-2001)',
+          'sends it to the channel and returns at once'
+        ]
+      },
+      {
+        box: 'the message channel — the broker',
+        role: 'transport',
+        parts: [
+          'RabbitMQ broker holding the queue',
+          'buffers messages until the consumer is ready'
+        ]
+      },
+      {
+        box: 'the receiver — e.g. Kitchen consumer',
+        role: 'reader (consumer)',
+        parts: [
+          'subscribes to the channel',
+          'handles each message — starts cooking'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  PUB[\"sender: Order Service\"] -->|\"publish message\"| BRK[\"transport: RabbitMQ queue orders\"]\n  BRK -->|\"deliver copy\"| CON[\"receiver: Kitchen consumer\"]",
+    program: `// SYSTEM DESIGN — messaging as a pipeline: sender/producer (builds the message, sends it) -> transport (RabbitMQ channel) -> receiver/consumer (subscribes, handles the message)
+// PARTIES: PUB = Order Service (producer/writer: builds the message and publishes it) · BRK = RabbitMQ broker (transport: the message channel) · CON = Kitchen consumer (reader: subscribes and handles messages)
+// DEF: message — the payload a sender writes to a channel; here "OrderCreated(PO-2001)"
+// DEF: channel — the named conduit through which messages flow from sender to receiver; here the RabbitMQ queue "orders"
+// DEF: inbox — a consumer's subscription mailbox the broker delivers one copy into; here "kitchen_inbox"
+// STATE (before):
+//    channel : []   // the RabbitMQ queue "orders" (transport)
+//    inbox   : []   // CON's subscription mailbox
+// DEF: publish_consume · CALLED BY: PUB after creating order "PO-2001"
+// -> order_id : "PO-2001" · -> event : "OrderCreated"
+//    step 1 · PUB builds the message    message : "none" -> "OrderCreated(PO-2001)"
+//    step 2 · PUB publishes to the channel    channel : [] -> [ "OrderCreated(PO-2001)" ]
+//    step 3 · BRK delivers a copy to CON's inbox    inbox : [] -> [ "OrderCreated(PO-2001)" ]
+//    step 4 · CON consumes and handles it    kitchen : {} -> { "PO-2001": "COOKING" }   BECAUSE the receiver reads the channel and handles the message
+// <- outcome : CON handled "OrderCreated(PO-2001)" · PUB returned at once, no reply   BECAUSE sender and receiver never run at the same instant`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Tight runtime coupling', content: '<p><strong>Why.</strong> Synchronous calls force the caller and the callee to be alive for the whole request, so one slow or dead service stalls every service that calls it.</p><p><strong>Claim.</strong> Synchronous communication results in tight runtime coupling.</p><p><strong>Grounding.</strong> The reference lists it as a force: both the client and service must be available for the duration of the request.</p><p><strong>In the wild.</strong> A REST call chain where an outage in the last hop blocks the first hop and cascades upstream.</p>' },

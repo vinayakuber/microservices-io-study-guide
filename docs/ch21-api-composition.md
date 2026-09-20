@@ -196,6 +196,74 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** client → API composer → provider services → their databases
+
+### API Composer
+
+_Role: API composer_
+
+```mermaid
+flowchart TD
+  R["API Composer"]
+  R --> P0["query — invokes each provider service that owns a fragment"]
+  R --> P1["join — merges fragments in memory on a shared key"]
+  R --> P2["returns one combined response"]
+```
+
+### provider services
+
+_Role: provider services_
+
+```mermaid
+flowchart TD
+  R["provider services"]
+  R --> P0["Order Service — owns the order rows"]
+  R --> P1["Customer Service — owns the customer rows"]
+  R --> P2["Inventory Service — owns the stock rows"]
+```
+
+### their databases
+
+_Role: databases_
+
+```mermaid
+flowchart TD
+  R["their databases"]
+  R --> P0["PostgreSQL 16 @ orders-db-1"]
+  R --> P1["PostgreSQL 16 @ customers-db-1"]
+```
+
+```mermaid
+flowchart LR
+  CLI["client"] -->|"get order O-101"| CMP["API Composer"]
+  CMP -->|"fetch order"| ORD["Order Service"]
+  CMP -->|"fetch customer"| CUST["Customer Service"]
+  ORD -->|"reads"| ORDDB[("PostgreSQL 16 @ orders-db-1")]
+  CUST -->|"reads"| CUSTDB[("PostgreSQL 16 @ customers-db-1")]
+  CMP -->|"join in memory"| OUT["order + customer name"]
+```
+
+```java
+// SYSTEM DESIGN — API composition as a pipeline: client -> API composer -> provider services -> their databases
+// PARTIES: CLI = client · CMP = API Composer (query orchestrator) · ORD = Order Service (provider service) · CUST = Customer Service (provider service) · ORDDB = PostgreSQL 16 @ orders-db-1 · CUSTDB = PostgreSQL 16 @ customers-db-1
+// DEF: fragment — one partial result a provider returns, keyed by a shared id; here the order fragment { order_id:"O-101", cust_id:"C-77", total:120.00 }
+// DEF: join — merging fragments in memory on the shared key; here cust_id "C-77" pulls in name "Ada"
+// DEF: db — a service-owned database; here ORDDB holds "O-101" and CUSTDB holds "C-77"
+// STATE (before):
+//    orders    : [ { order_id:"O-101", cust_id:"C-77", total:120.00 } ]
+//    customers : [ { id:"C-77", name:"Ada" } ]
+//    joined    : {}
+// DEF: compose_order · CALLED BY: CLI asking for order "O-101"
+// -> order_id : "O-101"
+//    step 1 · CMP queries ORD    order_row : "none" -> { order_id:"O-101", cust_id:"C-77", total:120.00 }  BECAUSE ORD reads its own ORDDB
+//    step 2 · CMP queries CUST by the foreign key    cust_row : "none" -> { id:"C-77", name:"Ada" }
+//    step 3 · CMP joins in memory    joined : {} -> { order_id:"O-101", cust_id:"C-77", total:120.00, name:"Ada" }
+//    step 4 · CMP returns one response    response : "none" -> { order_id:"O-101", name:"Ada", total:120.00 }
+// <- outcome : CLI gets { order_id:"O-101", name:"Ada", total:120.00 }  BECAUSE the composer read each provider's fragment from its own database and joined them in memory
+```
+
 ## Interview Questions
 
 ### Q1

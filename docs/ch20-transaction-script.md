@@ -145,6 +145,80 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** presentation tier → transaction script (OrderService) → DAO (OrderDao) → database
+
+### presentation tier
+
+_Role: presentation tier_
+
+```mermaid
+flowchart TD
+  R["presentation tier"]
+  R --> P0["receives the HTTP request POST /orders"]
+  R --> P1["maps it to OrderService.createOrder()"]
+```
+
+### OrderService — the transaction script
+
+_Role: transaction script (service class)_
+
+```mermaid
+flowchart TD
+  R["OrderService — the transaction script"]
+  R --> P0["createOrder() — one procedural method per request type"]
+  R --> P1["reviseOrder()/cancelOrder() — each runs its whole transaction"]
+  R --> P2["mutates a pure-data Order object step by step"]
+```
+
+### OrderDao — the DAO
+
+_Role: DAO_
+
+```mermaid
+flowchart TD
+  R["OrderDao — the DAO"]
+  R --> P0["save(Order) — writes the row"]
+  R --> P1["findOrderById() — reads the row back"]
+```
+
+### PostgreSQL 16 @ orders-db-1 — the database
+
+_Role: database_
+
+```mermaid
+flowchart TD
+  R["PostgreSQL 16 @ orders-db-1 — the database"]
+  R --> P0["holds the Order rows"]
+  R --> P1["written by save(Order), read by findOrderById()"]
+```
+
+```mermaid
+flowchart LR
+  WEB["presentation tier"] -->|"POST /orders"| TS["transaction script: OrderService.createOrder()"]
+  TS -->|"save(Order)"| DAO["DAO: OrderDao"]
+  DAO -->|"INSERT / SELECT"| DB[("PostgreSQL 16 @ orders-db-1")]
+```
+
+```java
+// SYSTEM DESIGN — transaction script as a pipeline: presentation tier -> transaction script (OrderService) -> DAO (OrderDao) -> database (PostgreSQL 16 @ orders-db-1)
+// PARTIES: WEB = presentation tier (client) · SVC = OrderService (transaction script service class) · DAO = OrderDao (data access object) · DB = PostgreSQL 16 @ orders-db-1
+// DEF: script — one procedural method per request type; here createOrder() runs request "PO-100" top-to-bottom
+// DEF: order — a pure-data object with no behavior; here { orderId:"PO-100", lineItems:[{sku:"S1", qty:2, unit:25.00}] }
+// DEF: dao — the data-access layer; here save(Order) writes row "PO-100" and findOrderById() reads it back
+// STATE (before):
+//    order : { orderId:null, lineItems:[] }
+//    rows  : {}
+// DEF: create_order · CALLED BY: WEB issuing POST /orders
+// -> order_id : "PO-100" · -> line_items : [{sku:"S1", qty:2, unit:25.00}]
+//    step 1 · script fills the data object    order : { orderId:null, lineItems:[] } -> { orderId:"PO-100", lineItems:[{sku:"S1", qty:2, unit:25.00}] }
+//    step 2 · script hands off to the DAO    DAO.save(order) -> rows : {} -> { "PO-100" : { lineItems:[{sku:"S1", qty:2, unit:25.00}] } }
+//    step 3 · script reads it back through the DAO    findOrderById("PO-100") -> rows["PO-100"] : { orderId:"PO-100", lineItems:[{sku:"S1", qty:2, unit:25.00}] } returned
+//    step 4 · WEB receives the row    response : "none" -> { orderId:"PO-100", lineItems:[{sku:"S1", qty:2, unit:25.00}] }
+// <- outcome : DB row "PO-100" persisted and returned  BECAUSE the script wrote through OrderDao.save and read back through OrderDao.findOrderById
+```
+
 ## Interview Questions
 
 ### Q1
@@ -163,7 +237,7 @@ Your business logic is simple, and you want each HTTP request handled by one pro
 
 ```mermaid
 flowchart LR
-  WEB["create_order request"] -->|createOrder()| TS["TransactionScript"]
+  WEB["create_order request"] -->|"createOrder()"| TS["TransactionScript"]
   TS -->|save| DAO["OrderDao"]
   DAO -->|INSERT| DB[("Database")]
 ```
@@ -325,7 +399,7 @@ Organize business logic as a collection of procedural transaction scripts, one f
 
 ```mermaid
 flowchart LR
-  WEB["create_order request"] -->|createOrder()| TS["TransactionScript"]
+  WEB["create_order request"] -->|"createOrder()"| TS["TransactionScript"]
   TS -->|save| DAO["OrderDao"]
   DAO -->|INSERT| DB[("Database")]
 ```

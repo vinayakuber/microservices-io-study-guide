@@ -240,6 +240,62 @@ registerChapter({
       problems: ["19-distributed-message-queue", "26-payment-system"]
     }
   ],
+  systemDesign: {
+    pipeline: 'database transaction log → log tailer/miner → message broker → subscriber',
+    decomposition: [
+      {
+        box: 'source database (transaction log) — the source database',
+        role: 'source database',
+        parts: [
+          'Appends every committed change to the log',
+          'Exposes the log to the tailer'
+        ]
+      },
+      {
+        box: 'log tailer / miner — the tailer',
+        role: 'log tailer',
+        parts: [
+          'Tails the transaction log',
+          'Converts log records into domain events',
+          'Publishes each event to the broker'
+        ]
+      },
+      {
+        box: 'message broker (RabbitMQ) — the broker',
+        role: 'broker',
+        parts: [
+          'Receives the events in commit order',
+          'Holds them for subscribers'
+        ]
+      },
+      {
+        box: 'subscriber — the consumer',
+        role: 'subscriber',
+        parts: [
+          'Consumes each event off the broker'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  DB[(\"source database: transaction log\")] -->|\"tail binlog/WAL\"| TLR[\"log tailer / miner\"]\n  TLR -->|\"publish OrderCreated\"| BRK[(\"message broker RabbitMQ\")]\n  BRK -->|\"consume\"| CNS[\"subscriber\"]",
+    program: `// SYSTEM DESIGN — transaction log tailing as a pipeline: database transaction log -> log tailer/miner -> message broker -> subscriber (consumer)
+// PARTIES: DB = MySQL 8 @ orders-db-1 (source database) · TLR = log tailer (transaction log miner) · BRK = message broker (RabbitMQ) · CNS = subscriber (consumer)
+// DEF: binlog — the source database's transaction log; here [ (tx 91, "INSERT orders PO-77"), (tx 92, "UPDATE orders") ]
+// DEF: event — a domain event the tailer emits from a log record; here {"type":"OrderCreated","order_id":"PO-77"}
+// DEF: position — where the tailer has read to; here 0 advanced to 92 (LSN / binlog offset)
+// DEF: status — whether an event reached the subscriber; here "pending" -> "delivered"
+// STATE (before):
+//    binlog   : [ (tx 91, "INSERT orders PO-77"), (tx 92, "UPDATE orders") ]
+//    position : 0
+//    event    : "none"
+//    status   : "pending"
+// DEF: tail_and_publish · CALLED BY: TLR reading the log continuously
+// -> log record : (tx 91, "INSERT orders PO-77")
+//    step 1 · TLR reads the next record    position : 0 -> 91   BECAUSE the tailer advances past the last-read offset
+//    step 2 · TLR emits a domain event    event : "none" -> {"type":"OrderCreated","order_id":"PO-77"}   BECAUSE the INSERT maps to a domain event
+//    step 3 · TLR publishes the event to BRK    status : "pending" -> "published"   BECAUSE the event is handed to the broker in commit order
+//    step 4 · CNS consumes "OrderCreated"    status : "published" -> "delivered"   BECAUSE the subscriber reads the event off BRK
+// <- output : BRK holds [ "OrderCreated" ] · CNS consumes it (no app-level write needed to publish)`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'The outbox is committed but sits idle', content: '<p><strong>Why.</strong> The Transactional Outbox pattern leaves messages in the database, and they only matter once they reach the broker.</p><p><strong>Claim.</strong> A relay must discover each committed outbox message and publish it to the broker.</p><p><strong>Grounding.</strong> The reference problem statement: how to publish messages and events in the outbox in the database to the message broker.</p><p><strong>In the wild.</strong> The outbox pattern creates the need for this pattern.</p>' },

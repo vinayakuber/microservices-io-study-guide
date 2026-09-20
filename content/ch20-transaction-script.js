@@ -82,7 +82,7 @@ registerChapter({
         "Database — rows the DAO writes"
       ],
       diagram: `flowchart LR
-  WEB["create_order request"] -->|createOrder()| TS["TransactionScript"]
+  WEB["create_order request"] -->|"createOrder()"| TS["TransactionScript"]
   TS -->|save| DAO["OrderDao"]
   DAO -->|INSERT| DB[("Database")]`,
       code: `// ORDER SERVICE SIDE — the transaction-script pattern: one procedural method per request type, using a DAO for the database
@@ -189,6 +189,60 @@ registerChapter({
       problems: ["03-framework-for-system-design-interviews"]
     }
   ],
+  systemDesign: {
+    pipeline: 'presentation tier → transaction script (OrderService) → DAO (OrderDao) → database',
+    decomposition: [
+      {
+        box: 'presentation tier',
+        role: 'presentation tier',
+        parts: [
+          'receives the HTTP request POST /orders',
+          'maps it to OrderService.createOrder()'
+        ]
+      },
+      {
+        box: 'OrderService — the transaction script',
+        role: 'transaction script (service class)',
+        parts: [
+          'createOrder() — one procedural method per request type',
+          'reviseOrder()/cancelOrder() — each runs its whole transaction',
+          'mutates a pure-data Order object step by step'
+        ]
+      },
+      {
+        box: 'OrderDao — the DAO',
+        role: 'DAO',
+        parts: [
+          'save(Order) — writes the row',
+          'findOrderById() — reads the row back'
+        ]
+      },
+      {
+        box: 'PostgreSQL 16 @ orders-db-1 — the database',
+        role: 'database',
+        parts: [
+          'holds the Order rows',
+          'written by save(Order), read by findOrderById()'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  WEB[\"presentation tier\"] -->|\"POST /orders\"| TS[\"transaction script: OrderService.createOrder()\"]\n  TS -->|\"save(Order)\"| DAO[\"DAO: OrderDao\"]\n  DAO -->|\"INSERT / SELECT\"| DB[(\"PostgreSQL 16 @ orders-db-1\")]",
+    program: `// SYSTEM DESIGN — transaction script as a pipeline: presentation tier -> transaction script (OrderService) -> DAO (OrderDao) -> database (PostgreSQL 16 @ orders-db-1)
+// PARTIES: WEB = presentation tier (client) · SVC = OrderService (transaction script service class) · DAO = OrderDao (data access object) · DB = PostgreSQL 16 @ orders-db-1
+// DEF: script — one procedural method per request type; here createOrder() runs request "PO-100" top-to-bottom
+// DEF: order — a pure-data object with no behavior; here { orderId:"PO-100", lineItems:[{sku:"S1", qty:2, unit:25.00}] }
+// DEF: dao — the data-access layer; here save(Order) writes row "PO-100" and findOrderById() reads it back
+// STATE (before):
+//    order : { orderId:null, lineItems:[] }
+//    rows  : {}
+// DEF: create_order · CALLED BY: WEB issuing POST /orders
+// -> order_id : "PO-100" · -> line_items : [{sku:"S1", qty:2, unit:25.00}]
+//    step 1 · script fills the data object    order : { orderId:null, lineItems:[] } -> { orderId:"PO-100", lineItems:[{sku:"S1", qty:2, unit:25.00}] }
+//    step 2 · script hands off to the DAO    DAO.save(order) -> rows : {} -> { "PO-100" : { lineItems:[{sku:"S1", qty:2, unit:25.00}] } }
+//    step 3 · script reads it back through the DAO    findOrderById("PO-100") -> rows["PO-100"] : { orderId:"PO-100", lineItems:[{sku:"S1", qty:2, unit:25.00}] } returned
+//    step 4 · WEB receives the row    response : "none" -> { orderId:"PO-100", lineItems:[{sku:"S1", qty:2, unit:25.00}] }
+// <- outcome : DB row "PO-100" persisted and returned  BECAUSE the script wrote through OrderDao.save and read back through OrderDao.findOrderById`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Complex logic sprawls when behavior and state are split', content: '<p><strong>Why.</strong> Separating the classes that implement behavior from those that store state means every rule lives in a script far from the data it changes.</p><p><strong>Claim.</strong> The procedural Transaction script style tends not to be a good way to implement complex business logic — scripts grow continually, just as a monolith keeps growing.</p><p><strong>Grounding.</strong> The book lists this as the pattern\'s central drawback after noting the approach uses few of the capabilities of an OOP language.</p><p><strong>In the wild.</strong> An OrderService holding create, revise and cancel scripts absorbs every edge case, so each new rule means editing a shared method.</p>' },

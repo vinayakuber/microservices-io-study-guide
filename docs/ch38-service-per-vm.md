@@ -183,6 +183,67 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** build pipeline → image (AMI) → IaaS → VM instances
+
+### Build pipeline — the baker
+
+_Role: build pipeline_
+
+```mermaid
+flowchart TD
+  R["Build pipeline — the baker"]
+  R --> P0["bakes JDK 17 + OS into one machine image"]
+  R --> P1["publishes the AMI catalog:2.3.0"]
+```
+
+### EC2 IaaS — the provisioner
+
+_Role: IaaS_
+
+```mermaid
+flowchart TD
+  R["EC2 IaaS — the provisioner"]
+  R --> P0["provisions a new EC2 instance per service instance"]
+  R --> P1["boots the AMI on each VM"]
+```
+
+### Auto-scaling group + load balancer
+
+_Role: VM instances_
+
+```mermaid
+flowchart TD
+  R["Auto-scaling group + load balancer"]
+  R --> P0["ASG scales between min 2 and max 6"]
+  R --> P1["ELB routes to the healthy instances i-1, i-2, i-3"]
+```
+
+```mermaid
+flowchart LR
+  BLD["Build pipeline"] -->|"publish AMI catalog:2.3.0"| IaaS["EC2 IaaS"]
+  IaaS -->|"provision EC2 instance"| ASG["Auto-scaling group"]
+  ASG -->|"boot VM"| VM["instances i-1, i-2, i-3"]
+  VM -->|"route"| ELB["Load balancer"]
+```
+
+```java
+// SYSTEM DESIGN — service per VM: build pipeline -> image (AMI) -> IaaS -> VM instances
+// PARTIES: BLD = build pipeline (builder) · REG = AMI catalog (image repository) · IaaS = EC2 infrastructure service (provisions VMs) · ASG = auto-scaling group (scheduler) · ELB = load balancer (routing)
+// DEF: image — a baked machine artifact; here AMI catalog:2.3.0 with JDK 17 + OS
+// DEF: instance — one EC2 VM running the service; here i-1, i-2, i-3
+// STATE (before):
+//    instances : { "i-1":"UP", "i-2":"UP", "i-3":"UP" }   // three VMs behind the ELB
+//    capacity : 3        // current running count
+// DEF: scale_vm · CALLED BY: BLD baking, IaaS provisioning, ASG scaling
+// -> image_name : "catalog:2.3.0"
+//    step 1 · BLD bakes the AMI with JDK 17 + OS   // image : "" -> "catalog:2.3.0"   BECAUSE the build pipeline packages the runtime into one artifact
+//    step 2 · IaaS provisions a fourth EC2 instance   // instances : { "i-1":"UP", "i-2":"UP", "i-3":"UP" } -> { "i-1":"UP", "i-2":"UP", "i-3":"UP", "i-4":"STARTING" }   BECAUSE the ASG raises capacity from 3 toward its max 6
+//    step 3 · ELB adds the new VM to rotation   // capacity : 3 -> 4   BECAUSE the load balancer registers i-4
+// <- outcome : instances = 4 · min 2, max 6  BECAUSE the ASG scales VM instances from the same AMI catalog:2.3.0
+```
+
 ## Interview Questions
 
 ### Q1

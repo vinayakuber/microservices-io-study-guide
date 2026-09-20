@@ -147,6 +147,51 @@ registerChapter({
       problems: ["03-framework-for-system-design-interviews"]
     }
   ],
+  systemDesign: {
+    pipeline: 'consumer → mock provider (contract) → provider service',
+    decomposition: [
+      {
+        box: 'OrderServiceProxy — the consumer under test',
+        role: 'consumer (test)',
+        parts: [
+          'builds the request: GET /orders/ORD-4007 + Accept header',
+          'parses the reply into orderId and state'
+        ]
+      },
+      {
+        box: 'mock provider stub',
+        role: 'mock provider (contract)',
+        parts: [
+          'returns the canned reply: status 200 + JSON body',
+          'stands in for the real Order Service during the test'
+        ]
+      },
+      {
+        box: 'Order Service — the real provider',
+        role: 'provider service',
+        parts: [
+          'owns the real contract: GET /orders/{orderId}',
+          'answers the well-formed request in production'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  CLI[\"OrderServiceProxy (consumer under test)\"] -->|\"sends GET /orders/ORD-4007\"| STUB[\"mock provider stub (contract)\"]\n  STUB -->|\"canned reply 200 + JSON body\"| CLI\n  CLI -->|\"same request in production\"| SVC[\"Order Service (real provider)\"]",
+    program: `// SYSTEM DESIGN — consumer-side contract test: consumer (OrderServiceProxy) -> mock provider (contract stub) -> provider service (real Order Service)
+// PARTIES: CLI = OrderServiceProxy (consumer under test) · STUB = mock provider stub (contract double) · SVC = Order Service (the real provider service)
+// DEF: contract — the shape the client must speak; here GET /orders/ORD-4007 answered with status 200 and body {"orderId":"ORD-4007","state":"CREATED"}
+// DEF: request — the outbound message the client forms; here {"method":"GET","path":"/orders/ORD-4007","headers":{"Accept":"application/json"}}
+// DEF: reply — the incoming message the client parses; here {"status":200,"body":{"orderId":"ORD-4007","state":"CREATED"}}
+// STATE (before):
+//    request : { method:"", path:"", headers:{} }
+//    reply : { status:0, body:{} }
+//    verdict : ""
+// DEF: exercise_client · CALLED BY: the client-side test driving CLI against STUB
+// -> order_id : "ORD-4007"
+//    step 1 · CLI forms the request    request : { method:"", path:"" } -> { method:"GET", path:"/orders/ORD-4007" }
+//    step 2 · STUB returns the canned reply    reply : { status:0, body:{} } -> { status:200, body:{"orderId":"ORD-4007","state":"CREATED"} }
+//    step 3 · CLI parses the reply    verdict : "" -> "pass"  BECAUSE the client read status 200 and decoded orderId and state
+// <- outcome : verdict "pass" · the client can communicate  BECAUSE it sent a well-formed request and consumed the stub's reply, which mirrors SVC's real contract`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'The client\'s half goes unverified', content: '<p><strong>Why.</strong> A service can change, and a client can regress, without anyone noticing that the two no longer fit together.</p><p><strong>Claim.</strong> You need an automated check that the client of a service can still communicate with that service.</p><p><strong>Grounding.</strong> The pattern\'s own statement names the client as the thing under test, not the service.</p><p><strong>In the wild.</strong> An OrderServiceProxy that builds the wrong path silently stops talking to Order Service.</p>' },

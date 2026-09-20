@@ -152,6 +152,92 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** writer (instrumented service) → transport (push/pull) → collector (metrics service) → aggregator (store/registry) → reader (dashboard)
+
+### Order Service — the writer
+
+_Role: writer (instrumented service)_
+
+```mermaid
+flowchart TD
+  R["Order Service — the writer"]
+  R --> P0["counter increments on create_order completion"]
+  R --> P1["histogram observes each request duration"]
+```
+
+### push/pull transport
+
+_Role: transport (push/pull)_
+
+```mermaid
+flowchart TD
+  R["push/pull transport"]
+  R --> P0["push: the service POSTs metrics"]
+  R --> P1["pull: the metrics service GETs /metrics"]
+```
+
+### Prometheus — the collector
+
+_Role: collector (metrics service)_
+
+```mermaid
+flowchart TD
+  R["Prometheus — the collector"]
+  R --> P0["scrapes or receives the metrics"]
+  R --> P1["provides reporting and alerting"]
+```
+
+### time-series registry — the aggregator
+
+_Role: aggregator/store (registry)_
+
+```mermaid
+flowchart TD
+  R["time-series registry — the aggregator"]
+  R --> P0["holds each series keyed by metric name"]
+  R --> P1["stores orders_created and request_ms"]
+```
+
+### dashboard — the reader
+
+_Role: reader (dashboard)_
+
+```mermaid
+flowchart TD
+  R["dashboard — the reader"]
+  R --> P0["queries the stored series"]
+  R --> P1["renders the counts and latencies"]
+```
+
+```mermaid
+flowchart LR
+  SVC["Order Service (writer)"] -->|"push POST metrics"| TR["push/pull transport"]
+  TR -->|"pull GET /metrics"| SVC
+  TR -->|"delivers"| COL["Prometheus (collector)"]
+  COL -->|"stores"| STO[("time-series registry (aggregator)")]
+  STO -->|"queries"| DSH["dashboard (reader)"]
+```
+
+```java
+// SYSTEM DESIGN — application metrics pipeline: writer (Order Service, instrumented) -> transport (push/pull) -> collector (Prometheus metrics service) -> aggregator (time-series registry) -> reader (dashboard)
+// PARTIES: SVC = Order Service (writer, instrumented) · MS = Prometheus (collector, metrics service) · STO = time-series registry (aggregator, holds each series) · DSH = dashboard (reader)
+// DEF: metric — a measured quantity per operation; here counter orders_created = 3 and request_ms_sum = 123
+// DEF: series — one stored time series keyed by metric name; here {"orders_created":3,"request_ms":[41,37,48]}
+// DEF: transport — how metrics travel; here push (SVC POSTs) or pull (MS GETs /metrics every 15 s)
+// STATE (before):
+//    series : {}
+//    counter : { orders_created: 0 }
+// DEF: instrument_and_aggregate · CALLED BY: SVC counting completions, MS scraping on an interval
+// -> request1 : "PO-2001"
+//    step 1 · SVC increments the counter across 3 completions    counter.orders_created : 0 -> 3
+//    step 2 · SVC pushes {"orders_created":3} to MS    series : {} -> {"orders_created":3,"request_ms":[41,37,48]}
+//    step 3 · MS stores each metric as a series    series : {"orders_created":3} -> {"orders_created":3,"request_ms":[41,37,48]}  BECAUSE orders_created and request_ms each become a stored series
+//    step 4 · DSH queries the series and renders the chart    series : {"orders_created":3,"request_ms":[41,37,48]} -> {"orders_created":3,"request_ms":[41,37,48]}  BECAUSE the dashboard reads the counts and latencies back
+// <- outcome : DSH renders orders_created 3 · request_ms [41,37,48]  BECAUSE the writer shipped the values over the transport, the collector stored them, and the reader pulled them back
+```
+
 ## Interview Questions
 
 ### Q1

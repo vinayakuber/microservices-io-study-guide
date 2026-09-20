@@ -201,6 +201,54 @@ registerChapter({
       problems: ["01-scale-from-zero-to-millions", "03-framework-for-system-design-interviews"]
     }
   ],
+  systemDesign: {
+    pipeline: 'service → sidecar proxy (data plane) → control plane',
+    decomposition: [
+      {
+        box: 'Order Service — the business service whose traffic the mesh mediates',
+        role: 'service',
+        parts: [
+          'Application code — sends queries and receives replies',
+          'Traffic — every in/out call is routed through the sidecar proxy'
+        ]
+      },
+      {
+        box: 'sidecar proxy — the per-service data plane',
+        role: 'data plane',
+        parts: [
+          'Interceptor — sees each call before it leaves the service',
+          'mTLS — encrypts service-to-service traffic with a distributed cert',
+          'Retry / circuit-breaker — retries and trips circuits on failures',
+          'Metrics — counts requests and answers health pings'
+        ]
+      },
+      {
+        box: 'control plane — the mesh brain that pushes policy to every proxy',
+        role: 'control plane',
+        parts: [
+          'Route config — distributes route rules to the proxies',
+          'Cert distribution — hands each proxy its mTLS identity'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  SVC[\"Order Service\"] -->|\"SELECT * FROM orders\"| PX[\"sidecar proxy (data plane)\"]\n  PX -->|\"mTLS + route lookup\"| DB[(\"PostgreSQL 16 @ orders-db-1\")]\n  CP[\"control plane\"] -->|\"pushes route config\"| PX\n  CP -->|\"distributes cert cert-7f21\"| PX\n  PX -->|\"reports metrics\"| MON[\"monitoring service\"]",
+    program: `// SYSTEM DESIGN — service mesh: service -> sidecar proxy (data plane) -> control plane
+// PARTIES: SVC = Order Service (business service) · PROXY = sidecar proxy (data plane: intercepts traffic, mTLS, retries/circuit-break, metrics) · CP = control plane (route-config distributor + certificate authority) · DB = PostgreSQL 16 @ orders-db-1 (the proxied backend)
+// DEF: route — one control-plane rule mapping a target host to its backend; here "db:5432" -> "orders-db-1"
+// DEF: trace — one shared id stamped on a request so its hops can be reassembled; here "trc-9f2a"
+// DEF: cert — the mTLS identity the control plane distributes to each proxy; here "cert-7f21"
+// DEF: mTLS — mutual TLS the proxy applies to service-to-service calls; here cert "cert-7f21"
+// STATE (before):
+//    request : {}                                 // the outbound call, not yet seen by the proxy
+//    route_table : { "db:5432": "orders-db-1" }    // routes pushed by the control plane
+// DEF: mediate_one_call · CALLED BY: the Order Service sending a query
+// -> call : "SELECT * FROM orders" · -> target : "db:5432"
+//    step 1 · the proxy intercepts the call    request : {} -> {"call":"SELECT * FROM orders","to":"db:5432"}   BECAUSE the mesh mediates ALL traffic in and out
+//    step 2 · the proxy records the trace id    trace_id : "" -> "trc-9f2a"   // the data plane stamps a unique id
+//    step 3 · the proxy reads the route and applies mTLS    sent : 0 -> 1   // cert "cert-7f21" encrypts the hop to the route "orders-db-1"
+//    step 4 · the control plane pushes fresh routes    route_table : { "db:5432":"orders-db-1" } -> { "db:5432":"orders-db-1", "brk:9092":"broker-1" }   BECAUSE CP distributes config
+// <- call : "SELECT * FROM orders" delivered to "db:5432" · trace_id "trc-9f2a"   BECAUSE the sidecar sits between the service and the network, and the response is routed back to SVC`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'Five cross-cutting concerns per service', content: '<p><strong>Why.</strong> In a set of microservices, every service must implement the same non-business concerns over and over.</p><p><strong>Claim.</strong> The pattern lists them: externalized configuration (credentials and network locations of databases and message brokers), logging, health checks, metrics, and distributed tracing.</p><p><strong>Grounding.</strong> The problem statement enumerates these concerns, including instrumenting services with a unique identifier passed between services for distributed tracing.</p><p><strong>In the wild.</strong> Implementing each concern in every service leads to duplicated, drifting code across the system.</p>' },

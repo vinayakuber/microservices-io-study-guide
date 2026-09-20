@@ -150,6 +150,51 @@ registerChapter({
       problems: ["01-scale-from-zero-to-millions"]
     }
   ],
+  systemDesign: {
+    pipeline: 'service → chassis framework (libraries) → cross-cutting concerns',
+    decomposition: [
+      {
+        box: 'Order Service — the new service',
+        role: 'service',
+        parts: [
+          'adopts the chassis via a Gradle plugin',
+          'inherits the cross-cutting wiring'
+        ]
+      },
+      {
+        box: 'chassis framework 2.4.0 — the shared libraries',
+        role: 'chassis framework (libraries)',
+        parts: [
+          'externalized configuration + health-check URL',
+          'logging, metrics (counter: orders_created), and tracing'
+        ]
+      },
+      {
+        box: 'the cross-cutting concerns',
+        role: 'cross-cutting concerns',
+        parts: [
+          'security via an Access Token',
+          'service registration/discovery + circuit breakers'
+        ]
+      }
+    ],
+    wiring: "flowchart LR\n  SVC[\"Order Service\"] -->|\"adopts\"| CHS[\"chassis framework 2.4.0\"]\n  CHS -->|\"wires\"| CFG[\"externalized config\"]\n  CHS -->|\"wires\"| LOG[\"logging + health check\"]\n  CHS -->|\"wires\"| MET[\"metrics counter: orders_created\"]\n  CHS -->|\"wires\"| TRC[\"tracing\"]\n  CHS -->|\"registers\"| REG[\"service registry\"]",
+    program: `// SYSTEM DESIGN — microservice chassis: service (Order Service) -> chassis framework (shared libraries) -> cross-cutting concerns (security, config, logging, health, metrics, tracing)
+// PARTIES: SVC = Order Service (adopts the chassis) · CHS = chassis framework 2.4.0 (shared libraries) · REG = service registry (registration target)
+// DEF: concern — one cross-cutting capability the chassis wires; here 6 concerns = security + config + logging + health + metrics + tracing
+// DEF: wiring — the act of connecting one concern to a service; here 3 services x 6 concerns = 18 wirings by hand, 6 in the chassis
+// DEF: counter — a metric the chassis wires; here "counter:orders_created"
+// STATE (before):
+//    svc : { build:"none", security:"none", metrics:"none", registered:false }
+//    wirings : 0
+// DEF: adopt_chassis · CALLED BY: a developer scaffolding SVC
+// -> chassis_version : "2.4.0"
+//    step 1 · add the chassis Gradle plugin    svc.build : "none" -> "gradle-plugin:2.4.0"
+//    step 2 · chassis injects security and metrics    svc.security : "none" -> "access-token-check" · svc.metrics : "none" -> "counter:orders_created"
+//    step 3 · chassis self-registers SVC with REG    svc.registered : false -> true
+//    step 4 · count the wirings done once, not per service    wirings : 0 -> 6  BECAUSE the chassis wires the 6 concerns once and every service inherits them
+// <- outcome : svc { build:"gradle-plugin:2.4.0", security:"access-token-check", metrics:"counter:orders_created", registered:true } · wirings 6, not 18`
+  },
   concepts: {
     cards: [
       { tag: 'problem', tagLabel: 'Problem', title: 'The per-service setup tax', content: '<p><strong>Why.</strong> Every new service needs build logic and cross-cutting concerns before any business logic can start.</p><p><strong>Claim.</strong> One or two days of setup per service is fine for a monolith, but unaffordable across tens or hundreds of microservices.</p><p><strong>Grounding.</strong> The reference lists build logic (Gradle/Maven, Docker packaging, CI config) plus six cross-cutting concerns — security, externalized configuration, logging, health check, metrics, distributed tracing — and microservice extras like registration/discovery and circuit breakers.</p><p><strong>In the wild.</strong> Teams re-created this wiring by hand for every service until the chassis centralised it.</p>' },

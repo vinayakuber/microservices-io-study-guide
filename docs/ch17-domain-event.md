@@ -153,6 +153,73 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** aggregate (publisher) → event broker (transport) → subscriber/consumer
+
+### Order aggregate (in Order Service) — the publisher
+
+_Role: aggregate/publisher_
+
+```mermaid
+flowchart TD
+  R["Order aggregate (in Order Service) — the publisher"]
+  R --> P0["change state — flips order state &quot;NEW&quot; -&gt; &quot;PLACED&quot;"]
+  R --> P1["emit DomainEvent — produces &quot;OrderPlaced&quot; { order_id:&quot;PO-2001&quot; }"]
+  R --> P2["Transactional Outbox — writes the event row in the same DB transaction"]
+  R --> P3["Relay — polls the outbox after commit and publishes to the broker"]
+```
+
+### message broker — the transport
+
+_Role: broker/transport_
+
+```mermaid
+flowchart TD
+  R["message broker — the transport"]
+  R --> P0["carries &quot;OrderPlaced&quot; from the publisher to every subscriber"]
+  R --> P1["decouples the aggregate from the consumers"]
+```
+
+### CQRS view updater — the subscriber/consumer
+
+_Role: subscriber/consumer_
+
+```mermaid
+flowchart TD
+  R["CQRS view updater — the subscriber/consumer"]
+  R --> P0["consume — receives &quot;OrderPlaced&quot; off the broker"]
+  R --> P1["react — updates its read model order_count 0 -&gt; 1"]
+```
+
+```mermaid
+flowchart LR
+  AG["Order aggregate (publisher)"] -->|"emit OrderPlaced"| OB[("Transactional outbox (PostgreSQL 16 @ orders-db-1)")]
+  OB -->|"relay publishes after commit"| BRK["message broker (transport)"]
+  BRK -->|"deliver"| SUB["subscriber: CQRS view updater"]
+  SUB -->|"order_count 0 -> 1"| V[("read model")]
+```
+
+```java
+// SYSTEM DESIGN — domain event as a pipeline: aggregate (publisher) -> event broker (transport) -> subscriber (consumer)
+// PARTIES: AG = Order aggregate (publisher, inside Order Service) · DB = PostgreSQL 16 @ orders-db-1 (holds the outbox table) · BRK = message broker (event transport) · SUB = CQRS view updater (subscriber/consumer)
+// DEF: DomainEvent — the fact the aggregate emits when created or updated; here {type:"OrderPlaced", order_id:"PO-2001"}
+// DEF: outbox — the table the event is written to in the SAME transaction as the data change; here row {event:"OrderPlaced", order_id:"PO-2001", sent:false}
+// DEF: relay — the publisher process that polls the outbox after commit and publishes unsent rows; here it sends row "OrderPlaced"
+// DEF: view — the subscriber's read model it updates per event; here {order_count:0}
+// STATE (before):
+//    order  : { id:"PO-2001", state:"NEW" }
+//    outbox : []
+//    view   : { order_count : 0 }
+// DEF: place_order_and_publish · CALLED BY: AG handling command "place_order"
+// -> command : "place_order"
+//    step 1 · AG changes state    order : { id:"PO-2001", state:"NEW" } -> { id:"PO-2001", state:"PLACED" }
+//    step 2 · AG emits the event and DB writes the outbox row in the SAME transaction    outbox : [] -> [{event:"OrderPlaced", order_id:"PO-2001", sent:false}]
+//    step 3 · COMMIT makes both durable, then the relay publishes    outbox : [{sent:false}] -> [{sent:true}]  BECAUSE the relay polls the outbox and ships the row to BRK
+//    step 4 · SUB consumes the event and reacts    view : { order_count : 0 } -> { order_count : 1 }  BECAUSE one more order was placed
+// <- outcome : BRK delivered "OrderPlaced" { order_id:"PO-2001" } and SUB's view now reads order_count 1  BECAUSE the publisher wrote the outbox row atomically with the data change and the relay shipped it to the broker
+```
+
 ## Interview Questions
 
 ### Q1

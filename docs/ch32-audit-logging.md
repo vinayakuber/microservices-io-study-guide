@@ -158,6 +158,80 @@ n0["<b>1. Request arrives</b><br/>create_order for PO-2001"]:::start
 ```
 
 
+## System Design Interview
+
+**The pipeline:** service → audit log (store) → log aggregator → reader
+
+### Order Service — the writer
+
+_Role: service (business op + audit record)_
+
+```mermaid
+flowchart TD
+  R["Order Service — the writer"]
+  R --> P0["performs the business op (view/create/pay order)"]
+  R --> P1["writes one audit row per action"]
+```
+
+### audit log store
+
+_Role: audit log (store)_
+
+```mermaid
+flowchart TD
+  R["audit log store"]
+  R --> P0["PostgreSQL 16 @ audit-db-1"]
+  R --> P1["holds rows (id, user, action, target, at)"]
+```
+
+### log aggregator
+
+_Role: log aggregator_
+
+```mermaid
+flowchart TD
+  R["log aggregator"]
+  R --> P0["collects audit rows across services"]
+  R --> P1["indexes them for query"]
+```
+
+### reader (auditor queries)
+
+_Role: reader_
+
+```mermaid
+flowchart TD
+  R["reader (auditor queries)"]
+  R --> P0["support/compliance/security query the log"]
+  R --> P1["reconstructs what a user did"]
+```
+
+```mermaid
+flowchart LR
+  SVC["Order Service"] -->|"INSERT audit row"| LOG[("audit log store: PostgreSQL 16 @ audit-db-1")]
+  LOG -->|"shipped"| AGG["log aggregator"]
+  AGG -->|"indexed"| IDX[("aggregated index")]
+  IDX -->|"query user=alice"| RDR["reader: support/compliance/security"]
+```
+
+```java
+// SYSTEM DESIGN — audit logging pipeline: service (Order Service, business op + audit record) -> audit log (PostgreSQL 16 @ audit-db-1) -> log aggregator -> reader (support/compliance/security)
+// PARTIES: SVC = Order Service (writer, business op + audit record) · DB = PostgreSQL 16 @ audit-db-1 (audit log store) · AGG = log aggregator (collects and indexes audit rows) · RDR = support agent (reader)
+// DEF: audit — a durable row recording who did what to which target and when; here (1,"alice","view_order","PO-2001",t1)
+// DEF: action — one user action to record; here "view_order", "create_order", "pay_order"
+// DEF: answer — the reconstruction a reader builds from the rows; here 3 rows for "alice"
+// STATE (before):
+//    audit_log : []      // rows: (id, user, action, target, at), kept by DB
+//    answer : []
+// DEF: record_and_reconstruct · CALLED BY: alice acting on PO-2001, then a reader querying
+// -> action1 : ("alice","view_order","PO-2001")
+//    step 1 · SVC INSERTs the view row    audit_log : [] -> [(1,"alice","view_order","PO-2001",t1)]
+//    step 2 · SVC INSERTs the create and pay rows    audit_log : [(1,"alice","view_order","PO-2001",t1)] -> [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2),(3,"alice","pay_order","PO-2001",t3)]
+//    step 3 · AGG collects and indexes the rows    audit_log : [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2),(3,"alice","pay_order","PO-2001",t3)] -> [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2),(3,"alice","pay_order","PO-2001",t3)]
+//    step 4 · RDR queries user "alice"    answer : [] -> [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2),(3,"alice","pay_order","PO-2001",t3)]
+// <- outcome : answer 3 rows · row id=3 is the payment, so the support agent confirms "alice paid at t3"  BECAUSE the writer INSERTed rows, the aggregator indexed them, and the reader queried them back
+```
+
 ## Interview Questions
 
 ### Q1

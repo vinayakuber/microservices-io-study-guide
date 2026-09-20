@@ -221,6 +221,71 @@ flowchart TD
 ```
 
 
+## System Design Interview
+
+**The pipeline:** client → service registry → service instances (client load-balances)
+
+### order-service client — the client
+
+_Role: client_
+
+```mermaid
+flowchart TD
+  R["order-service client — the client"]
+  R --> P0["Queries the registry for a service name"]
+  R --> P1["Selects one instance from the returned set"]
+  R --> P2["Load-balances across the instances"]
+```
+
+### service registry (Eureka) — the store of locations
+
+_Role: service registry_
+
+```mermaid
+flowchart TD
+  R["service registry (Eureka) — the store of locations"]
+  R --> P0["Keeps the name -&gt; instances map"]
+  R --> P1["Returns instance locations on query"]
+```
+
+### order-service instances — the targets
+
+_Role: service instances_
+
+```mermaid
+flowchart TD
+  R["order-service instances — the targets"]
+  R --> P0["Self-register on startup"]
+  R --> P1["Serve the direct request"]
+```
+
+```mermaid
+flowchart LR
+  CLI["order-service client"] -->|"query order-service"| REG[("service registry Eureka")]
+  REG -->|"returns 10.0.1.7:8080, 10.0.1.8:8080"| CLI
+  CLI -->|"direct call, client load-balances"| SVC["order-service instance 10.0.1.7:8080"]
+```
+
+```java
+// SYSTEM DESIGN — client-side discovery as a pipeline: client -> service registry -> service instances (the client load-balances and calls one instance directly, no router)
+// PARTIES: CLI = order-service client (queries the registry, load-balances, and calls an instance directly) · REG = service registry (Eureka) · SVC = order-service instances (self-register and serve requests)
+// DEF: registry — REG's map of service name -> instances; here {"order-service" -> ["10.0.1.7:8080", "10.0.1.8:8080"]}
+// DEF: list — the instances REG returns for one name; here ["10.0.1.7:8080", "10.0.1.8:8080"]
+// DEF: target — the one instance location the client picks; here "10.0.1.7:8080"
+// DEF: status — the outcome of the direct call; here "200 OK"
+// STATE (before):
+//    registry : {"order-service" -> ["10.0.1.7:8080", "10.0.1.8:8080"]}
+//    list     : []
+//    target   : "none"
+//    status   : "none"
+// DEF: resolve_and_call · CALLED BY: CLI placing an order
+// -> request : "POST /orders"
+//    step 1 · CLI queries REG for "order-service"    list : [] -> ["10.0.1.7:8080", "10.0.1.8:8080"]   BECAUSE REG returns every known instance for the name
+//    step 2 · CLI load-balances across the set    target : "none" -> "10.0.1.7:8080"   BECAUSE the client picks one instance from the returned list
+//    step 3 · CLI calls the instance directly    status : "none" -> "200 OK"   BECAUSE the request goes straight to the chosen instance, no router
+// <- call : "POST http://10.0.1.7:8080/orders"   (2 hops: CLI->REG then CLI->SVC)
+```
+
 ## Interview Questions
 
 ### Q1
