@@ -10,6 +10,10 @@
 //       (digit or quoted literal). A DEF block is the text from one `// DEF:`
 //       to the next `// DEF:` (or end of program).
 //   R3  the program overall must have >= 4 concrete-value lines.
+//   R14 (chapter-level) every chapter with a program must cover BOTH a write
+//       path (data created/stored) AND a read path (data queried/served back).
+//       A write-only chapter hides how its store is consumed; a read-only
+//       chapter hides how its store was populated.
 //
 // Run (from repo root):  node tools/explain_program_gate.js
 global.CHAPTERS = [];
@@ -21,6 +25,11 @@ for (const f of fs.readdirSync('content').filter(x => x.endsWith('.js')).sort())
 CHAPTERS.sort((a, b) => a.num - b.num);
 
 const VALUE = /\d|"[^"]+"|'[^']+'/;
+// R14 signal sets — a WRITE verb creates/stores data; a READ verb queries or
+// serves it back to a consumer. Chapter-level, so a chapter may satisfy the
+// two halves in different blocks.
+const WRITE = /(stores?|stored|writes?|written|persists?|lands?|opens?\b|insert|publishes?|reports?|appends?|records?\b|saves?|creates?|created|mints?|injects?|ships?|produces?)/i;
+const READ = /(quer(y|ies|ied)|search(es|ing)?|reads?\b|looks?\s*up|lookup|fetch(es|ing)?|select|reassembles?|reconstructs?|retrieves?|displays?|serves?|served|\bgets?\b|\breturns?\b|consumer|consumes?)/i;
 const failures = [];
 let programs = 0;
 
@@ -186,6 +195,24 @@ for (const ch of CHAPTERS) {
 
 
     if (probs.length) failures.push({ id: ch.id, section: s.section, probs });
+  }
+
+  // R14: read + write path coverage — a chapter must show data being written
+  // (created/stored) AND read back (queried/served). Enforces "both paths in
+  // every chapter": a write-only chapter hides how its store is consumed; a
+  // read-only chapter hides how its store was populated.
+  const rwBlocks = (ch.flow || []).filter(s => s.program && String(s.program).trim());
+  if (rwBlocks.length) {
+    let hasWrite = false, hasRead = false;
+    for (const b of rwBlocks) {
+      const p = String(b.program);
+      if (WRITE.test(p)) hasWrite = true;
+      if (READ.test(p)) hasRead = true;
+    }
+    const r14 = [];
+    if (!hasWrite) r14.push('R14 no write path (no block creates/stores: mint/open/insert/publish/store)');
+    if (!hasRead) r14.push('R14 no read path (no block queries/serves back: query/search/read/return)');
+    if (r14.length) failures.push({ id: ch.id, section: '(whole chapter)', probs: r14 });
   }
 }
 
