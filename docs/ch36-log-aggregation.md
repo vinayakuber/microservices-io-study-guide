@@ -12,14 +12,24 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 36 · microservice
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Write to a log file</b><br/>Each service instance writes information about what it is doing to…"]:::start
-  s0n1["<b>2. Record the severity</b><br/>The log file contains errors, warnings, information, and debug mess…"]:::step
-  s0n2["<b>3. Tag with the request id</b><br/>Each line includes the external request id so it can be joined to t…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+n0["<b>1. Request handled</b><br/>SVC handles GET /orders for REQ-3001"]:::start
+  n1["<b>2. Format the line</b><br/>standard shape, severity recorded"]:::step
+  n2["<b>3. Line written</b><br/>10:00:01 INFO order-service REQ-3001 handle /orders"]:::core
+  n3["<b>4. Append to the log file</b><br/>logfile holds the line"]:::step
+  n4["<b>5. Tag downstream</b><br/>hand the same req_id to the next call"]:::step
+  n5["<b>6. Logged and tagged</b><br/>the id rides with the request"]:::stop
+  n6["<b>The call errors</b><br/>line becomes ERROR customer lookup failed"]:::warn
+  n0 -->|"1. request handled"| n1
+  n1 -->|"2. standard shape"| n2
+  n2 -->|"3. append to file"| n3
+  n3 -->|"4. forward the id"| n4
+  n4 -->|"5. logged and tagged"| n5
+  n2 -->|"6. call fails"| n6
 ```
 
 1. **Write to a log file** — Each service instance writes information about what it is doing to a log file in a standardized format.
@@ -48,14 +58,25 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Point at the logging service</b><br/>Use a centralized logging service to aggregate logs from each servi…"]:::start
-  s1n1["<b>2. Forward each line</b><br/>Each instance ships its own log lines to the centralized service as…"]:::step
-  s1n2["<b>3. Index by request id</b><br/>The service indexes the lines so one request id gathers its lines f…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+n0["<b>1. Collect the fleet's lines</b><br/>batch of 3 log lines tagged REQ-3001"]:::start
+  n1["<b>2. Order Service ships</b><br/>INFO order-service REQ-3001 handle /orders"]:::step
+  n2["<b>3. Customer Service ships</b><br/>INFO customer-service REQ-3001 lookup customer 42"]:::step
+  n3["<b>4. Payment Service ships</b><br/>INFO payment-service REQ-3001 charge 19.00"]:::step
+  n4["<b>5. Index grows</b><br/>index key REQ-3001 holds 3 lines from 3 services"]:::core
+  n5["<b>6. Whole request assembled</b><br/>one key reconstructs the full request"]:::stop
+  n6["<b>Second request</b><br/>REQ-3002 opens its own key with 1 line"]:::warn
+  n0 -->|"1. first instance ships"| n1
+  n1 -->|"2. next instance ships"| n2
+  n2 -->|"3. next instance ships"| n3
+  n3 -->|"4. more lines arrive"| n2
+  n3 -->|"5. all lines in"| n4
+  n4 -->|"6. reassembled"| n5
+  n2 -->|"7. another request"| n6
 ```
 
 1. **Point at the logging service** — Use a centralized logging service to aggregate logs from each service instance.
@@ -84,14 +105,22 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Query by request id</b><br/>Users search the aggregated logs, often by the external request id."]:::start
-  s2n1["<b>2. Get hits from every instance</b><br/>A single query returns matching lines from all the services that ha…"]:::step
-  s2n2["<b>3. Order by time</b><br/>The lines are sorted by timestamp to reconstruct the path of the re…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+n0["<b>1. Developer searches</b><br/>DEV types REQ-3001 into the search UI"]:::start
+  n1["<b>2. Match the key</b><br/>REQ-3001 returns 3 hits"]:::step
+  n2["<b>3. Sort by timestamp</b><br/>order unsorted becomes t1, t2, t3"]:::step
+  n3["<b>4. One path rendered</b><br/>order-service, then customer-service, then payment-service"]:::core
+  n4["<b>5. Request story shown</b><br/>3 lines across 3 services, in time order"]:::stop
+  n5["<b>Unknown request id</b><br/>REQ-9999 returns 0 hits, never logged"]:::warn
+  n0 -->|"1. query the index"| n1
+  n1 -->|"2. hits from every instance"| n2
+  n2 -->|"3. order by time"| n3
+  n3 -->|"4. whole path shown"| n4
+  n1 -->|"5. no hits - never logged"| n5
 ```
 
 1. **Query by request id** — Users search the aggregated logs, often by the external request id.
@@ -120,14 +149,24 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. Configure alerts</b><br/>Users configure alerts that are triggered when certain messages app…"]:::start
-  s3n1["<b>2. Fire on the pattern</b><br/>When an indexed line matches a configured pattern, the alert fires."]:::step
-  s3n2["<b>3. Provision for volume</b><br/>Handling a large volume of logs requires substantial infrastructure."]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
+n0["<b>1. New line indexed</b><br/>ERROR order-service REQ-3001 customer lookup failed"]:::start
+  n1["<b>2. Rule matches</b><br/>the configured rule ERROR matches this line"]:::step
+  n2["<b>3. Count to threshold</b><br/>ERROR count 0 becomes 1"]:::step
+  n3["<b>4. Fire and notify</b><br/>rule fired, alert goes to DEV"]:::core
+  n4["<b>5. Alert delivered</b><br/>1 notification for this pattern"]:::stop
+  n5["<b>Plain INFO line</b><br/>no match, count stays 0, no alert"]:::warn
+  n6["<b>Volume cost</b><br/>large volume of logs needs substantial infrastructure"]:::warn
+  n0 -->|"1. evaluate the rule"| n1
+  n1 -->|"2. matched"| n2
+  n2 -->|"3. threshold reached"| n3
+  n3 -->|"4. notify the on-call"| n4
+  n1 -->|"5. no match - no alert"| n5
+  n3 -->|"6. at scale - storage grows"| n6
 ```
 
 1. **Configure alerts** — Users configure alerts that are triggered when certain messages appear in the logs.

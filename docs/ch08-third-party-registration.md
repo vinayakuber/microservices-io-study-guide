@@ -12,16 +12,28 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 8 · microservices
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Register on startup</b><br/>An instance must be added to the registry as soon as it comes up, s…"]:::start
-  s0n1["<b>2. Unregister on shutdown</b><br/>A graceful stop must remove the instance, so no new requests are ro…"]:::step
-  s0n2["<b>3. Evict crashed instances</b><br/>An instance that dies without a clean shutdown leaves a stale entry…"]:::step
-  s0n3["<b>4. Evict broken instances</b><br/>An instance that is running but cannot handle requests must also le…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
-  s0n2 --> s0n3
+  n0["<b>1. A second instance boots</b><br/>order-service on 10.0.1.8 port 8080"]:::start
+  n1["<b>2. Register on startup</b><br/>registry order-service gains 10.0.1.8:8080"]:::step
+  n2["<b>3. live_count 1 becomes 2</b><br/>the new instance is discoverable"]:::core
+  n3["<b>4. Crashed without shutdown</b><br/>process dies, no unregister runs"]:::warn
+  n4["<b>5. Running but broken</b><br/>cannot handle requests, entry must go"]:::warn
+  n5["<b>6. Graceful shutdown</b><br/>SVC sends unregister, the entry is removed"]:::step
+  n6["<b>7. Evict the bad entries</b><br/>the registry drops dead or broken instances"]:::step
+  n7["<b>8. Discovery returns only live instances</b><br/>no request routed to a dead host"]:::stop
+  n0 -->|"1. autoscaler adds capacity"| n1
+  n1 -->|"2. registry now holds two entries"| n2
+  n2 -->|"3. hard kill"| n3
+  n2 -->|"4. instance degrades"| n4
+  n2 -->|"5. clean stop"| n5
+  n3 -->|"6. evict stale entry"| n6
+  n4 -->|"7. evict broken entry"| n6
+  n5 -->|"8. remove on shutdown"| n6
+  n6 -->|"9. registry accurate"| n7
 ```
 
 1. **Register on startup** — An instance must be added to the registry as soon as it comes up, so discovery can return it.
@@ -56,16 +68,24 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Co-locate a registrar</b><br/>Run it beside the service as a sidecar (Netflix Prana), a parent pr…"]:::start
-  s1n1["<b>2. Register on startup</b><br/>The registrar registers the instance with the registry when the ins…"]:::step
-  s1n2["<b>3. Unregister on shutdown</b><br/>The registrar removes the instance from the registry when the insta…"]:::step
-  s1n3["<b>4. Keep the service oblivious</b><br/>The service never calls the registry itself — it only runs, and the…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
-  s1n2 --> s1n3
+  n0["<b>1. A non-JVM service needs registering</b><br/>order-service on host 10.0.1.7"]:::start
+  n1["<b>2. Co-locate a registrar</b><br/>Netflix Prana sidecar, Container buddy, or Registrator"]:::core
+  n2["<b>3. Watch the service process</b><br/>RGR polls the local process every 5 s"]:::step
+  n3["<b>4. Sees START, registers</b><br/>registry order-service empty becomes 10.0.1.7:8080"]:::step
+  n4["<b>5. discoverable false becomes true</b><br/>the registry now holds the entry"]:::step
+  n5["<b>6. Service stays oblivious</b><br/>SVC never calls the registry itself"]:::stop
+  n6["<b>Sees STOP, unregisters</b><br/>registry order-service becomes empty again"]:::warn
+  n0 -->|"1. keep the service simple"| n1
+  n1 -->|"2. registrar watches"| n2
+  n2 -->|"3. process came up"| n3
+  n3 -->|"4. now discoverable"| n4
+  n4 -->|"5. registrar acts on its behalf"| n5
+  n2 -->|"6. process stopped instead"| n6
 ```
 
 1. **Co-locate a registrar** — Run it beside the service as a sidecar (Netflix Prana), a parent process (Container buddy), or a Docker helper (Registrator).
@@ -99,16 +119,25 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Probe health</b><br/>The registrar performs a health check on the instance, like Netflix…"]:::start
-  s2n1["<b>2. Register only when healthy</b><br/>The instance is registered while the health check passes."]:::step
-  s2n2["<b>3. Unregister on failure</b><br/>The instance is removed when the health check fails."]:::step
-  s2n3["<b>4. Beware superficial state</b><br/>A registrar that only knows RUNNING vs NOT RUNNING cannot tell a ru…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
-  s2n2 --> s2n3
+  n0["<b>1. Registrar health-checks SVC</b><br/>GET /health every 10 s"]:::start
+  n1["<b>2. Probe passes</b><br/>200 OK, pass_count 0 becomes 1"]:::step
+  n2["<b>3. Instance stays registered</b><br/>10.0.1.7:8080 remains in the registry"]:::core
+  n3["<b>4. Next probe fails</b><br/>503, health PASS becomes FAIL"]:::step
+  n4["<b>5. Unregister on failure</b><br/>registry order-service becomes empty"]:::step
+  n5["<b>6. Broken instance removed</b><br/>no more traffic to the 503-ing host"]:::stop
+  n6["<b>Superficial state</b><br/>registrar sees only RUNNING, the broken instance stays registered"]:::warn
+  n0 -->|"1. probe answers 200"| n1
+  n1 -->|"2. healthy, keep the entry"| n2
+  n0 -->|"3. probe answers 503"| n3
+  n2 -->|"4. a later probe fails"| n3
+  n3 -->|"5. registrar removes it"| n4
+  n4 -->|"6. entry gone"| n5
+  n0 -->|"7. shallow check only"| n6
 ```
 
 1. **Probe health** — The registrar performs a health check on the instance, like Netflix Prana.

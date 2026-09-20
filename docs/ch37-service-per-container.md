@@ -12,16 +12,25 @@ _Also known as: Chris Richardson · Microservice Patterns p.393 · microservices
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Write a Dockerfile</b><br/>A Dockerfile wraps the service code plus its runtime so the image i…"]:::start
-  s0n1["<b>2. Build the image</b><br/>docker build turns the source into an image the cluster can run."]:::step
-  s0n2["<b>3. Tag with a version</b><br/>Pin a version tag so the cluster can select specific releases inste…"]:::step
-  s0n3["<b>4. Push to a registry</b><br/>The cluster pulls the image from a registry, so a push makes it dep…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
-  s0n2 --> s0n3
+n0["<b>1. Source commit lands</b><br/>restaurant-service, version 1.4.2"]:::start
+  n1["<b>2. Docker build</b><br/>image becomes rsvc:1.4.2, wraps the JAR plus its JVM"]:::step
+  n2["<b>3. Docker tag</b><br/>tag latest becomes 1.4.2, pinning the release"]:::step
+  n3["<b>4. Docker push</b><br/>REG now holds one copy the cluster can pull"]:::step
+  n4["<b>5. Image in the registry</b><br/>rsvc:1.4.2 ready to run"]:::core
+  n5["<b>6. Deployable everywhere</b><br/>1 image runs as N containers"]:::stop
+  n6["<b>Next commit</b><br/>version 1.4.2 becomes 1.4.3, a fresh tag"]:::warn
+  n0 -->|"1. build from the Dockerfile"| n1
+  n1 -->|"2. pin a version tag"| n2
+  n2 -->|"3. push to the registry"| n3
+  n3 -->|"4. stored and pullable"| n4
+  n4 -->|"5. ready to run"| n5
+  n5 -->|"6. next commit"| n0
+  n0 -->|"7. newer version"| n6
 ```
 
 1. **Write a Dockerfile** — A Dockerfile wraps the service code plus its runtime so the image is self-contained.
@@ -53,14 +62,23 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Pull the image</b><br/>A host pulls the shared image once, then launches as many container…"]:::start
-  s1n1["<b>2. Set the replica count</b><br/>Scaling up or down means changing the number of container instances…"]:::step
-  s1n2["<b>3. Spread traffic across replicas</b><br/>A load balancer routes requests across all running containers."]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+n0["<b>1. Load rises</b><br/>CLUSTER decides to scale"]:::start
+  n1["<b>2. Set the replica count</b><br/>replicas 2 becomes 4"]:::step
+  n2["<b>3. Schedule the new containers</b><br/>2 more land on healthy hosts"]:::step
+  n3["<b>4. Spread traffic</b><br/>load balancer routes over 4"]:::core
+  n4["<b>5. Scaled without a rebuild</b><br/>4 instances, same image rsvc:1.4.2, zero rebuilds"]:::stop
+  n5["<b>Load drops</b><br/>replicas 4 becomes 1, terminate 3 containers"]:::warn
+  n0 -->|"1. change the count"| n1
+  n1 -->|"2. start 2 more from the same image"| n2
+  n2 -->|"3. route over 4"| n3
+  n3 -->|"4. scaled without a rebuild"| n4
+  n4 -->|"5. load drops"| n5
+  n5 -->|"6. scale back down"| n1
 ```
 
 1. **Pull the image** — A host pulls the shared image once, then launches as many containers as needed from it.
@@ -90,14 +108,22 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Declare the limit</b><br/>The pod spec names the CPU and memory cap before the container runs."]:::start
-  s2n1["<b>2. Throttle beyond the cap</b><br/>The container runtime blocks any consumption above the declared limit."]:::step
-  s2n2["<b>3. Isolate neighbors</b><br/>Each container keeps its own separate cap, so one cannot starve the…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+n0["<b>1. Pod spec declares the cap</b><br/>cpu limit 0.5, set at deploy time"]:::start
+  n1["<b>2. Apply the cap</b><br/>caps holds cpu 0.5"]:::step
+  n2["<b>3. Throttle the excess</b><br/>usage 0.9 becomes 0.5, the excess blocked"]:::step
+  n3["<b>4. Isolate neighbors</b><br/>each container keeps its own separate cap"]:::core
+  n4["<b>5. Bounded consumption</b><br/>one container cannot consume another's share"]:::stop
+  n5["<b>No cap declared</b><br/>usage climbs back to 0.9, grabs the idle CPU"]:::warn
+  n0 -->|"1. record the limit before run"| n1
+  n1 -->|"2. block the excess"| n2
+  n2 -->|"3. neighbors isolated"| n3
+  n3 -->|"4. bounded consumption"| n4
+  n1 -->|"5. limit omitted"| n5
 ```
 
 1. **Declare the limit** — The pod spec names the CPU and memory cap before the container runs.
@@ -127,14 +153,25 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. Start only the app process</b><br/>A container starts the application process, not an entire OS, so it…"]:::start
-  s3n1["<b>2. Package much faster than an AMI</b><br/>It is about 100x faster to package an application as a Docker conta…"]:::step
-  s3n2["<b>3. Accept the tradeoff</b><br/>Container deployment infrastructure is not as rich as the mature VM…"]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
+n0["<b>1. Deploy test times the service</b><br/>same service 1.4.2, two packaging paths"]:::start
+  n1["<b>2. Container path</b><br/>only the app process starts, 3 s"]:::step
+  n2["<b>3. VM path</b><br/>an entire OS boots first, 30 s"]:::step
+  n3["<b>4. Compare the start</b><br/>30 s divided by 3 s, 10x faster container start"]:::core
+  n4["<b>5. Compare packaging</b><br/>a Docker image in seconds vs an AMI in minutes, about 100x"]:::step
+  n5["<b>6. The tradeoff</b><br/>container infra is thinner than the mature VM IaaS ecosystem"]:::warn
+  n6["<b>7. Verdict</b><br/>container wins on speed, loses on infrastructure maturity"]:::stop
+  n0 -->|"1. container path"| n1
+  n0 -->|"2. VM path"| n2
+  n1 -->|"3. measure the start"| n3
+  n2 -->|"4. measure the start"| n3
+  n3 -->|"5. packaging comparison"| n4
+  n4 -->|"6. the tradeoff"| n5
+  n5 -->|"7. final verdict"| n6
 ```
 
 1. **Start only the app process** — A container starts the application process, not an entire OS, so it boots much faster than a VM.

@@ -12,14 +12,26 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 33 (p.370) · micr
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Unique external request id</b><br/>Instrument services with code that assigns each external request a…"]:::start
-  s0n1["<b>2. Carry it on the request</b><br/>The id is attached to the request as it enters the service graph."]:::step
-  s0n2["<b>3. Chassis-provided</b><br/>This instrumentation might be part of the functionality provided by…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. External request arrives</b><br/>GET /orders/PO-2001 hits the API gateway"]:::start
+  n1["<b>2. Assign a unique request id</b><br/>trace_id = 4bf92f3577b34da6a3ce90d0e2b88a4d, once per request"]:::step
+  n2["<b>3. Attach the id to the header</b><br/>header.trace_id : empty becomes 4bf92f3577b34da6a3ce90d0e2b88a4d"]:::step
+  n3["<b>4. Open the root span</b><br/>span 6f9a3c1b8e2d4001, parent empty, start 100"]:::core
+  n4["<b>5. Index the trace by id</b><br/>trace_registry : empty becomes one entry keyed by trace_id"]:::core
+  n5["<b>6. Chassis provides the wiring</b><br/>one framework runs steps 2-4 for every service"]:::step
+  n6["<b>7. Request enters the first service</b><br/>carries trace_id plus the open root span"]:::stop
+  n7["<b>No id assigned</b><br/>later hops cannot be reassembled into one trace"]:::warn
+  n0 -->|"1. request needs a label"| n1
+  n1 -->|"2. id travels on the request"| n2
+  n2 -->|"3. first unit of work opens"| n3
+  n3 -->|"4. span stored under its trace"| n4
+  n4 -->|"5. chassis centralizes this"| n5
+  n5 -->|"6. hand off downstream"| n6
+  n1 -->|"7. skipped - request untraceable"| n7
 ```
 
 1. **Unique external request id** — Instrument services with code that assigns each external request a unique external request id.
@@ -53,14 +65,26 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Pass the id</b><br/>Pass the external request id to all services involved in handling t…"]:::start
-  s1n1["<b>2. Child spans</b><br/>Each service opens a span whose parent is the span of the previous…"]:::step
-  s1n2["<b>3. One trace, many operations</b><br/>Each service performs one or more operations — database queries, me…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+  n0["<b>1. Request leaves the gateway</b><br/>GW span 6f9a3c1b8e2d4001, parent empty"]:::start
+  n1["<b>2. Header carries the parent span</b><br/>header.span_id : empty becomes 6f9a3c1b8e2d4001"]:::step
+  n2["<b>3. ORD opens a child span</b><br/>6f9a3c1b8e2d4002, parent 6f9a3c1b8e2d4001, start 105"]:::step
+  n3["<b>4. KIT opens the next child</b><br/>6f9a3c1b8e2d4003, parent 6f9a3c1b8e2d4002, start 121"]:::step
+  n4["<b>5. PAY opens the final child</b><br/>6f9a3c1b8e2d4004, parent 6f9a3c1b8e2d4003, start 136"]:::step
+  n5["<b>6. Four spans, one chain</b><br/>all share trace_id 4bf92f3577b34da6a3ce90d0e2b88a4d"]:::core
+  n6["<b>7. Chain rebuilt from parents</b><br/>each parent id names who invoked whom"]:::stop
+  n7["<b>Missing parent</b><br/>a child without a parent id breaks the chain"]:::warn
+  n0 -->|"1. forward to ORD"| n1
+  n1 -->|"2. ORD invoked"| n2
+  n2 -->|"3. ORD calls KIT"| n3
+  n3 -->|"4. KIT calls PAY"| n4
+  n4 -->|"5. spans chained by parent ids"| n5
+  n5 -->|"6. one trace, many operations"| n6
+  n2 -->|"7. parent id lost"| n7
 ```
 
 1. **Pass the id** — Pass the external request id to all services involved in handling the request.
@@ -93,16 +117,27 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Record in a central service</b><br/>Record information about requests and operations — for example star…"]:::start
-  s2n1["<b>2. Sleuth and Zipkin</b><br/>Spring Cloud Sleuth instruments components and delivers trace infor…"]:::step
-  s2n2["<b>3. Deliver via RabbitMQ</b><br/>RabbitMQ is used to deliver traces to Zipkin; the Zipkin server is…"]:::step
-  s2n3["<b>4. Latency from times</b><br/>Start and end times per span let Zipkin derive per-operation latency."]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
-  s2n2 --> s2n3
+  n0["<b>1. Each service finishes its operation</b><br/>GW span done at end 104"]:::start
+  n1["<b>2. Sleuth instruments delivery</b><br/>Spring Cloud Sleuth hands spans to the broker"]:::step
+  n2["<b>3. RabbitMQ carries the spans</b><br/>broker delivers each span to Zipkin"]:::step
+  n3["<b>4. Zipkin appends to the trace</b><br/>trace_store : empty becomes one entry per trace_id"]:::core
+  n4["<b>5. All four spans collected</b><br/>4 spans under trace_id 4bf92f3577b34da6a3ce90d0e2b88a4d"]:::core
+  n5["<b>6. Derive latency = end - start</b><br/>104-100=4, 120-105=15, 135-121=14, 150-136=14 ms"]:::step
+  n6["<b>7. Trace reconstructable</b><br/>Zipkin displays the full request timeline"]:::stop
+  n7["<b>Lost span in transit</b><br/>broker drops a span - the trace is incomplete"]:::warn
+  n0 -->|"1. span ready"| n1
+  n1 -->|"2. deliver via broker"| n2
+  n2 -->|"3. arrives at Zipkin"| n3
+  n3 -->|"4. next span arrives"| n3
+  n3 -->|"5. all spans in"| n4
+  n4 -->|"6. subtract times"| n5
+  n5 -->|"7. reconstruct the request"| n6
+  n2 -->|"8. broker fails"| n7
 ```
 
 1. **Record in a central service** — Record information about requests and operations — for example start time and end time — in a centralized service.
@@ -135,16 +170,24 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. Include id in logs</b><br/>Include the external request id in all log messages, per the instru…"]:::start
-  s3n1["<b>2. Search aggregated logs</b><br/>The benefit is searching across aggregated logs for the external re…"]:::step
-  s3n2["<b>3. Find the slow hop</b><br/>Ordering the matched lines by time exposes the sources of latency."]:::step
-  s3n3["<b>4. Infrastructure cost</b><br/>The issue is that aggregating and storing traces can require signif…"]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
-  s3n2 --> s3n3
+  n0["<b>1. Each service logs with the trace id</b><br/>log_index : empty becomes 3 lines tagged 4bf92f3577b34da6a3ce90d0e2b88a4d"]:::start
+  n1["<b>2. Operator queries the index</b><br/>search trace_id 4bf92f3577b34da6a3ce90d0e2b88a4d"]:::step
+  n2["<b>3. Matches reassemble the request</b><br/>matches : empty becomes ORD line, KIT line, PAY line"]:::step
+  n3["<b>4. Order the lines by timestamp</b><br/>ORD at 105, KIT at 121, PAY at 136"]:::step
+  n4["<b>5. Slow hop exposed</b><br/>KIT took 135-121 = 14 ms"]:::core
+  n5["<b>6. One search, many machines</b><br/>the id links logs on 3 different machines"]:::stop
+  n6["<b>Infrastructure cost</b><br/>N requests times M spans = N times M stored records"]:::warn
+  n0 -->|"1. logs carry the id"| n1
+  n1 -->|"2. query the index"| n2
+  n2 -->|"3. matched lines"| n3
+  n3 -->|"4. sort by time"| n4
+  n4 -->|"5. latency per hop"| n5
+  n3 -->|"6. at scale - storage grows"| n6
 ```
 
 1. **Include id in logs** — Include the external request id in all log messages, per the instrumentation.

@@ -12,14 +12,24 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 21 · microservice
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Apply Database per service</b><br/>Each service owns a private database that no other service may read…"]:::start
-  s0n1["<b>2. One query now spans several owners</b><br/>A single logical result needs columns that are owned by two or more…"]:::step
-  s0n2["<b>3. No shared table to JOIN</b><br/>There is no single database where one SQL statement can combine the…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. Apply Database per Service</b><br/>each service owns a private database"]:::start
+  n1["<b>2. One query spans several owners</b><br/>an order page needs the order and the customer name"]:::step
+  n2["<b>3. No shared table to JOIN</b><br/>no single database combines the rows"]:::step
+  n3["<b>4. Fetch each fragment</b><br/>ORD returns total 120.00, CUST returns name Ada"]:::core
+  n4["<b>5. Join in memory</b><br/>result O-101 name Ada total 120.00"]:::step
+  n5["<b>6. One logical result, many owners</b><br/>the single SQL JOIN is gone"]:::stop
+  n6["<b>Monolith alternative</b><br/>one shared database returned this row with one JOIN"]:::warn
+  n0 -->|"1. data scattered"| n1
+  n1 -->|"2. columns split across services"| n2
+  n2 -->|"3. no shared table"| n3
+  n3 -->|"4. two calls, two fragments"| n4
+  n4 -->|"5. merged in memory"| n5
+  n2 -->|"6. pre-microservice - one JOIN sufficed"| n6
 ```
 
 1. **Apply Database per service** — Each service owns a private database that no other service may read or write directly.
@@ -51,14 +61,22 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Introduce a composer component</b><br/>A dedicated API Composer (often the API Gateway) owns the joined qu…"]:::start
-  s1n1["<b>2. Invoke the owning services</b><br/>The composer calls each service that owns a piece of the result."]:::step
-  s1n2["<b>3. Join the partial results</b><br/>The composer merges the returned fragments into one response object."]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+  n0["<b>1. Introduce a composer component</b><br/>often the API Gateway owns the joined query"]:::start
+  n1["<b>2. Invoke the owning services</b><br/>call ORD, CUST, INV"]:::step
+  n2["<b>3. Accumulate fragments</b><br/>joined gains total 120.00, name Ada, stock 3"]:::core
+  n3["<b>4. Join the partial results</b><br/>calls 0 becomes 3"]:::step
+  n4["<b>5. One endpoint answers the query</b><br/>composed response for order O-101"]:::stop
+  n5["<b>A service is down</b><br/>INV raises, calls stays at 2, stock missing"]:::warn
+  n0 -->|"1. dedicated component"| n1
+  n1 -->|"2. fan out"| n2
+  n2 -->|"3. each call adds a field"| n3
+  n3 -->|"4. merge the fragments"| n4
+  n1 -->|"5. one owner fails - partial result"| n5
 ```
 
 1. **Introduce a composer component** — A dedicated API Composer (often the API Gateway) owns the joined query.
@@ -88,14 +106,22 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Fragment by a shared key</b><br/>Each partial result is keyed by the same id, e.g. the order id."]:::start
-  s2n1["<b>2. Merge rows in memory</b><br/>The composer combines fragments with matching keys into one row."]:::step
-  s2n2["<b>3. Emit the assembled response</b><br/>The joined object is returned as if one query had produced it."]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+  n0["<b>1. Fragment by a shared key</b><br/>each partial result keyed by the order id"]:::start
+  n1["<b>2. Match on the key</b><br/>matched O-101 total 120.00"]:::step
+  n2["<b>3. Merge rows in memory</b><br/>attach name Ada to the matched row"]:::core
+  n3["<b>4. Append to the joined list</b><br/>joined gains O-101 total 120.00 name Ada"]:::step
+  n4["<b>5. Emit the assembled response</b><br/>as if one query produced it"]:::stop
+  n5["<b>Key with no match</b><br/>O-102 gets name null, the composer cannot invent it"]:::warn
+  n0 -->|"1. shared id"| n1
+  n1 -->|"2. match the order row"| n2
+  n2 -->|"3. attach the name"| n3
+  n3 -->|"4. add the joined row"| n4
+  n2 -->|"5. no matching row - null field"| n5
 ```
 
 1. **Fragment by a shared key** — Each partial result is keyed by the same id, e.g. the order id.
@@ -128,14 +154,22 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. Recognize the large-dataset case</b><br/>Some queries pull big result sets from several services before join…"]:::start
-  s3n1["<b>2. The join happens in the composer's memory</b><br/>All fragments must be loaded into memory to be combined."]:::step
-  s3n2["<b>3. Prefer CQRS for those queries</b><br/>When the join is too large or too hot, CQRS is the alternative solu…"]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
+  n0["<b>1. Recognize the large-dataset case</b><br/>some queries pull full history before joining"]:::start
+  n1["<b>2. Pull the big result sets</b><br/>ORD returns 900000 rows, CUST returns 120000 rows"]:::step
+  n2["<b>3. Join happens in the composer's memory</b><br/>900000 rows loaded into RAM"]:::core
+  n3["<b>4. The in-memory cost bites</b><br/>the composer materializes 900000 rows at once"]:::step
+  n4["<b>5. Prefer CQRS for those queries</b><br/>the alternative when the join is too hot"]:::stop
+  n5["<b>Single-row query</b><br/>fetch returns 1 row, the in-memory cost is negligible"]:::warn
+  n0 -->|"1. query asks for the whole set"| n1
+  n1 -->|"2. two big pulls"| n2
+  n2 -->|"3. all rows in RAM"| n3
+  n3 -->|"4. too large - use CQRS"| n4
+  n0 -->|"5. one-row query - still cheap"| n5
 ```
 
 1. **Recognize the large-dataset case** — Some queries pull big result sets from several services before joining.

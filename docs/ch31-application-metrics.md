@@ -12,14 +12,25 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 31 (p.373) · micr
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Gather statistics</b><br/>Instrument the service to collect statistics about individual opera…"]:::start
-  s0n1["<b>2. Count completions</b><br/>A counter increments each time an operation such as create_order co…"]:::step
-  s0n2["<b>3. Minimal overhead</b><br/>The force is that any solution must have minimal runtime overhead —…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. Instrument the operation</b><br/>SVC collects statistics on create_order"]:::start
+  n1["<b>2. First completion</b><br/>counters.orders_created : 0 becomes 1, PO-2001 done"]:::step
+  n2["<b>3. Second completion</b><br/>counters.orders_created : 1 becomes 2, PO-2002 done"]:::step
+  n3["<b>4. Third completion</b><br/>counters.orders_created : 2 becomes 3, PO-2003 done"]:::step
+  n4["<b>5. Minimal overhead</b><br/>one in-memory add per call, no per-request network hop"]:::core
+  n5["<b>6. Counter ready to report</b><br/>orders_created : 3 gathered"]:::stop
+  n6["<b>7. Per-request network hop</b><br/>pushing every call would break the overhead force"]:::warn
+  n0 -->|"1. counter starts at zero"| n1
+  n1 -->|"2. next request"| n2
+  n2 -->|"3. next request"| n3
+  n3 -->|"4. each new request increments again"| n3
+  n3 -->|"5. increment is cheap"| n4
+  n4 -->|"6. aggregate later"| n5
+  n3 -->|"7. network call per request - too costly"| n6
 ```
 
 1. **Gather statistics** — Instrument the service to collect statistics about individual operations.
@@ -49,16 +60,23 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Central metrics service</b><br/>Aggregate metrics in a centralized metrics service that provides re…"]:::start
-  s1n1["<b>2. Push model</b><br/>The service pushes metrics to the metrics service."]:::step
-  s1n2["<b>3. Pull model</b><br/>The metrics service pulls (scrapes) metrics from the service."]:::step
-  s1n3["<b>4. Aggregation services</b><br/>Prometheus and AWS CloudWatch are the listed metrics aggregation se…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
-  s1n2 --> s1n3
+  n0["<b>1. Central metrics service</b><br/>MS provides reporting and alerting"]:::start
+  n1["<b>2. Push the counter</b><br/>SVC POSTs orders_created 3, MS.view.orders_created : 0 becomes 3"]:::core
+  n2["<b>3. Push the sum</b><br/>SVC POSTs request_ms_sum 123, MS.view.request_ms_sum : 0 becomes 123"]:::step
+  n3["<b>4. Pull model</b><br/>MS GETs /metrics, body orders_created 3 request_ms_sum 123"]:::core
+  n4["<b>5. Both values aggregated</b><br/>MS.view : orders_created 3, request_ms_sum 123"]:::stop
+  n5["<b>6. Aggregation services</b><br/>Prometheus or AWS CloudWatch"]:::core
+  n0 -->|"1. service pushes metrics"| n1
+  n1 -->|"2. second value pushed"| n2
+  n2 -->|"3. converge on the view"| n4
+  n0 -->|"4. metrics service scrapes the service"| n3
+  n3 -->|"5. converge on the view"| n4
+  n4 -->|"6. report and alert"| n5
 ```
 
 1. **Central metrics service** — Aggregate metrics in a centralized metrics service that provides reporting and alerting.
@@ -89,16 +107,25 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Deep insight</b><br/>The benefit is deep insight into application behavior."]:::start
-  s2n1["<b>2. Intertwined code</b><br/>The drawback is that metrics code is intertwined with business logi…"]:::step
-  s2n2["<b>3. A histogram inline</b><br/>A histogram observes each request duration from inside the business…"]:::step
-  s2n3["<b>4. Infrastructure</b><br/>Aggregating metrics can require significant infrastructure."]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
-  s2n2 --> s2n3
+  n0["<b>1. Deep insight</b><br/>metrics reveal application behavior"]:::start
+  n1["<b>2. First observe</b><br/>hist.request_ms : empty becomes 41, 141-100 equals 41"]:::step
+  n2["<b>3. Second observe</b><br/>hist.request_ms becomes 41,37, 237-200 equals 37"]:::step
+  n3["<b>4. Third observe</b><br/>hist.request_ms becomes 41,37,48, 348-300 equals 48"]:::step
+  n4["<b>5. Intertwined code</b><br/>observe calls woven between the save calls"]:::core
+  n5["<b>6. Business logic obscured</b><br/>reading the flow means reading past metric lines"]:::warn
+  n6["<b>7. Infrastructure cost</b><br/>aggregating metrics requires significant infrastructure"]:::stop
+  n0 -->|"1. benefit of the pattern"| n1
+  n1 -->|"2. next request"| n2
+  n2 -->|"3. next request"| n3
+  n3 -->|"4. metrics sit inside the method"| n4
+  n4 -->|"5. the drawback"| n5
+  n5 -->|"6. plus the aggregation cost"| n6
+  n4 -->|"7. each request observed again"| n2
 ```
 
 1. **Deep insight** — The benefit is deep insight into application behavior.

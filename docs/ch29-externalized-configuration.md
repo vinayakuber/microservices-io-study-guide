@@ -12,14 +12,22 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 29 · microservice
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. The service starts</b><br/>On startup, the service needs configuration telling it how to conne…"]:::start
-  s0n1["<b>2. It reads the values externally</b><br/>The service reads its configuration from an external source, e.g. O…"]:::step
-  s0n2["<b>3. It connects with those values</b><br/>The service uses the resolved values, e.g. the database network loc…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. Service starts</b><br/>SVC needs DB credentials and network location to connect"]:::start
+  n1["<b>2. Read DB_URL</b><br/>config : empty becomes db_url jdbc:mysql://prod-db:3306/orders"]:::step
+  n2["<b>3. Read DB_PASSWORD</b><br/>config gains db_password prod-secret"]:::step
+  n3["<b>4. Open the connection</b><br/>connection : empty becomes open, URL and password accepted"]:::core
+  n4["<b>5. Connected</b><br/>SVC talks to the production database"]:::stop
+  n5["<b>6. Missing value</b><br/>DB_PASSWORD absent, connection : empty becomes failed"]:::warn
+  n0 -->|"1. startup needs config"| n1
+  n1 -->|"2. pull the URL from the environment"| n2
+  n2 -->|"3. pull the password"| n3
+  n3 -->|"4. values match what the DB expects"| n4
+  n2 -->|"5. password not supplied"| n5
 ```
 
 1. **The service starts** — On startup, the service needs configuration telling it how to connect to external and third-party services.
@@ -49,14 +57,23 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. One artifact, many environments</b><br/>The same build is deployed to each environment with no modification…"]:::start
-  s1n1["<b>2. Each environment supplies its own values</b><br/>Each environment injects its own instances, e.g. a QA database vs a…"]:::step
-  s1n2["<b>3. Each instance connects to its own dependency</b><br/>The same code resolves different database locations and credentials…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+  n0["<b>1. One artifact</b><br/>orders-service.jar, no modification or recompilation"]:::start
+  n1["<b>2. QA injects its values</b><br/>qa_config becomes jdbc:mysql://qa-db:3306/orders, qa-secret"]:::core
+  n2["<b>3. Production injects different values</b><br/>prod_config becomes jdbc:mysql://prod-db:3306/orders, prod-secret"]:::core
+  n3["<b>4. QA connects to its DB</b><br/>qa_connection : empty becomes qa-db"]:::step
+  n4["<b>5. Production connects to its DB</b><br/>prod_connection : empty becomes prod-db"]:::step
+  n5["<b>6. One build, two databases</b><br/>qa points at qa-db, prod at prod-db"]:::stop
+  n0 -->|"1. same jar deployed to QA"| n1
+  n0 -->|"2. same jar deployed to production"| n2
+  n1 -->|"3. QA dependency resolved"| n3
+  n2 -->|"4. production dependency resolved"| n4
+  n3 -->|"5. converge on one artifact"| n5
+  n4 -->|"6. converge on one artifact"| n5
 ```
 
 1. **One artifact, many environments** — The same build is deployed to each environment with no modification or recompilation.
@@ -91,14 +108,20 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Config names the dependency logically</b><br/>The configuration holds a logical name (e.g. USER_REGISTRATION_URL:…"]:::start
-  s2n1["<b>2. Client-side discovery resolves it</b><br/>The logical name REGISTRATION-SERVICE is resolved using client-side…"]:::step
-  s2n2["<b>3. The component calls the resolved service</b><br/>A component like RegistrationServiceProxy uses the resolved address…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+  n0["<b>1. Logical name in config</b><br/>config holds user_registration_url http://REGISTRATION-SERVICE/user"]:::start
+  n1["<b>2. Resolve via discovery</b><br/>resolved_url : empty becomes http://10.0.0.7:8080/user"]:::step
+  n2["<b>3. Proxy calls the instance</b><br/>call_target : empty becomes http://10.0.0.7:8080/user"]:::step
+  n3["<b>4. Registration service reached</b><br/>RegistrationServiceProxy reaches REG"]:::stop
+  n4["<b>5. Name unresolved</b><br/>a logical name has no host and port to dial"]:::warn
+  n0 -->|"1. name is not a network location"| n1
+  n1 -->|"2. logical name becomes a real address"| n2
+  n2 -->|"3. invoke the dependency"| n3
+  n0 -->|"4. discovery unavailable - call has no address"| n4
 ```
 
 1. **Config names the dependency logically** — The configuration holds a logical name (e.g. USER_REGISTRATION_URL: http://REGISTRATION-SERVICE/user), not a host and port.

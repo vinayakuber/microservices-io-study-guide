@@ -12,14 +12,24 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 23 · microservice
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. One page spans many services</b><br/>Product details data is spread over Product Info, Pricing, Order, I…"]:::start
-  s0n1["<b>2. Clients must call each service</b><br/>A client needing the details of one product must fetch data from nu…"]:::step
-  s0n2["<b>3. Mobile can only afford a few calls</b><br/>A mobile network is much slower, so the client should make few roun…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. One page spans many services</b><br/>product P-9 data is spread over Product Info, Pricing, Inventory, and Review"]:::start
+  n1["<b>2. Call Product Info</b><br/>page gains title POJOs in Action, author Chris Richardson, roundtrips 0 becomes 1"]:::step
+  n2["<b>3. Call Pricing</b><br/>page gains price 39.99, roundtrips 1 becomes 2"]:::step
+  n3["<b>4. Call Inventory</b><br/>page gains stock 3, roundtrips 2 becomes 3"]:::step
+  n4["<b>5. Call Review</b><br/>page gains reviews 12, roundtrips 3 becomes 4"]:::step
+  n5["<b>6. Page assembled, expensively</b><br/>4 round-trips over a slow mobile network"]:::stop
+  n6["<b>Alt - a LAN client</b><br/>4 round-trips are cheap, a server-side web app can afford them"]:::warn
+  n0 -->|"1. client must call each"| n1
+  n1 -->|"2. next service"| n2
+  n2 -->|"3. next service"| n3
+  n3 -->|"4. next service"| n4
+  n4 -->|"5. mobile pays the price"| n5
+  n4 -->|"6. alt - fast network"| n6
 ```
 
 1. **One page spans many services** — Product details data is spread over Product Info, Pricing, Order, Inventory, Review, and more.
@@ -50,14 +60,22 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. The client hits the single entry point</b><br/>Every client sends its request to the API gateway, not to individua…"]:::start
-  s1n1["<b>2. The gateway routes to the right service</b><br/>For a simple request, the gateway proxies it to the appropriate ser…"]:::step
-  s1n2["<b>3. The response returns through the gateway</b><br/>The client receives the answer without learning the service instanc…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+  n0["<b>1. Client hits the single entry point</b><br/>CLI sends GET /products/P-9 to the gateway"]:::start
+  n1["<b>2. Match the path</b><br/>route_table maps /products to PROD"]:::core
+  n2["<b>3. Forward to the service</b><br/>the gateway proxies the request to Product Info Service"]:::step
+  n3["<b>4. Response returns through the gateway</b><br/>response is title POJOs in Action, author Chris Richardson"]:::step
+  n4["<b>5. Client never learns the host</b><br/>the client got its answer without PROD host or port"]:::stop
+  n5["<b>Alt - route table changes</b><br/>/products now maps to PROD-v2, the client keeps sending to the gateway unchanged"]:::warn
+  n0 -->|"1. one request in"| n1
+  n1 -->|"2. lookup the URL"| n2
+  n2 -->|"3. proxy it"| n3
+  n3 -->|"4. answer out"| n4
+  n2 -->|"5. alt - route swap"| n5
 ```
 
 1. **The client hits the single entry point** — Every client sends its request to the API gateway, not to individual services.
@@ -88,14 +106,24 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. One request enters the gateway</b><br/>The client sends a single request for the whole page."]:::start
-  s2n1["<b>2. The gateway fans out</b><br/>The gateway calls the several services that own pieces of the page."]:::step
-  s2n2["<b>3. The gateway composes and returns</b><br/>It merges the partial results and sends one response back to the cl…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+  n0["<b>1. One request enters the gateway</b><br/>client sends GET /product/P-9, not four requests"]:::start
+  n1["<b>2. Fan out to Product Info</b><br/>response gains title POJOs in Action, author Chris Richardson"]:::step
+  n2["<b>3. Fan out to Pricing</b><br/>response gains price 39.99"]:::step
+  n3["<b>4. Fan out to Review</b><br/>response gains reviews 12"]:::step
+  n4["<b>5. Compose the page</b><br/>the gateway merges the partial results into one response"]:::core
+  n5["<b>6. One round-trip for the client</b><br/>the client received the composed page in a single call"]:::stop
+  n6["<b>A service call fails</b><br/>the circuit breaker opens, the gateway returns a partial page instead of hanging"]:::warn
+  n0 -->|"1. fan out"| n1
+  n1 -->|"2. next service"| n2
+  n2 -->|"3. next service"| n3
+  n3 -->|"4. merge partials"| n4
+  n4 -->|"5. single reply"| n5
+  n2 -->|"6. failure - partial page"| n6
 ```
 
 1. **One request enters the gateway** — The client sends a single request for the whole page.
@@ -124,14 +152,26 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. An extra hop, usually insignificant</b><br/>Every request passes through the gateway, adding one more network leg."]:::start
-  s3n1["<b>2. A different API per client</b><br/>Rather than one-size-fits-all, the gateway can expose an API suited…"]:::step
-  s3n2["<b>3. A Backends for frontends variation</b><br/>A separate gateway per client type is the Backends for frontends va…"]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
+  n0["<b>1. Every request passes through the gateway</b><br/>one more network leg per call"]:::start
+  n1["<b>2. CLI to GW</b><br/>hops gains CLI-GW, latency 0 becomes 12 ms"]:::step
+  n2["<b>3. GW to PROD</b><br/>hops gains GW-PROD, latency 12 becomes 24 ms"]:::step
+  n3["<b>4. Back to CLI</b><br/>hops gains GW-CLI, latency 24 becomes 36 ms"]:::step
+  n4["<b>5. Three hops, 36 ms</b><br/>the extra gateway hop added 12 ms, insignificant for most applications"]:::stop
+  n5["<b>Alt - no gateway</b><br/>the client calls PROD directly in 24 ms but must locate and call every other service itself"]:::warn
+  n6["<b>Variation - a different API per client</b><br/>the gateway can expose an API suited to each client"]:::warn
+  n7["<b>Variation - Backends for frontends</b><br/>a separate gateway per client type is the BFF variation"]:::warn
+  n0 -->|"1. measure the hop"| n1
+  n1 -->|"2. second leg"| n2
+  n2 -->|"3. third leg"| n3
+  n3 -->|"4. tally"| n4
+  n3 -->|"5. alt - direct call"| n5
+  n0 -->|"6. per-client API"| n6
+  n0 -->|"7. BFF"| n7
 ```
 
 1. **An extra hop, usually insignificant** — Every request passes through the gateway, adding one more network leg.

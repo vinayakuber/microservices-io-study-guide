@@ -12,14 +12,22 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 44 · microservice
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. You have a working monolith</b><br/>The legacy application runs the business today and cannot simply be…"]:::start
-  s0n1["<b>2. You want microservices</b><br/>The team wants a microservice architecture, but the monolith cannot…"]:::step
-  s0n2["<b>3. Incremental replacement</b><br/>The migration proceeds by building the new system gradually around…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. You have a working monolith</b><br/>mono_features : catalog, orders, accounts all true"]:::start
+  n1["<b>2. You want microservices</b><br/>the monolith cannot be rebuilt in a single step"]:::warn
+  n2["<b>3. Incremental replacement</b><br/>new_features : empty becomes catalog true, one piece at a time"]:::step
+  n3["<b>4. Cut the piece over</b><br/>mono_features.catalog : true becomes false, traffic moves to the new service"]:::core
+  n4["<b>5. Monolith shrinks</b><br/>mono_features : orders, accounts remain, one feature moved"]:::stop
+  n5["<b>Big-bang rewrite instead</b><br/>rebuild the whole monolith at once, high risk"]:::warn
+  n0 -->|"1. legacy runs the business"| n1
+  n1 -->|"2. migrate gradually"| n2
+  n2 -->|"3. re-implement one feature"| n3
+  n3 -->|"4. cut over that feature"| n4
+  n1 -->|"5. the one-shot rewrite"| n5
 ```
 
 1. **You have a working monolith** — The legacy application runs the business today and cannot simply be switched off.
@@ -49,16 +57,21 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. A router fronts both systems</b><br/>The strangler receives every request and decides which system handl…"]:::start
-  s1n1["<b>2. Migrated paths go to new services</b><br/>Functionality already moved to a microservice is served by that ser…"]:::step
-  s1n2["<b>3. Unmigrated paths fall back</b><br/>Everything else still goes to the monolith, so it keeps running as…"]:::step
-  s1n3["<b>4. The strangler grows</b><br/>As more functionality is re-implemented, more paths move over, and…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
-  s1n2 --> s1n3
+  n0["<b>1. A router fronts both systems</b><br/>route_table : /catalog NEW, /orders MONO"]:::start
+  n1["<b>2. Migrated paths go to new services</b><br/>look up /catalog, matched : empty becomes NEW"]:::step
+  n2["<b>3. Unmigrated paths fall back</b><br/>path /orders, matched : NEW becomes MONO, the monolith still serves it"]:::warn
+  n3["<b>4. The strangler grows</b><br/>target : empty becomes NEW, /catalog served by the new service"]:::core
+  n4["<b>5. Monolith never sees it</b><br/>catalog items come from NEW, unchanged paths stay on MONO"]:::stop
+  n0 -->|"1. every request is decided"| n1
+  n1 -->|"2. the migrated path"| n3
+  n3 -->|"3. served by the new service"| n4
+  n0 -->|"4. the unmigrated path falls back"| n2
+  n2 -->|"5. monolith unchanged"| n4
 ```
 
 1. **A router fronts both systems** — The strangler receives every request and decides which system handles it.
@@ -90,16 +103,20 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Re-implement monolith features</b><br/>Services that take over functionality that previously resided in th…"]:::start
-  s2n1["<b>2. Add brand-new features</b><br/>Services that implement new features the monolith never had."]:::step
-  s2n2["<b>3. Demonstrate the value</b><br/>The new-feature services are useful because they show the business…"]:::step
-  s2n3["<b>4. Keep strangling</b><br/>The strangler keeps taking over monolith functionality piece by pie…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
-  s2n2 --> s2n3
+  n0["<b>1. Re-implement monolith features</b><br/>new_features : catalog true, taken over from the monolith"]:::start
+  n1["<b>2. Add brand-new features</b><br/>brand_new : empty becomes recommendations true, no monolith twin"]:::step
+  n2["<b>3. Demonstrate the value</b><br/>route_table : /catalog NEW becomes /catalog NEW, /recommendations NEW"]:::core
+  n3["<b>4. Keep strangling</b><br/>new_features : catalog, recommendations, the monolith keeps shrinking"]:::stop
+  n4["<b>Feature already in the monolith</b><br/>it must be re-implemented and cut over, not just added"]:::warn
+  n0 -->|"1. take over old features"| n1
+  n1 -->|"2. ship net-new features"| n2
+  n2 -->|"3. show the business the value"| n3
+  n1 -->|"4. feature has a monolith twin"| n4
 ```
 
 1. **Re-implement monolith features** — Services that take over functionality that previously resided in the monolith.

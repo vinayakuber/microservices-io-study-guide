@@ -12,14 +12,24 @@ _Also known as: Application events · Chris Richardson · Microservice Patterns 
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Update the aggregate</b><br/>The sender applies its normal business change to the database insid…"]:::start
-  s0n1["<b>2. Insert the outbox row</b><br/>In that same transaction it inserts the message or event into the o…"]:::step
-  s0n2["<b>3. Commit both or neither</b><br/>Commit makes the business row and the outbox row durable together;…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. Begin local transaction T1</b><br/>SVC starts a local transaction, BRK not enlisted, no 2PC"]:::start
+  n1["<b>2. Insert business row</b><br/>orders becomes PO-2001 PENDING"]:::step
+  n2["<b>3. Insert outbox row</b><br/>outbox becomes row 1, order_created"]:::core
+  n3["<b>4. Commit T1</b><br/>both rows become durable together"]:::core
+  n4["<b>5. Broker sees nothing yet</b><br/>outbox holds order_created, BRK received 0 messages so far"]:::stop
+  n5["<b>6. Rollback T1 instead</b><br/>orders stays empty, outbox drops the row"]:::warn
+  n6["<b>7. Event not published</b><br/>the rollback undoes both inserts, no event leaks"]:::warn
+  n0 -->|"start local tx"| n1
+  n1 -->|"same transaction"| n2
+  n2 -->|"same transaction"| n3
+  n3 -->|"commit path"| n4
+  n3 -->|"rollback path"| n5
+  n5 -->|"both inserts undone"| n6
 ```
 
 1. **Update the aggregate** — The sender applies its normal business change to the database inside a local transaction.
@@ -51,14 +61,27 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Read unsent rows in order</b><br/>The relay selects outbox rows that are not yet sent, ordered by the…"]:::start
-  s1n1["<b>2. Publish each to the broker</b><br/>Each row is published to the broker topic in the order it was read."]:::step
-  s1n2["<b>3. Mark the row sent</b><br/>The relay updates the row so a later poll will not re-publish it."]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+  n0["<b>1. Polling loop fires</b><br/>the relay wakes every 100 ms"]:::start
+  n1["<b>2. Read unsent rows in order</b><br/>query SELECT rows WHERE sent=false ORDER BY id ASC, returns id 1 then id 2"]:::step
+  n2["<b>3. Publish E1</b><br/>published : empty becomes E1, id 1 is first"]:::step
+  n3["<b>4. Mark id 1 sent</b><br/>outbox row 1 sent=false becomes sent=true"]:::core
+  n4["<b>5. Publish E2</b><br/>published : E1 becomes E1, E2"]:::step
+  n5["<b>6. Mark id 2 sent</b><br/>outbox row 2 sent=false becomes sent=true"]:::core
+  n6["<b>7. Broker receives in order</b><br/>BRK receives E1, E2 in id order, outbox fully sent"]:::stop
+  n7["<b>Query has no ORDER BY</b><br/>the database could return id 2 first, order wrong"]:::warn
+  n0 -->|"timer fires"| n1
+  n1 -->|"ordered by id"| n2
+  n1 -->|"no ORDER BY"| n7
+  n2 -->|"send E1"| n3
+  n3 -->|"next row"| n4
+  n4 -->|"send E2"| n5
+  n5 -->|"outbox drained"| n6
+  n7 -->|"add ORDER BY id to fix"| n2
 ```
 
 1. **Read unsent rows in order** — The relay selects outbox rows that are not yet sent, ordered by their id.
@@ -89,14 +112,27 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Publish then mark</b><br/>The relay publishes a row and only then marks it sent, leaving a wi…"]:::start
-  s2n1["<b>2. Crash inside the window</b><br/>If the relay dies after publish but before marking, the row is stil…"]:::step
-  s2n2["<b>3. Consumer dedupes</b><br/>The consumer records each processed message id and skips any it has…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+  n0["<b>1. Relay polls the next row</b><br/>row 1, E1, sent=false"]:::start
+  n1["<b>2. Publish E1 to BRK</b><br/>published : empty becomes E1, BRK holds one copy"]:::step
+  n2["<b>3. Crash before mark</b><br/>row still sent=false, the relay dies"]:::warn
+  n3["<b>4. Restart polls again</b><br/>query returns row 1 again"]:::step
+  n4["<b>5. Re-publish E1</b><br/>published : E1 becomes E1, E1, at-least-once duplicate"]:::warn
+  n5["<b>6. Mark id 1 sent</b><br/>outbox row becomes sent=true"]:::step
+  n6["<b>7. Consumer dedupes</b><br/>processed becomes E1 true, INSERT ON CONFLICT DO NOTHING"]:::core
+  n7["<b>8. Delivered twice, handled once</b><br/>CNS idempotently skips the second copy"]:::stop
+  n0 -->|"read the unsent row"| n1
+  n1 -->|"crash before mark"| n2
+  n1 -->|"no crash - mark sent"| n5
+  n2 -->|"restart re-reads the row"| n3
+  n3 -->|"row still unsent"| n4
+  n4 -->|"mark sent after republish"| n5
+  n5 -->|"copies delivered"| n6
+  n6 -->|"duplicate skipped"| n7
 ```
 
 1. **Publish then mark** — The relay publishes a row and only then marks it sent, leaving a window between the two writes.
@@ -131,14 +167,24 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. Sequence by commit order</b><br/>Each committed transaction inserts its outbox row, and the row id g…"]:::start
-  s3n1["<b>2. Order by the row id</b><br/>The relay reads rows ordered by id, not by which instance wrote them."]:::step
-  s3n2["<b>3. Preserve T1 before T2</b><br/>Because T1 committed before T2, event E1 is published before E2."]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
+  n0["<b>1. Two instances, one aggregate</b><br/>SVC1 and SVC2 both update PO-2001"]:::start
+  n1["<b>2. T1 commits first</b><br/>SVC1 updates aggregate to APPROVED, inserts outbox row id 1 E1"]:::core
+  n2["<b>3. T2 commits after</b><br/>SVC2 updates aggregate to SHIPPED, inserts outbox row id 2 E2"]:::core
+  n3["<b>4. Relay reads by id</b><br/>rows ordered by id, not by which instance wrote them"]:::step
+  n4["<b>5. Publish E1 before E2</b><br/>id 1 is read first"]:::step
+  n5["<b>6. Commit order preserved</b><br/>T1 before T2 means E1 before E2 in the broker"]:::stop
+  n6["<b>Read by instance, not id</b><br/>would scramble E1 and E2, order lost"]:::warn
+  n0 -->|"SVC1 runs T1"| n1
+  n1 -->|"SVC2 runs T2"| n2
+  n2 -->|"both rows in outbox"| n3
+  n3 -->|"order by id"| n4
+  n3 -->|"no id ordering"| n6
+  n4 -->|"E1 then E2"| n5
 ```
 
 1. **Sequence by commit order** — Each committed transaction inserts its outbox row, and the row id grows with commit order.

@@ -12,14 +12,21 @@ _Also known as: Chris Richardson · Microservice Patterns p.390 · microservices
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Install the runtime into the image</b><br/>The image captures the service's technology stack, such as the JDK…"]:::start
-  s0n1["<b>2. Copy the service code</b><br/>The service code is baked into the image so the instance is self-co…"]:::step
-  s0n2["<b>3. Register the image</b><br/>The finished image is registered with the IaaS so instances can be…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. Install the runtime into the image</b><br/>stack : empty becomes jdk 17 plus os linux"]:::start
+  n1["<b>2. Copy the service code</b><br/>image : null becomes catalog:2.3.0"]:::step
+  n2["<b>3. Register the image</b><br/>ami : 0 becomes 1, one AMI ready to launch"]:::core
+  n3["<b>4. Image ready to launch</b><br/>catalog:2.3.0 launches as N EC2 instances"]:::stop
+  n4["<b>Slow rebuild after a change</b><br/>version : 2.3.0 becomes 2.3.1, build is slow and time consuming"]:::warn
+  n0 -->|"1. capture the tech stack"| n1
+  n1 -->|"2. bake the code in"| n2
+  n2 -->|"3. one AMI registered"| n3
+  n1 -->|"4. a change forces a rebuild"| n4
+  n4 -->|"5. rebuild the image"| n1
 ```
 
 1. **Install the runtime into the image** — The image captures the service's technology stack, such as the JDK and OS.
@@ -49,14 +56,21 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Launch VMs from the image</b><br/>Each service instance is a separate VM started from the same image."]:::start
-  s1n1["<b>2. Front with a load balancer</b><br/>An Elastic Load Balancer fronts the instances and spreads traffic."]:::step
-  s1n2["<b>3. Add instances for throughput</b><br/>Scaling the service means increasing the number of instances."]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+  n0["<b>1. Launch VMs from the image</b><br/>instances : empty becomes i-1, i-2, i-3 from the shared AMI"]:::start
+  n1["<b>2. Front with a load balancer</b><br/>load_balancer : 0 becomes 1, an Elastic Load Balancer"]:::step
+  n2["<b>3. Add instances for throughput</b><br/>endpoints : 0 becomes 3, three VMs answer for the service"]:::core
+  n3["<b>4. Service is live</b><br/>one EC2 instance per service instance"]:::stop
+  n4["<b>Scale out on demand</b><br/>instance_count : 3 becomes 5 to add throughput"]:::warn
+  n0 -->|"1. spin up the VMs"| n1
+  n1 -->|"2. spread the traffic"| n2
+  n2 -->|"3. VMs serving"| n3
+  n2 -->|"4. need more capacity"| n4
+  n4 -->|"5. launch more instances"| n0
 ```
 
 1. **Launch VMs from the image** — Each service instance is a separate VM started from the same image.
@@ -86,14 +100,21 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Bound the group</b><br/>An autoscaling group is bounded by a minimum and maximum number of…"]:::start
-  s2n1["<b>2. Trigger on load</b><br/>When load crosses a threshold, the group launches more VMs automati…"]:::step
-  s2n2["<b>3. Shrink when load drops</b><br/>The group terminates VMs when they are no longer needed."]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+  n0["<b>1. Bound the group</b><br/>policy : empty becomes min 2, max 6 VMs"]:::start
+  n1["<b>2. Trigger on load</b><br/>load 8.0 crosses the threshold, group_size : 2 becomes 4"]:::step
+  n2["<b>3. Shrink when load drops</b><br/>group_size : 4 becomes 2, unneeded VMs terminated"]:::warn
+  n3["<b>4. Stabilized at load</b><br/>healthy : 2 becomes 4, the new VMs come up"]:::core
+  n4["<b>5. Scaling handled by the IaaS</b><br/>no manual launch needed"]:::stop
+  n0 -->|"1. set the bounds"| n1
+  n1 -->|"2. load exceeds threshold"| n3
+  n3 -->|"3. group reaches target"| n4
+  n1 -->|"4. load drops instead"| n2
+  n2 -->|"5. remove the VMs"| n4
 ```
 
 1. **Bound the group** — An autoscaling group is bounded by a minimum and maximum number of VMs.
@@ -123,14 +144,20 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. Use ready-made features</b><br/>AWS provides mature infrastructure such as the Elastic Load Balance…"]:::start
-  s3n1["<b>2. Pay the build cost</b><br/>Building a VM image is slow and time consuming."]:::step
-  s3n2["<b>3. Compare with containers</b><br/>A container packages about 100x faster than an AMI, which is why co…"]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
+  n0["<b>1. Use ready-made features</b><br/>tools : 0 becomes 1, the Elastic Load Balancer"]:::start
+  n1["<b>2. Use more ready-made features</b><br/>tools : 1 becomes 2, autoscaling groups"]:::step
+  n2["<b>3. Pay the build cost</b><br/>build_time : 0 becomes 600 s, image build is slow"]:::warn
+  n3["<b>4. Rich but slow</b><br/>mature IaaS, yet each image build is slow and time consuming"]:::stop
+  n4["<b>5. Compare with containers</b><br/>build_time : 600 becomes 6 s, about 100x faster"]:::warn
+  n0 -->|"1. mature load balancer"| n1
+  n1 -->|"2. mature autoscaling"| n2
+  n2 -->|"3. the tradeoff"| n3
+  n2 -->|"4. the lighter alternative"| n4
 ```
 
 1. **Use ready-made features** — AWS provides mature infrastructure such as the Elastic Load Balancer and autoscaling groups.

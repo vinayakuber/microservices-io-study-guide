@@ -12,14 +12,27 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 7 · microservices
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Count consecutive failures</b><br/>The proxy increments a counter on each failed call."]:::start
-  s0n1["<b>2. Cross the threshold</b><br/>When the count crosses the threshold, the breaker trips."]:::step
-  s0n2["<b>3. Open the circuit</b><br/>For the timeout period, all attempts fail immediately."]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. Client calls the proxy</b><br/>get-user-1, breaker state CLOSED, threshold 3"]:::start
+  n1["<b>2. Forward the call</b><br/>remote_calls 0 becomes 1"]:::step
+  n2["<b>3. Count the failure</b><br/>SVC is down, consecutive_failures 0 becomes 1"]:::step
+  n3["<b>4. Second call fails too</b><br/>consecutive_failures 1 becomes 2"]:::step
+  n4["<b>5. Third call hits the threshold</b><br/>consecutive_failures 2 becomes 3, at least threshold 3"]:::core
+  n5["<b>6. Open the circuit</b><br/>state CLOSED becomes OPEN"]:::step
+  n6["<b>7. Verdict OPEN at 00:00:02</b><br/>later attempts fail immediately for the timeout"]:::stop
+  n7["<b>Below threshold</b><br/>failures stay under 3, the breaker stays CLOSED"]:::warn
+  n0 -->|"1. proxy forwards the call"| n1
+  n1 -->|"2. remote service is down"| n2
+  n2 -->|"3. another failure"| n3
+  n3 -->|"4. count climbs again"| n3
+  n3 -->|"5. third failure crosses the threshold"| n4
+  n4 -->|"6. trip the breaker"| n5
+  n5 -->|"7. circuit open"| n6
+  n2 -->|"8. count never reaches threshold"| n7
 ```
 
 1. **Count consecutive failures** — The proxy increments a counter on each failed call.
@@ -50,14 +63,24 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Reject without calling</b><br/>Attempts to invoke the remote service fail immediately."]:::start
-  s1n1["<b>2. Protect the caller</b><br/>Threads are not consumed waiting for an unresponsive service."]:::step
-  s1n2["<b>3. Stop the cascade</b><br/>The failure of one service no longer drains the services that call it."]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+  n0["<b>1. Request arrives while open</b><br/>get-user-2 at 00:00:10, opened_at 00:00:02"]:::start
+  n1["<b>2. Check the window</b><br/>elapsed 0 becomes 8 s, under the 60 s timeout"]:::step
+  n2["<b>3. Reject without calling</b><br/>attempts 0 becomes 1, SVC untouched"]:::step
+  n3["<b>4. Protect the caller</b><br/>svc_calls 0 becomes 0, threads freed at once"]:::core
+  n4["<b>5. Second request fails fast too</b><br/>attempts 1 becomes 2 at 00:00:30"]:::step
+  n5["<b>6. Verdict FAIL_FAST twice</b><br/>the cascade is stopped"]:::stop
+  n6["<b>Window already over</b><br/>elapsed at least 60 s, the breaker moves to half-open"]:::warn
+  n0 -->|"1. inside the timeout"| n1
+  n1 -->|"2. still within 60 s"| n2
+  n2 -->|"3. never touches the dead service"| n3
+  n3 -->|"4. next attempt"| n4
+  n4 -->|"5. two rejections"| n5
+  n1 -->|"6. timeout expired instead"| n6
 ```
 
 1. **Reject without calling** — Attempts to invoke the remote service fail immediately.
@@ -89,14 +112,26 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Timeout expires</b><br/>The breaker allows a limited number of test requests to pass through."]:::start
-  s2n1["<b>2. Success resumes operation</b><br/>If those requests succeed, the breaker resumes normal operation."]:::step
-  s2n2["<b>3. Failure restarts the timeout</b><br/>If there is a failure, the timeout period begins again."]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+  n0["<b>1. Timeout expires</b><br/>60 s elapsed at 00:01:02"]:::start
+  n1["<b>2. Move to half-open</b><br/>state OPEN becomes HALF-OPEN"]:::step
+  n2["<b>3. Let one test request pass</b><br/>probe_count 0 becomes 1"]:::step
+  n3["<b>4. SVC answers OK</b><br/>reply null becomes user-3"]:::core
+  n4["<b>5. Resume normal operation</b><br/>state HALF-OPEN becomes CLOSED"]:::step
+  n5["<b>6. Reset the failure counter</b><br/>consecutive_failures 3 becomes 0"]:::step
+  n6["<b>7. Verdict CLOSED resumed</b><br/>normal operation restored"]:::stop
+  n7["<b>Test request fails</b><br/>state HALF-OPEN becomes OPEN, the timeout begins again"]:::warn
+  n0 -->|"1. window has passed"| n1
+  n1 -->|"2. allow a probe"| n2
+  n2 -->|"3. probe succeeds"| n3
+  n3 -->|"4. recovery"| n4
+  n4 -->|"5. counter clears"| n5
+  n5 -->|"6. closed again"| n6
+  n2 -->|"7. probe fails instead"| n7
 ```
 
 1. **Timeout expires** — The breaker allows a limited number of test requests to pass through.
@@ -128,14 +163,25 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. False positives</b><br/>A too-short timeout trips on a healthy but slow service."]:::start
-  s3n1["<b>2. Excessive latency</b><br/>A too-long timeout delays detection of a real failure."]:::step
-  s3n2["<b>3. The one hard dial</b><br/>The challenge is choosing values without false positives or excessi…"]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
+  n0["<b>1. Request hits a slow-but-alive service</b><br/>get-user-4, avg answer 450 ms"]:::start
+  n1["<b>2. Forward the call</b><br/>remote_calls 0 becomes 1"]:::step
+  n2["<b>3. SVC answers at 450 ms</b><br/>reply null becomes user-4"]:::core
+  n3["<b>4. Too-short timeout trips early</b><br/>200 ms fires first, verdict becomes TIMEOUT"]:::warn
+  n4["<b>5. False positive</b><br/>a healthy service is marked down, failure count 0 becomes 1"]:::warn
+  n5["<b>Too-long timeout</b><br/>5000 ms waits through real outages, hiding the failure"]:::warn
+  n6["<b>6. The one hard dial</b><br/>no value avoids both false positives and excessive latency"]:::stop
+  n0 -->|"1. proxy forwards"| n1
+  n1 -->|"2. service responds slowly"| n2
+  n2 -->|"3. timeout_ms 200 gives up early"| n3
+  n2 -->|"4. timeout_ms 5000 waits too long"| n5
+  n3 -->|"5. healthy service marked down"| n4
+  n4 -->|"6. dial too tight"| n6
+  n5 -->|"7. dial too loose"| n6
 ```
 
 1. **False positives** — A too-short timeout trips on a healthy but slow service.

@@ -12,14 +12,29 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. · microservices.i
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. The context</b><br/>You have applied the microservice architecture: the application is…"]:::start
-  s0n1["<b>2. The obligation</b><br/>You must write automated tests that verify a service behaves correc…"]:::step
-  s0n2["<b>3. The dependency</b><br/>Verifying a service means observing the calls it makes to the other…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. The context</b><br/>application is numerous services that often invoke each other"]:::start
+  n1["<b>2. The obligation</b><br/>write automated tests that verify Order Service behaves correctly"]:::step
+  n2["<b>3. The dependency</b><br/>verifying means observing the calls it makes to Kitchen Service"]:::step
+  n3["<b>4. place_order arrives</b><br/>order_id ORD-4007 reaches Order Service"]:::core
+  n4["<b>5. create order</b><br/>order.id : empty becomes ORD-4007"]:::step
+  n5["<b>6. start cooking</b><br/>order.ticket : empty becomes T-88, Kitchen Service invoked"]:::step
+  n6["<b>7. record the call</b><br/>calls : empty becomes one entry KitchenService.createTicket"]:::core
+  n7["<b>8. Order verifiable</b><br/>state PENDING, ticket T-88, one tracked outbound call"]:::stop
+  n8["<b>Untracked call</b><br/>an unrecorded outbound call cannot be asserted by the test"]:::warn
+  n0 -->|"1. services invoke each other"| n1
+  n1 -->|"2. tests must cover outbound calls"| n2
+  n2 -->|"3. observe the dependency calls"| n3
+  n3 -->|"4. a fresh order enters"| n4
+  n4 -->|"5. outbound call to Kitchen Service"| n5
+  n5 -->|"6. capture the call"| n6
+  n6 -->|"7. behavior now testable"| n7
+  n7 -->|"8. another order - loop back to create"| n4
+  n5 -->|"9. call never recorded - assertion impossible"| n8
 ```
 
 1. **The context** — You have applied the microservice architecture: the application is numerous services that often invoke each other.
@@ -49,14 +64,24 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Launch multiple services</b><br/>An end-to-end test starts several services at once to exercise a fu…"]:::start
-  s1n1["<b>2. Pay for every one</b><br/>Each launched service adds setup, config, and a failure surface to…"]:::step
-  s1n2["<b>3. The verdict</b><br/>End-to-end testing is difficult, slow, brittle, and expensive."]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+  n0["<b>1. Launch every service</b><br/>TST starts OrderService, KitchenService, DeliveryService at once"]:::start
+  n1["<b>2. Configure each one</b><br/>checks : 0 becomes 1, config and data wired before running"]:::step
+  n2["<b>3. Three services up</b><br/>launched : empty becomes three entries"]:::core
+  n3["<b>4. One flake fails all</b><br/>launched gains FAILED:DeliveryService, length 4"]:::warn
+  n4["<b>5. Run collapses</b><br/>result brittle - depends on every service being up"]:::stop
+  n5["<b>6. Isolate instead</b><br/>component test launches only OrderService"]:::core
+  n6["<b>7. Small surface</b><br/>one service under test, no cross-service failure"]:::stop
+  n0 -->|"1. exercise a full flow"| n1
+  n1 -->|"2. wire each service"| n2
+  n2 -->|"3. a dependency flakes"| n3
+  n3 -->|"4. whole run fails"| n4
+  n2 -->|"5. choose isolation"| n5
+  n5 -->|"6. fewer moving parts"| n6
 ```
 
 1. **Launch multiple services** — An end-to-end test starts several services at once to exercise a full flow.
@@ -86,14 +111,24 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Stub the dependencies</b><br/>Replace any service the service invokes with a test double that ret…"]:::start
-  s2n1["<b>2. Drive the service directly</b><br/>The test calls the service in-process, not through the network."]:::step
-  s2n2["<b>3. Assert the behavior</b><br/>The test checks the service's response against the double's canned…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+  n0["<b>1. Stub the dependency</b><br/>double.createTicket : empty becomes T-88, real Kitchen Service not launched"]:::start
+  n1["<b>2. Drive the service</b><br/>order.id : empty becomes ORD-4007, called in-process not over the network"]:::step
+  n2["<b>3. Assert the behavior</b><br/>ticket_seen : empty becomes T-88, the double's reply"]:::step
+  n3["<b>4. Order correct</b><br/>order ORD-4007 PENDING, double returned T-88"]:::core
+  n4["<b>5. Isolated test passes</b><br/>real_dep KitchenService never launched"]:::stop
+  n5["<b>6. Double drifts</b><br/>double.createTicket : T-88 becomes T-99, a stale shape"]:::warn
+  n6["<b>7. Hidden mismatch</b><br/>ticket_seen becomes T-99, production break stays hidden"]:::warn
+  n0 -->|"1. canned reply replaces the real service"| n1
+  n1 -->|"2. no network, direct call"| n2
+  n2 -->|"3. service read the reply"| n3
+  n3 -->|"4. green, real dependency untouched"| n4
+  n3 -->|"5. the double changes its reply shape"| n5
+  n5 -->|"6. test trusts a stale reply"| n6
 ```
 
 1. **Stub the dependencies** — Replace any service the service invokes with a test double that returns canned replies.
@@ -130,14 +165,25 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. The benefit</b><br/>Testing a service in isolation is easier, faster, more reliable, an…"]:::start
-  s3n1["<b>2. The drawback</b><br/>Tests might pass but the application will fail in production."]:::step
-  s3n2["<b>3. The open issue</b><br/>How do you ensure the test doubles always correctly emulate the beh…"]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
+  n0["<b>1. Run in isolation</b><br/>test_result : empty becomes green"]:::start
+  n1["<b>2. The benefit</b><br/>easier, faster, more reliable, cheap"]:::core
+  n2["<b>3. The drawback</b><br/>double still returns an old reply, drift : false becomes true"]:::warn
+  n3["<b>4. Production red</b><br/>prod_result : empty becomes red, the real service changed"]:::stop
+  n4["<b>5. The open issue</b><br/>how to ensure doubles correctly emulate invoked services"]:::warn
+  n5["<b>6. Faithful doubles</b><br/>drift : true becomes false, contracts kept in sync"]:::core
+  n6["<b>7. Production green</b><br/>prod_result : red becomes green, test mirrors real behavior"]:::stop
+  n0 -->|"1. suite runs fast and cheap"| n1
+  n1 -->|"2. the double returns an old shape"| n2
+  n2 -->|"3. deploy against the real service"| n3
+  n3 -->|"4. green test, red app - why"| n4
+  n1 -->|"5. keep doubles in sync with contracts"| n5
+  n5 -->|"6. test mirrors the real service"| n6
+  n4 -->|"7. resolve by verifying the doubles"| n5
 ```
 
 1. **The benefit** — Testing a service in isolation is easier, faster, more reliable, and cheap.

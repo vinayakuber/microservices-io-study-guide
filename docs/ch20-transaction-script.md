@@ -12,14 +12,24 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.5 · microservices.
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Map each request to a method</b><br/>A service class exposes one method per system operation — createOrd…"]:::start
-  s0n1["<b>2. Build a pure data object</b><br/>The script fills an Order (orderId, orderLineItems) that has no beh…"]:::step
-  s0n2["<b>3. Reach the database through a DAO</b><br/>OrderDao exposes save(Order) and findOrderById(), keeping SQL out o…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. Map each request to a method</b><br/>OrderService exposes createOrder, reviseOrder, cancelOrder"]:::start
+  n1["<b>2. Build a pure data object</b><br/>Order holds orderId and lineItems, no behavior"]:::step
+  n2["<b>3. Fill from the request</b><br/>orderId PO-100, line S1 qty 2 unit 25.00"]:::step
+  n3["<b>4. Reach the database via a DAO</b><br/>DAO.save order, SQL stays out of the script"]:::core
+  n4["<b>5. Persist the row</b><br/>store gains PO-100"]:::step
+  n5["<b>6. One method per operation</b><br/>the script moves data, it does not own it"]:::stop
+  n6["<b>Rules creep into the script</b><br/>adding logic here starts the sprawl"]:::warn
+  n0 -->|"1. request maps to a script"| n1
+  n1 -->|"2. allocate the data object"| n2
+  n2 -->|"3. fill its fields"| n3
+  n3 -->|"4. hand off to the DAO"| n4
+  n4 -->|"5. row saved"| n5
+  n1 -->|"6. rules in the script - sprawl"| n6
 ```
 
 1. **Map each request to a method** — A service class exposes one method per system operation — createOrder(), reviseOrder(), cancelOrder().
@@ -48,14 +58,24 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Service classes hold the scripts</b><br/>OrderService has methods and no meaningful state."]:::start
-  s1n1["<b>2. Data classes hold the state</b><br/>Order holds orderId and orderLineItems and little or no behavior."]:::step
-  s1n2["<b>3. The script does all mutation</b><br/>A change to a field is written by the script, never by the data obj…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+  n0["<b>1. Service classes hold the scripts</b><br/>OrderService has methods and no state"]:::start
+  n1["<b>2. Data classes hold the state</b><br/>Order has orderId and lineItems, little or no behavior"]:::step
+  n2["<b>3. Load the object</b><br/>findOrderById returns PO-100"]:::step
+  n3["<b>4. The script does the mutation</b><br/>qty 2 becomes 5, written by the script not the Order"]:::core
+  n4["<b>5. Persist the change</b><br/>DAO.save writes the object back"]:::step
+  n5["<b>6. The split signature</b><br/>behavior and state stay in separate classes"]:::stop
+  n6["<b>Object never mutates itself</b><br/>any rule on fields lives far from the data"]:::warn
+  n0 -->|"1. scripts in one class"| n1
+  n1 -->|"2. data in another"| n2
+  n2 -->|"3. load the stored object"| n3
+  n3 -->|"4. script writes the field"| n4
+  n4 -->|"5. saved back"| n5
+  n1 -->|"6. rule far from its data"| n6
 ```
 
 1. **Service classes hold the scripts** — OrderService has methods and no meaningful state.
@@ -83,14 +103,24 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Accept the style when logic is simple</b><br/>Do not be ashamed of procedural code where it is appropriate."]:::start
-  s2n1["<b>2. Watch for sprawl</b><br/>Each new rule is another branch inside the same script, so it grows…"]:::step
-  s2n2["<b>3. Switch when complexity arrives</b><br/>For complex logic, move to the Domain model before the script becom…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+  n0["<b>1. Accept the style for simple logic</b><br/>do not be ashamed of procedural code where it fits"]:::start
+  n1["<b>2. Load the order</b><br/>PO-100 status CREATED"]:::step
+  n2["<b>3. Evaluate the rule</b><br/>cancellable false becomes true"]:::step
+  n3["<b>4. Set the field</b><br/>status CREATED becomes CANCELLED"]:::step
+  n4["<b>5. Persist the change</b><br/>DAO.save writes it back"]:::core
+  n5["<b>6. Linear happy path</b><br/>simple logic reads top to bottom"]:::stop
+  n6["<b>Complexity arrives</b><br/>each new rule adds another branch, so switch to the Domain model first"]:::warn
+  n0 -->|"1. simple logic only"| n1
+  n1 -->|"2. load the object"| n2
+  n2 -->|"3. rule holds"| n3
+  n3 -->|"4. flip the status"| n4
+  n4 -->|"5. save"| n5
+  n0 -->|"6. logic grows complex - switch"| n6
 ```
 
 1. **Accept the style when logic is simple** — Do not be ashamed of procedural code where it is appropriate.

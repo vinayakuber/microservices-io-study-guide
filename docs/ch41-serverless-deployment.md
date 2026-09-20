@@ -12,14 +12,20 @@ _Also known as: Chris Richardson · Microservice Patterns p.416 · microservices
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Package the code</b><br/>Package your Node.js, Java, or Python code for the service as a ZIP…"]:::start
-  s0n1["<b>2. Upload it</b><br/>Upload the ZIP to the deployment infrastructure and describe the de…"]:::step
-  s0n2["<b>3. Name the handler and limits</b><br/>Specify the name of the function that handles events, plus the reso…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. Package the code</b><br/>Node.js, Java, or Python packed as restaurant.zip"]:::start
+  n1["<b>2. Upload it</b><br/>function : null becomes restaurant, the ZIP goes to the infrastructure"]:::step
+  n2["<b>3. Name the handler and limits</b><br/>handler : null becomes index.handler, limits : empty becomes memory 128"]:::core
+  n3["<b>4. No servers to manage</b><br/>no OS, VM, or container is managed by your team"]:::stop
+  n4["<b>Redeploy a fresh ZIP</b><br/>code : restaurant.zip becomes restaurant-v2.zip"]:::warn
+  n0 -->|"1. pack the code"| n1
+  n1 -->|"2. hand it to the provider"| n2
+  n2 -->|"3. handler plus limits"| n3
+  n1 -->|"4. the next version uploads again"| n4
 ```
 
 1. **Package the code** — Package your Node.js, Java, or Python code for the service as a ZIP file.
@@ -49,14 +55,20 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Find an idle instance</b><br/>Lambda finds an idle instance of your function, launching one if no…"]:::start
-  s1n1["<b>2. Invoke the handler</b><br/>The handler function is invoked with the event."]:::step
-  s1n2["<b>3. Isolate under the covers</b><br/>Lambda runs enough instances for the load, using containers on EC2…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+  n0["<b>1. Find an idle instance</b><br/>instances : empty becomes i-1, launch one if none exist"]:::start
+  n1["<b>2. Invoke the handler</b><br/>handler_runs : 0 becomes 1, event object-created for photo-7.jpg"]:::step
+  n2["<b>3. Isolate under the covers</b><br/>containers : 0 becomes 1, a hidden container isolates the instance"]:::core
+  n3["<b>4. Event handled</b><br/>the function ran, nothing provisioned by you"]:::stop
+  n4["<b>No idle instance available</b><br/>instances : empty becomes i-1, a fresh launch adds startup latency"]:::warn
+  n0 -->|"1. reuse or launch"| n1
+  n1 -->|"2. run the handler"| n2
+  n2 -->|"3. hidden isolation"| n3
+  n0 -->|"4. the cold start path"| n4
 ```
 
 1. **Find an idle instance** — Lambda finds an idle instance of your function, launching one if none are available.
@@ -86,14 +98,20 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Transform the request</b><br/>The gateway turns the HTTP request into an event object."]:::start
-  s2n1["<b>2. Invoke the lambda</b><br/>The gateway invokes the lambda function with the event."]:::step
-  s2n2["<b>3. Generate the response</b><br/>The gateway generates an HTTP response from the function's result."]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+  n0["<b>1. Transform the request</b><br/>http : empty becomes method GET, path /restaurants/42"]:::start
+  n1["<b>2. Invoke the lambda</b><br/>http becomes handled, the event is passed to the function"]:::step
+  n2["<b>3. Generate the response</b><br/>response : null becomes status 200"]:::core
+  n3["<b>4. One HTTP call, one reply</b><br/>the request became an event and a response"]:::stop
+  n4["<b>Function returned an error</b><br/>response : null becomes status 500"]:::warn
+  n0 -->|"1. HTTP into an event object"| n1
+  n1 -->|"2. call the function"| n2
+  n2 -->|"3. build the HTTP reply"| n3
+  n2 -->|"4. the error result"| n4
 ```
 
 1. **Transform the request** — The gateway turns the HTTP request into an event object.
@@ -123,14 +141,20 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. Price by duration and memory</b><br/>The cost of each invocation is a function of its duration, measured…"]:::start
-  s3n1["<b>2. Accept the constraints</b><br/>Only a few languages are supported, and only stateless applications…"]:::step
-  s3n2["<b>3. Accept the latency risk</b><br/>The infrastructure can only react to load, not pre-provision it, so…"]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
+  n0["<b>1. Price by duration and memory</b><br/>increments : 0 becomes 3, 300 ms at 100 ms each"]:::start
+  n1["<b>2. Accept the constraints</b><br/>bill : 0 becomes 3, few languages and stateless only"]:::warn
+  n2["<b>3. Accept the latency risk</b><br/>latency : 0 becomes 350 ms, spikes cannot be pre-provisioned"]:::warn
+  n3["<b>4. Pay per request</b><br/>extremely elastic, but you cannot pre-provision capacity"]:::stop
+  n4["<b>Warm instance on steady load</b><br/>latency : 350 becomes 10 ms, no startup cost"]:::core
+  n0 -->|"1. cost is duration times memory"| n1
+  n1 -->|"2. trade away languages and state"| n2
+  n2 -->|"3. trade away pre-provisioning"| n3
+  n2 -->|"4. the warm path is fast"| n4
 ```
 
 1. **Price by duration and memory** — The cost of each invocation is a function of its duration, measured in 100 millisecond increments, and the memory consumed.

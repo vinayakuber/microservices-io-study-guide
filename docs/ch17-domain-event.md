@@ -12,14 +12,20 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.17 (p.160) · micro
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Data changes silently</b><br/>A service updates its own data, but the update is local to that ser…"]:::start
-  s0n1["<b>2. Consumers need to know</b><br/>Events may be needed to update a CQRS view or to coordinate a chore…"]:::step
-  s0n2["<b>3. The open question</b><br/>How does a service publish an event when it updates its data?"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. Data changes locally</b><br/>order.state NEW becomes PLACED, written only inside the service"]:::start
+  n1["<b>2. Two consumers need the news</b><br/>a CQRS view and a choreography saga both depend on the change"]:::step
+  n2["<b>3. The open question</b><br/>how does a service publish an event when it updates its data"]:::core
+  n3["<b>4. A publish step is required</b><br/>the update must be emitted, not just stored"]:::stop
+  n4["<b>No publish step</b><br/>view.placed_count stays 0 and saga.next_step stays none, consumers stranded"]:::warn
+  n0 -->|"1. service updates its own data"| n1
+  n1 -->|"2. consumers depend on the change"| n2
+  n2 -->|"3. the pattern to find"| n3
+  n1 -->|"4. skipped publish - consumers stranded"| n4
 ```
 
 1. **Data changes silently** — A service updates its own data, but the update is local to that service.
@@ -49,14 +55,26 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Aggregates hold the business logic</b><br/>The business logic of a service is organized as a collection of DDD…"]:::start
-  s1n1["<b>2. Emit on create or update</b><br/>An aggregate emits a domain event when it is created or updated."]:::step
-  s1n2["<b>3. Publish for consumers</b><br/>The service publishes the domain events so they can be consumed by…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+  n0["<b>1. Command arrives at the aggregate</b><br/>place_order for order PO-2001"]:::start
+  n1["<b>2. Aggregate changes state</b><br/>order.state NEW becomes PLACED"]:::step
+  n2["<b>3. Aggregate emits the event</b><br/>events gains OrderPlaced with order_id PO-2001"]:::core
+  n3["<b>4. Service publishes to the broker</b><br/>OrderPlaced delivered via the transactional outbox"]:::step
+  n4["<b>5. Broker delivers to the consumer</b><br/>the CQRS view updater receives OrderPlaced"]:::step
+  n5["<b>6. Consumer updates the read model</b><br/>view.order_count 0 becomes 1"]:::step
+  n6["<b>7. View reflects the change</b><br/>the consumer reacts without calling the aggregate"]:::stop
+  n7["<b>Event lost in transit</b><br/>view.order_count stays 0, the read model is stale"]:::warn
+  n0 -->|"1. service calls the aggregate"| n1
+  n1 -->|"2. state flips"| n2
+  n2 -->|"3. change recorded as an event"| n3
+  n3 -->|"4. publish the event"| n4
+  n4 -->|"5. deliver to subscriber"| n5
+  n5 -->|"6. count goes up"| n6
+  n4 -->|"7. event lost - view stale"| n7
 ```
 
 1. **Aggregates hold the business logic** — The business logic of a service is organized as a collection of DDD aggregates.
@@ -90,14 +108,26 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. No distributed transaction</b><br/>A service cannot span one transaction across its database and the m…"]:::start
-  s2n1["<b>2. Write the event in-transaction</b><br/>The Transactional Outbox stores the event in the same local transac…"]:::step
-  s2n2["<b>3. Relay publishes later</b><br/>A separate process publishes the outbox rows to the broker after th…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+  n0["<b>1. No distributed transaction</b><br/>one transaction cannot span the database and the broker"]:::start
+  n1["<b>2. Begin one local transaction</b><br/>the broker is not enlisted"]:::step
+  n2["<b>3. Update the data</b><br/>order.state NEW becomes PLACED"]:::step
+  n3["<b>4. Write the event to the outbox</b><br/>outbox gains OrderPlaced for PO-2001, same transaction"]:::core
+  n4["<b>5. Commit both or neither</b><br/>event cannot be lost, nor published for a rolled-back change"]:::step
+  n5["<b>6. Relay polls the outbox</b><br/>sent false becomes true, then forwards to the broker"]:::step
+  n6["<b>7. Event reaches the broker</b><br/>atomic with the data change"]:::stop
+  n7["<b>Rollback path</b><br/>the transaction aborts and both rows vanish together"]:::warn
+  n0 -->|"1. split write is impossible"| n1
+  n1 -->|"2. single local transaction"| n2
+  n2 -->|"3. change the row"| n3
+  n3 -->|"4. event stored alongside"| n4
+  n4 -->|"5. commit"| n5
+  n5 -->|"6. relay forwards"| n6
+  n4 -->|"7. rollback - event discarded with the change"| n7
 ```
 
 1. **No distributed transaction** — A service cannot span one transaction across its database and the message broker.

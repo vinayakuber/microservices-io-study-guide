@@ -12,14 +12,22 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 28 · microservice
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Client reaches the single entry point</b><br/>The client sends its request, with credentials, to the API gateway…"]:::start
-  s0n1["<b>2. The gateway authenticates the request</b><br/>The gateway authenticates the request, confirming who the requestor…"]:::step
-  s0n2["<b>3. The gateway issues an access token</b><br/>The gateway mints an access token, e.g. a JSON Web Token, that secu…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. Client reaches the gateway</b><br/>CL posts credentials to the single entry point"]:::start
+  n1["<b>2. Gateway verifies credentials</b><br/>gw_auth : empty becomes alice verified"]:::step
+  n2["<b>3. Build the identity claim</b><br/>payload : empty becomes sub alice"]:::step
+  n3["<b>4. Sign the JSON Web Token</b><br/>token : empty becomes eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"]:::core
+  n4["<b>5. Token returned</b><br/>CL holds it for every later request"]:::stop
+  n5["<b>6. Unknown user</b><br/>gw_auth becomes alice unknown, token stays empty"]:::warn
+  n0 -->|"1. credentials to the one entry point"| n1
+  n1 -->|"2. identity confirmed"| n2
+  n2 -->|"3. claim ready to sign"| n3
+  n3 -->|"4. portable identity minted"| n4
+  n1 -->|"5. verification fails - no token issued"| n5
 ```
 
 1. **Client reaches the single entry point** — The client sends its request, with credentials, to the API gateway — the one entry point for all client requests.
@@ -51,14 +59,22 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. The gateway forwards the token</b><br/>The gateway passes the access token in each request it forwards to…"]:::start
-  s1n1["<b>2. The service verifies the requestor</b><br/>The receiving service checks the token to learn the identity of the…"]:::step
-  s1n2["<b>3. The service checks authorization</b><br/>The service verifies that the requestor is authorized to perform th…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+  n0["<b>1. Gateway forwards the request</b><br/>token and operation place_order reach the service"]:::start
+  n1["<b>2. Verify the signature</b><br/>verdict : pending becomes authentic"]:::step
+  n2["<b>3. Read the identity</b><br/>requestor : empty becomes alice"]:::step
+  n3["<b>4. Check the role</b><br/>verdict : authentic becomes authorized, customer may place order"]:::step
+  n4["<b>5. Operation proceeds</b><br/>place_order handled for alice"]:::stop
+  n5["<b>6. Invalid signature</b><br/>verdict : pending becomes rejected, request refused"]:::warn
+  n0 -->|"1. token rides the request"| n1
+  n1 -->|"2. signature valid"| n2
+  n2 -->|"3. who is the requestor"| n3
+  n3 -->|"4. role permits the operation"| n4
+  n1 -->|"5. signature bad - refuse"| n5
 ```
 
 1. **The gateway forwards the token** — The gateway passes the access token in each request it forwards to a service.
@@ -91,14 +107,20 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. A service receives the token</b><br/>An intermediate service receives a request that carries the access…"]:::start
-  s2n1["<b>2. It includes the token downstream</b><br/>When that service invokes another service, it includes the same acc…"]:::step
-  s2n2["<b>3. The next service verifies from the same token</b><br/>The downstream service verifies identity and authorization from tha…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+  n0["<b>1. Order Service receives the token</b><br/>incoming : empty becomes the signed token"]:::start
+  n1["<b>2. Attach the same token</b><br/>forwarded : empty becomes the same token on the call to Payment Service"]:::step
+  n2["<b>3. Payment verifies and authorizes</b><br/>pay_verdict : pending becomes authorized"]:::step
+  n3["<b>4. Charge processed</b><br/>alice's card charged, no fresh authentication"]:::stop
+  n4["<b>5. Token dropped</b><br/>identity lost, downstream must re-establish it"]:::warn
+  n0 -->|"1. token arrives on the request"| n1
+  n1 -->|"2. same token rides downstream"| n2
+  n2 -->|"3. identity intact across the chain"| n3
+  n0 -->|"4. service fails to forward"| n4
 ```
 
 1. **A service receives the token** — An intermediate service receives a request that carries the access token.

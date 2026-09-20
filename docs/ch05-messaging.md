@@ -12,14 +12,27 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 5 · microservices
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Exchange messages over channels</b><br/>A sender writes a message to a channel and a consumer reads it late…"]:::start
-  s0n1["<b>2. Publish the domain event</b><br/>OrderService publishes an Order Created event when it creates an Or…"]:::step
-  s0n2["<b>3. Send and forget</b><br/>A notification expects no reply and none is sent, so the sender ret…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. Exchange messages over channels</b><br/>sender writes, consumer reads later"]:::start
+  n1["<b>2. OrderService writes the order locally</b><br/>orders empty becomes PO-2001 status CREATED"]:::step
+  n2["<b>3. Publish the domain event</b><br/>channel empty becomes Order Created PO-2001"]:::core
+  n3["<b>4a. Publisher side - send and forget</b><br/>reply NONE, the sender returns immediately"]:::step
+  n4["<b>4b. Consumer side - polls when ready</b><br/>channel drains, the message is received"]:::step
+  n5["<b>5. Kitchen starts cooking</b><br/>kitchen empty becomes PO-2001 COOKING"]:::step
+  n6["<b>6. Message consumed</b><br/>sender and consumer never run at the same instant"]:::stop
+  n7["<b>Notification expects no reply</b><br/>none is ever sent back to the sender"]:::warn
+  n0 -->|"1. local write"| n1
+  n1 -->|"2. publish event"| n2
+  n2 -->|"3a. publisher returns"| n3
+  n2 -->|"3b. consumer reads later"| n4
+  n3 -->|"4. work waits in channel"| n6
+  n4 -->|"5. start cooking"| n5
+  n5 -->|"6. done"| n6
+  n2 -->|"7. no reply expected"| n7
 ```
 
 1. **Exchange messages over channels** — A sender writes a message to a channel and a consumer reads it later; the two never run at the same instant.
@@ -55,14 +68,24 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Send a request message</b><br/>A service sends a request to a recipient and waits for a reply."]:::start
-  s1n1["<b>2. Correlate the reply</b><br/>A reply-to channel and a correlation id tie the reply back to its r…"]:::step
-  s1n2["<b>3. Expect a prompt reply</b><br/>The reply is expected promptly, unlike the eventual reply of reques…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+  n0["<b>1. Send a request and wait for a reply</b><br/>the caller needs an answer now"]:::start
+  n1["<b>2. CLIENT sends the request</b><br/>id REQ-77, reply-to reply_channel, get price"]:::step
+  n2["<b>3. SVC receives and processes it</b><br/>request_channel drains"]:::step
+  n3["<b>4. SVC replies on the reply channel</b><br/>REQ-77 becomes 42.50"]:::core
+  n4["<b>5. CLIENT reads its reply</b><br/>id REQ-77 matches the request"]:::step
+  n5["<b>6. Reply delivered promptly</b><br/>42.50 back to the caller"]:::stop
+  n6["<b>No reply arrives</b><br/>CLIENT keeps waiting, both sides must be up"]:::warn
+  n0 -->|"1. request out"| n1
+  n1 -->|"2. process"| n2
+  n2 -->|"3. answer"| n3
+  n3 -->|"4. correlate by id"| n4
+  n4 -->|"5. prompt reply"| n5
+  n2 -->|"6. if it never answers"| n6
 ```
 
 1. **Send a request message** — A service sends a request to a recipient and waits for a reply.
@@ -95,14 +118,25 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Publish to a topic</b><br/>A publisher writes a message to a topic and knows nothing of its re…"]:::start
-  s2n1["<b>2. Broker fans out</b><br/>The broker delivers a copy to each subscriber."]:::step
-  s2n2["<b>3. Zero or more recipients</b><br/>With no subscribers the message goes nowhere; with several, each ge…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+  n0["<b>1. Publish to a topic</b><br/>the publisher knows nothing of its recipients"]:::start
+  n1["<b>2. Publish once to the topic</b><br/>topic orders empty becomes Order Created PO-2001"]:::core
+  n2["<b>3a. Broker fans out to Billing</b><br/>inbox_billing receives a copy"]:::step
+  n3["<b>3b. Broker copies to Kitchen</b><br/>inbox_kitchen receives a copy"]:::step
+  n4["<b>4. The topic drains after fan-out</b><br/>topic orders becomes empty"]:::step
+  n5["<b>5. Two copies delivered</b><br/>zero subscribers would mean zero copies"]:::stop
+  n6["<b>Reader is down</b><br/>the broker holds its copy, buffering per subscriber"]:::warn
+  n0 -->|"1. publish"| n1
+  n1 -->|"2a. first subscriber"| n2
+  n1 -->|"2b. second subscriber"| n3
+  n2 -->|"3. both fanned"| n4
+  n3 -->|"3. both fanned"| n4
+  n4 -->|"4. delivery count"| n5
+  n2 -->|"5. if a reader is down"| n6
 ```
 
 1. **Publish to a topic** — A publisher writes a message to a topic and knows nothing of its recipients.
@@ -135,16 +169,26 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. Buffer while the consumer is down</b><br/>The broker keeps messages queued until the consumer is able to proc…"]:::start
-  s3n1["<b>2. Loose runtime coupling</b><br/>The sender is decoupled from the consumer, so neither blocks the ot…"]:::step
-  s3n2["<b>3. Pay the broker tax</b><br/>A broker adds complexity and must itself be highly available; reque…"]:::step
-  s3n3["<b>4. Compose with outbox, saga, CQRS</b><br/>The Transactional Outbox sends messages inside a database transacti…"]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
-  s3n2 --> s3n3
+  n0["<b>1. Buffer while the consumer is down</b><br/>the broker queues until it can process"]:::start
+  n1["<b>2. CON goes down</b><br/>con_status UP becomes DOWN"]:::step
+  n2["<b>3. SVC publishes 5 orders</b><br/>queue empty becomes 1, 2, 3, 4, 5"]:::core
+  n3["<b>4. SVC is not blocked</b><br/>loose runtime coupling, neither blocks the other"]:::step
+  n4["<b>5. CON reconnects</b><br/>con_status DOWN becomes UP"]:::step
+  n5["<b>6. CON drains the queue</b><br/>queue becomes empty again"]:::step
+  n6["<b>7. Five messages delivered after reconnect</b><br/>availability bought with a broker"]:::stop
+  n7["<b>Pay the broker tax</b><br/>adds complexity, must itself be highly available"]:::warn
+  n0 -->|"1. consumer down"| n1
+  n1 -->|"2. publish anyway"| n2
+  n2 -->|"3. decoupled"| n3
+  n3 -->|"4. consumer returns"| n4
+  n4 -->|"5. drain"| n5
+  n5 -->|"6. delivered"| n6
+  n2 -->|"7. cost of the broker"| n7
 ```
 
 1. **Buffer while the consumer is down** — The broker keeps messages queued until the consumer is able to process them.

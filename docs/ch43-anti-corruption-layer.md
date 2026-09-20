@@ -12,14 +12,21 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 43 · microservice
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. New service needs legacy data</b><br/>The new service must read from or call the legacy monolith to do it…"]:::start
-  s0n1["<b>2. Two models disagree</b><br/>The legacy model uses its own field names, status codes and date fo…"]:::step
-  s0n2["<b>3. The legacy model leaks in</b><br/>With no boundary, the raw legacy record is copied into the new serv…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. New service needs legacy data</b><br/>NEW reads customer C-1042 from the monolith"]:::start
+  n1["<b>2. Two models disagree</b><br/>legacy has cust_dob and status_cd, the new service has its own vocabulary"]:::warn
+  n2["<b>3. The legacy model leaks in</b><br/>new_customer : empty becomes cust_id C-1042, cust_dob 1987-04-03, status_cd A"]:::warn
+  n3["<b>4. The service adopts the raw code</b><br/>new_customer.status : empty becomes A, the verbatim 1-letter code"]:::stop
+  n4["<b>No boundary exists</b><br/>the raw legacy record is copied straight in"]:::warn
+  n0 -->|"1. fetch the legacy row"| n1
+  n1 -->|"2. names and codes differ"| n2
+  n2 -->|"3. copy it verbatim"| n3
+  n1 -->|"4. missing boundary"| n4
+  n4 -->|"5. pollution spreads"| n3
 ```
 
 1. **New service needs legacy data** — The new service must read from or call the legacy monolith to do its job.
@@ -49,16 +56,22 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Define the anti-corruption layer</b><br/>A layer that sits between the new service and the legacy monolith a…"]:::start
-  s1n1["<b>2. Translate on the way in</b><br/>The layer converts the legacy model into the new service's model be…"]:::step
-  s1n2["<b>3. Translate field by field</b><br/>Each legacy field is mapped onto the new service's field: rename th…"]:::step
-  s1n3["<b>4. Keep the new model clean</b><br/>The service only ever receives its own model and never references l…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
-  s1n2 --> s1n3
+  n0["<b>1. Define the anti-corruption layer</b><br/>a layer between NEW and the monolith owns all translation"]:::start
+  n1["<b>2. Translate on the way in</b><br/>the legacy record is converted before NEW ever sees it"]:::step
+  n2["<b>3. Translate field by field</b><br/>cust_id becomes id, cust_dob becomes dateOfBirth, status_cd A becomes ACTIVE"]:::core
+  n3["<b>4. Keep the new model clean</b><br/>domain : empty becomes id C-1042, dateOfBirth 1987-04-03, status ACTIVE"]:::core
+  n4["<b>5. Service sees only its own model</b><br/>NEW never references legacy names"]:::stop
+  n5["<b>Field left untranslated</b><br/>a skipped mapping lets a legacy name through"]:::warn
+  n0 -->|"1. place the boundary"| n1
+  n1 -->|"2. translate before the service"| n2
+  n2 -->|"3. rename and translate values"| n3
+  n3 -->|"4. hand over the clean model"| n4
+  n2 -->|"5. missed a field"| n5
 ```
 
 1. **Define the anti-corruption layer** — A layer that sits between the new service and the legacy monolith and owns all translation.
@@ -90,14 +103,18 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. One translation point</b><br/>The anti-corruption layer is the only code that knows the legacy mo…"]:::start
-  s2n1["<b>2. Legacy changes stop here</b><br/>When the monolith changes a code, only the layer's mapping is updated."]:::step
-  s2n2["<b>3. The new service stays clean</b><br/>The service's model never absorbs the legacy names or codes."]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+  n0["<b>1. One translation point</b><br/>the ACL is the only code that knows the legacy vocabulary"]:::start
+  n1["<b>2. Legacy changes stop here</b><br/>mapping.status_cd : A becomes 1, only the mapping table is updated"]:::core
+  n2["<b>3. The new service stays clean</b><br/>read_status : empty becomes ACTIVE, the rename is confined to the ACL"]:::stop
+  n3["<b>Change bypasses the layer</b><br/>a direct read of the legacy DB reintroduces the pollution"]:::warn
+  n0 -->|"1. a single translation point"| n1
+  n1 -->|"2. retranslate through the table"| n2
+  n0 -->|"3. bypass the layer"| n3
 ```
 
 1. **One translation point** — The anti-corruption layer is the only code that knows the legacy model's vocabulary.

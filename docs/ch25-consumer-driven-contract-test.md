@@ -12,14 +12,22 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. · microservices.i
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Name the relationship</b><br/>Each interacting pair is a consumer-provider relationship: API Gate…"]:::start
-  s0n1["<b>2. Agree on channel and shape</b><br/>Services must agree on the event message structure and channel, the…"]:::step
-  s0n2["<b>3. Enumerate the REST shape</b><br/>A contract test verifies the HTTP method and path, headers, request…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. Consumer-provider relationship</b><br/>API Gateway is the consumer, Order Service is the provider"]:::start
+  n1["<b>2. Pin the expected shape</b><br/>method GET, path /orders/orderId, headers Accept application/json"]:::core
+  n2["<b>3. Expect status 200</b><br/>the proxy needs a success code to parse the body"]:::step
+  n3["<b>4. Expect the body</b><br/>body orderId ORD-4007 state CREATED"]:::step
+  n4["<b>5. Contract recorded</b><br/>method, path, headers, status 200, and body all captured"]:::stop
+  n5["<b>Provider deviates</b><br/>SVC answers 404 because the endpoint changed, suite fails with expected 200 got 404"]:::warn
+  n0 -->|"1. name the pair"| n1
+  n1 -->|"2. status expected"| n2
+  n2 -->|"3. body expected"| n3
+  n3 -->|"4. pinned down"| n4
+  n3 -->|"5. drift - suite fails"| n5
 ```
 
 1. **Name the relationship** — Each interacting pair is a **consumer-provider** relationship: API Gateway is a consumer, Order Service is a provider.
@@ -49,14 +57,23 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. The consumer team writes the suite</b><br/>The team that develops the consumer writes a contract test suite fo…"]:::start
-  s1n1["<b>2. Contribute it to the provider</b><br/>The suite is added to the provider's test suite, for example via a…"]:::step
-  s1n2["<b>3. Every consumer contributes</b><br/>Each service that invokes Order Service contributes its own suite,…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+  n0["<b>1. Gateway team writes its suite</b><br/>author tests for GET /orders/orderId, test_count 0 becomes 1"]:::start
+  n1["<b>2. Contribute via pull request</b><br/>suites gains owner GW, name gateway-orders, 1 test"]:::step
+  n2["<b>3. Order History team contributes too</b><br/>author a suite for the published events, test_count 1 becomes 2"]:::step
+  n3["<b>4. Second pull request merges</b><br/>suites gains owner OH, name history-events"]:::core
+  n4["<b>5. Provider sees every consumer</b><br/>suites holds 2 entries, owners GW and OH"]:::stop
+  n5["<b>A consumer that never contributes</b><br/>its expectations stay invisible to the provider"]:::warn
+  n0 -->|"1. consumer authors"| n1
+  n1 -->|"2. next consumer"| n2
+  n2 -->|"3. merge into provider"| n3
+  n3 -->|"4. all covered"| n4
+  n3 -->|"5. another consumer contributes"| n2
+  n1 -->|"6. no contribution"| n5
 ```
 
 1. **The consumer team writes the suite** — The team that develops the consumer writes a contract test suite for the aspects of the API it uses.
@@ -90,14 +107,24 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Run the suites in the pipeline</b><br/>The contributed test suites are executed by the deployment pipeline…"]:::start
-  s2n1["<b>2. Compare expected versus actual</b><br/>Each test checks that the actual response matches the consumer's ex…"]:::step
-  s2n2["<b>3. A failure means a breaking change</b><br/>When a consumer contract test fails, the producer team must fix the…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+  n0["<b>1. Pipeline runs the contributed suites</b><br/>the deployment pipeline executes gateway-orders for Order Service"]:::start
+  n1["<b>2. Invoke the provider</b><br/>actual status 0 becomes 200, SVC serves GET /orders/ORD-4007"]:::step
+  n2["<b>3. Read the body</b><br/>actual body becomes orderId ORD-4007 state CREATED"]:::step
+  n3["<b>4. Compare status</b><br/>matches 0 becomes 1, 200 equals 200"]:::step
+  n4["<b>5. Compare body</b><br/>matches 1 becomes 2, both checks hold"]:::step
+  n5["<b>6. Verdict pass</b><br/>consumer expectations are met"]:::stop
+  n6["<b>Provider breaks the API</b><br/>SVC drops GET /orders/orderId, status 404, verdict fail, producer must fix the API or talk to the consumer team"]:::warn
+  n0 -->|"1. run one test"| n1
+  n1 -->|"2. status 200, read body"| n2
+  n2 -->|"3. check status"| n3
+  n3 -->|"4. check body"| n4
+  n4 -->|"5. both hold"| n5
+  n1 -->|"6. status 404 - fail"| n6
 ```
 
 1. **Run the suites in the pipeline** — The contributed test suites are executed by the deployment pipeline for Order Service.
@@ -132,14 +159,23 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. Define contracts as examples</b><br/>The interaction between a consumer and a provider is defined by a s…"]:::start
-  s3n1["<b>2. One interaction, two messages</b><br/>Each contract consists of the example messages exchanged during one…"]:::step
-  s3n2["<b>3. They are mock controller tests</b><br/>Consumer contract tests for a REST API are mock controller tests, n…"]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
+  n0["<b>1. A contract is a set of examples</b><br/>one interaction defined by example messages, not exhaustive inputs"]:::start
+  n1["<b>2. Example request</b><br/>request GET /orders/ORD-4007 with Accept application/json"]:::step
+  n2["<b>3. Example reply</b><br/>reply status 200 body orderId ORD-4007 state CREATED"]:::step
+  n3["<b>4. Two messages, one interaction</b><br/>contract holds the request and the reply pair"]:::core
+  n4["<b>5. A mock controller test</b><br/>a shallow shape check, not full business logic"]:::stop
+  n5["<b>Alt - another example</b><br/>order ORD-4008 needs a second contract, one example per interaction"]:::warn
+  n0 -->|"1. first message"| n1
+  n1 -->|"2. second message"| n2
+  n2 -->|"3. pair them"| n3
+  n3 -->|"4. shallow by design"| n4
+  n4 -->|"5. alt - next example"| n5
+  n5 -->|"6. another order, another example"| n1
 ```
 
 1. **Define contracts as examples** — The interaction between a consumer and a provider is defined by a set of examples, known as contracts.

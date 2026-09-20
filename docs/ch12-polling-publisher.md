@@ -12,14 +12,28 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.12 · microservices
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Select unsent rows</b><br/>A relay process runs a query for outbox rows that have not yet been…"]:::start
-  s0n1["<b>2. Publish each row</b><br/>The relay publishes each returned message or event to the broker."]:::step
-  s0n2["<b>3. Mark the row sent</b><br/>The relay updates the row so the next poll skips it."]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. Timer fires one poll</b><br/>a timer wakes the relay every 100 ms"]:::start
+  n1["<b>2. Select unsent rows</b><br/>query : SELECT rows FROM outbox WHERE sent=false, returns row 1 E1 and row 2 E2"]:::step
+  n2["<b>3. Publish row 1</b><br/>published : empty becomes E1"]:::step
+  n3["<b>4. Mark row 1 sent</b><br/>outbox row 1 : sent=false becomes sent=true"]:::core
+  n4["<b>5. Publish row 2</b><br/>published : E1 becomes E1, E2"]:::step
+  n5["<b>6. Mark row 2 sent</b><br/>outbox row 2 : sent=false becomes sent=true"]:::core
+  n6["<b>7. Poll cycle complete</b><br/>BRK received E1 and E2, outbox now fully sent"]:::stop
+  n7["<b>No unsent rows</b><br/>query returns empty, nothing published this cycle"]:::warn
+  n0 -->|"timer wakes the relay"| n1
+  n1 -->|"rows found"| n2
+  n1 -->|"no rows - wait for next poll"| n7
+  n2 -->|"send E1"| n3
+  n3 -->|"advance to next row"| n4
+  n4 -->|"send E2"| n5
+  n5 -->|"outbox drained"| n6
+  n6 -->|"next cycle in 100 ms"| n0
+  n7 -->|"retry on the next timer"| n0
 ```
 
 1. **Select unsent rows** — A relay process runs a query for outbox rows that have not yet been sent.
@@ -50,14 +64,25 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Order by a sequence</b><br/>The relay orders unsent rows by their outbox id so earlier events a…"]:::start
-  s1n1["<b>2. Watch the query order</b><br/>Without an ORDER BY, the database may return rows in any order, not…"]:::step
-  s1n2["<b>3. Add ORDER BY id</b><br/>Ordering the query by id makes the poll reproduce the insertion seq…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+  n0["<b>1. Two events await publishing</b><br/>outbox has row 1 E1 and row 2 E2, both sent=false"]:::start
+  n1["<b>2. Poll with no ORDER BY</b><br/>query SELECT rows WHERE sent=false, database returns id 2 before id 1"]:::step
+  n2["<b>3. Events published out of order</b><br/>published becomes E2 then E1, order WRONG, E1 should precede E2"]:::warn
+  n3["<b>4. Add ORDER BY id ASC</b><br/>query orders rows by id so id 1 comes first"]:::step
+  n4["<b>5. Publish id 1</b><br/>published : empty becomes E1"]:::step
+  n5["<b>6. Publish id 2</b><br/>published : E1 becomes E1, E2"]:::step
+  n6["<b>7. Correct order reached</b><br/>BRK receives E1 then E2, commit order reproduced"]:::stop
+  n0 -->|"query with no ORDER BY"| n1
+  n1 -->|"DB returns id 2 first"| n2
+  n2 -->|"fix - add ORDER BY id"| n3
+  n0 -->|"query already ordered by id"| n3
+  n3 -->|"id 1 returned first"| n4
+  n4 -->|"then id 2"| n5
+  n5 -->|"commit order preserved"| n6
 ```
 
 1. **Order by a sequence** — The relay orders unsent rows by their outbox id so earlier events are read first.
@@ -90,14 +115,24 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. A plain SELECT is enough</b><br/>Any SQL database exposes the outbox table to a standard query for u…"]:::start
-  s2n1["<b>2. NoSQL may lack the query</b><br/>Some NoSQL stores cannot query across records for the unsent outbox…"]:::step
-  s2n2["<b>3. Use log tailing there</b><br/>For those stores, transaction log tailing is the alternative relay."]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+  n0["<b>1. Outbox needs a queryable table</b><br/>row E1, sent=false, awaits publication"]:::start
+  n1["<b>2. Relay polls MySQL</b><br/>query SELECT unsent rows returns 1 unsent row"]:::step
+  n2["<b>3. Publish E1</b><br/>published : empty becomes E1"]:::step
+  n3["<b>4. Mark the row sent</b><br/>outbox row sent=false becomes sent=true"]:::core
+  n4["<b>5. SQL database supports polling</b><br/>BRK receives E1"]:::stop
+  n5["<b>6. NoSQL has no unsent-row query</b><br/>outbox is a per-record property, query returns 0 rows"]:::warn
+  n6["<b>7. Fall back to log tailing</b><br/>publish nothing, use transaction log tailing instead"]:::warn
+  n0 -->|"poll via MySQL"| n1
+  n0 -->|"poll via NoSQL store"| n5
+  n1 -->|"one unsent row found"| n2
+  n2 -->|"send E1"| n3
+  n3 -->|"row marked sent"| n4
+  n5 -->|"query cannot be expressed"| n6
 ```
 
 1. **A plain SELECT is enough** — Any SQL database exposes the outbox table to a standard query for unsent rows.

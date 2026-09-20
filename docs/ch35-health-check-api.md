@@ -12,14 +12,24 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 35 · microservice
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Add the endpoint</b><br/>The service exposes a health check API endpoint such as HTTP /health."]:::start
-  s0n1["<b>2. Return the health</b><br/>The endpoint returns the health of the service as its result."]:::step
-  s0n2["<b>3. Run it on every poll</b><br/>A health check client invokes the endpoint to check the health of t…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+n0["<b>1. Monitor polls</b><br/>MON calls GET /health every 30 s"]:::start
+  n1["<b>2. Probe the DB pool</b><br/>connection pool open, db UNKNOWN becomes UP"]:::step
+  n2["<b>3. Combine the checks</b><br/>into one verdict"]:::step
+  n3["<b>4. Verdict formed</b><br/>health db UP, status UP"]:::core
+  n4["<b>5. Respond with the body</b><br/>body becomes status UP"]:::step
+  n5["<b>6. Instance marked healthy</b><br/>MON records the instance as UP"]:::stop
+  n6["<b>DB pool exhausted</b><br/>probe closed, status DOWN, body status DOWN"]:::warn
+  n0 -->|"1. poll arrives"| n1
+  n1 -->|"2. checks combined"| n2
+  n2 -->|"3. verdict formed"| n3
+  n3 -->|"4. respond"| n4
+  n4 -->|"5. healthy"| n5
+  n1 -->|"6. pool exhausted"| n6
 ```
 
 1. **Add the endpoint** — The service exposes a health check API endpoint such as HTTP /health.
@@ -48,14 +58,26 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Check infrastructure connections</b><br/>The handler checks the status of the connections to the infrastruct…"]:::start
-  s1n1["<b>2. Check the host</b><br/>The handler checks the status of the host, such as disk space."]:::step
-  s1n2["<b>3. Run application-specific logic</b><br/>The handler runs application-specific checks on top of the generic…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+n0["<b>1. One poll, three checks</b><br/>the /health handler runs on each poll"]:::start
+  n1["<b>2. Check infra connections</b><br/>DB open, db UP"]:::step
+  n2["<b>3. Check the host disk</b><br/>12 free above the 1 floor, disk UP"]:::step
+  n3["<b>4. Run application logic</b><br/>passes, app UP"]:::step
+  n4["<b>5. Combine the verdicts</b><br/>checks db UP, disk UP, app UP"]:::core
+  n5["<b>6. Healthy verdict</b><br/>healthy only if all three are UP"]:::stop
+  n6["<b>One check fails</b><br/>db DOWN, the whole instance reports DOWN"]:::warn
+  n0 -->|"1. check connections"| n1
+  n0 -->|"2. check host"| n2
+  n0 -->|"3. check app logic"| n3
+  n1 -->|"4. combine verdicts"| n4
+  n2 -->|"5. combine verdicts"| n4
+  n3 -->|"6. combine verdicts"| n4
+  n4 -->|"7. all UP"| n5
+  n1 -->|"8. a check fails"| n6
 ```
 
 1. **Check infrastructure connections** — The handler checks the status of the connections to the infrastructure services the instance uses.
@@ -84,14 +106,23 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Choose a client</b><br/>A monitoring service, service registry, or load balancer acts as th…"]:::start
-  s2n1["<b>2. Poll on an interval</b><br/>The client periodically invokes the endpoint on each instance."]:::step
-  s2n2["<b>3. Compare with the previous result</b><br/>The client notices when an instance flips from UP to DOWN."]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+n0["<b>1. Next poll tick</b><br/>MON scheduler fires, every 30 s"]:::start
+  n1["<b>2. Poll SVC1</b><br/>GET /health returns UP, no change"]:::step
+  n2["<b>3. Poll SVC2</b><br/>GET /health returns DOWN, seen flips UP becomes DOWN"]:::step
+  n3["<b>4. Count healthy instances</b><br/>healthy 2 becomes 1"]:::core
+  n4["<b>5. Act on the flip</b><br/>MON alerts, SVC2 pulled from routing"]:::stop
+  n5["<b>Both UP this tick</b><br/>healthy stays 2, no alert, routing unchanged"]:::warn
+  n0 -->|"1. poll each instance"| n1
+  n1 -->|"2. next instance"| n2
+  n2 -->|"3. compare with previous"| n3
+  n3 -->|"4. flipped to DOWN"| n4
+  n4 -->|"5. next tick"| n0
+  n3 -->|"6. all still UP"| n5
 ```
 
 1. **Choose a client** — A monitoring service, service registry, or load balancer acts as the health check client.
@@ -120,14 +151,23 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. Stop routing to failed instances</b><br/>The load balancer or service registry does not route requests to a…"]:::start
-  s3n1["<b>2. Generate an alert</b><br/>The monitoring system generates an alert when a service instance fa…"]:::step
-  s3n2["<b>3. Recover into the pool</b><br/>When the instance reports healthy again, it returns to routing."]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
+n0["<b>1. Health check reports failure</b><br/>SVC2 DOWN"]:::start
+  n1["<b>2. Stop routing to it</b><br/>LB removes SVC2 from its routing table"]:::step
+  n2["<b>3. Next request routes safely</b><br/>target null becomes SVC1"]:::step
+  n3["<b>4. Registry and alert</b><br/>REG drops SVC2, MON raises alert SVC2 DOWN at tick 2"]:::core
+  n4["<b>5. Traffic stays on working instances</b><br/>pool holds SVC1 only"]:::stop
+  n5["<b>SVC2 recovers</b><br/>health SVC2 UP, rejoins the pool"]:::warn
+  n0 -->|"1. failure detected"| n1
+  n1 -->|"2. traffic avoids the failure"| n2
+  n2 -->|"3. registry and alert"| n3
+  n3 -->|"4. only working instances"| n4
+  n4 -->|"5. instance recovers"| n5
+  n5 -->|"6. rejoin the pool"| n1
 ```
 
 1. **Stop routing to failed instances** — The load balancer or service registry does not route requests to a failed instance.

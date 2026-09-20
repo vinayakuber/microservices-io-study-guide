@@ -12,16 +12,26 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 3 · microservices
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Benefits are not guaranteed</b><br/>Continuous delivery and small autonomous teams are achieved only by…"]:::start
-  s0n1["<b>2. Apply the Single Responsibility Principle</b><br/>SRP defines a responsibility as a reason to change; a service shoul…"]:::step
-  s0n2["<b>3. Apply the Common Closure Principle</b><br/>CCP says classes that change for the same reason belong in the same…"]:::step
-  s0n3["<b>4. Keep changes single-service</b><br/>Changes that affect multiple services require coordination across m…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
-  s0n2 --> s0n3
+  n0["<b>1. Benefits are not guaranteed</b><br/>only careful decomposition enables them"]:::start
+  n1["<b>2. Single Responsibility Principle</b><br/>one reason to change, strongly related functions"]:::step
+  n2["<b>3. Common Closure Principle</b><br/>things that change together live together"]:::step
+  n3["<b>4. Locate the owning service</b><br/>owner unknown becomes SVC_O for the tax rule"]:::core
+  n4["<b>5. Edit only that service</b><br/>change_impact SVC_O 0 becomes 1"]:::step
+  n5["<b>6. Coordinate one team</b><br/>teams_to_coordinate 0 becomes 1"]:::step
+  n6["<b>7. One service touched</b><br/>services_touched 1, teams_to_coordinate 1"]:::stop
+  n7["<b>Rule scattered across 3 services</b><br/>services_touched 1 becomes 3, three teams"]:::warn
+  n0 -->|"1. apply SRP"| n1
+  n1 -->|"2. apply CCP"| n2
+  n2 -->|"3. change the tax rule"| n3
+  n3 -->|"4. edit one service"| n4
+  n4 -->|"5. one team"| n5
+  n5 -->|"6. done"| n6
+  n3 -->|"7. if scattered"| n7
 ```
 
 1. **Benefits are not guaranteed** — Continuous delivery and small autonomous teams are achieved only by careful functional decomposition of the application into services.
@@ -54,16 +64,24 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. A capability generates value</b><br/>A business capability is a concept from business architecture model…"]:::start
-  s1n1["<b>2. Capabilities map to business objects</b><br/>A capability often corresponds to a business object — Order Managem…"]:::step
-  s1n2["<b>3. Capabilities form a hierarchy</b><br/>Business capabilities are often organized into a multi-level hierar…"]:::step
-  s1n3["<b>4. One service per capability</b><br/>Define services corresponding to business capabilities, so an onlin…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
-  s1n2 --> s1n3
+  n0["<b>1. A capability generates value</b><br/>something the business does"]:::start
+  n1["<b>2. Capabilities map to business objects</b><br/>Order Management owns orders"]:::core
+  n2["<b>3. One service per capability</b><br/>services empty becomes catalog, inventory, order, delivery"]:::step
+  n3["<b>4. Attach the managed business object</b><br/>owners empty becomes Product, Stock, Order, Shipment"]:::step
+  n4["<b>5. Place under a top-level category</b><br/>category none becomes Product/Service delivery"]:::step
+  n5["<b>6. Four services</b><br/>each corresponds to one capability"]:::stop
+  n6["<b>Merge delivery into order</b><br/>services 4 becomes 3, a group maps to one service"]:::warn
+  n0 -->|"1. value then object"| n1
+  n1 -->|"2. decompose"| n2
+  n2 -->|"3. name the object"| n3
+  n3 -->|"4. hierarchy"| n4
+  n4 -->|"5. count"| n5
+  n3 -->|"6. or merge"| n6
 ```
 
 1. **A capability generates value** — A business capability is a concept from business architecture modeling: something the business does in order to generate value.
@@ -96,16 +114,28 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Stable and cohesive</b><br/>The architecture must be stable, and a service should implement a s…"]:::start
-  s2n1["<b>2. Conform to CCP</b><br/>Things that change together should be packaged together, so each ch…"]:::step
-  s2n2["<b>3. Loosely coupled via an API</b><br/>Each service has an API that encapsulates its implementation, so th…"]:::step
-  s2n3["<b>4. Small and testable</b><br/>Each service must be small enough to be developed by a two-pizza te…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
-  s2n2 --> s2n3
+  n0["<b>1. Stable and cohesive</b><br/>a service implements strongly related functions"]:::start
+  n1["<b>2. Conform to CCP</b><br/>each change affects only one service"]:::step
+  n2["<b>3. Loosely coupled via an API</b><br/>implementation changes without affecting clients"]:::step
+  n3["<b>4. Small enough for a two-pizza team</b><br/>6 to 10 people, testable, autonomous"]:::core
+  n4["<b>5. Grow the team into the band</b><br/>members 2 becomes 7"]:::step
+  n5["<b>6. Encapsulate the implementation</b><br/>service_api exposed 0 becomes 1"]:::step
+  n6["<b>7. Confirm testable</b><br/>testable unknown becomes yes"]:::step
+  n7["<b>8. Verdict fits</b><br/>7 members in the 6 to 10 band, API hides internals"]:::stop
+  n8["<b>Team stays at 2</b><br/>split the service, two people cannot own it"]:::warn
+  n0 -->|"1. CCP"| n1
+  n1 -->|"2. loose coupling"| n2
+  n2 -->|"3. size limit"| n3
+  n3 -->|"4. grow"| n4
+  n4 -->|"5. hide internals"| n5
+  n5 -->|"6. test"| n6
+  n6 -->|"7. verdict"| n7
+  n4 -->|"8. if still 2"| n8
 ```
 
 1. **Stable and cohesive** — The architecture must be stable, and a service should implement a small set of strongly related functions.
@@ -139,16 +169,26 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. Understand the business first</b><br/>Identifying business capabilities requires understanding the organi…"]:::start
-  s3n1["<b>2. Start from the organization structure</b><br/>Different groups within an organization might correspond to busines…"]:::step
-  s3n2["<b>3. Start from the domain model</b><br/>Business capabilities often correspond to domain objects in the hig…"]:::step
-  s3n3["<b>4. Iterate</b><br/>Bounded contexts are best identified using an iterative process, re…"]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
-  s3n2 --> s3n3
+  n0["<b>1. Understand the business first</b><br/>purpose, structure, processes, expertise"]:::start
+  n1["<b>2. Start from the organization structure</b><br/>groups may be capabilities"]:::step
+  n2["<b>3. Start from the domain model</b><br/>capabilities match domain objects"]:::step
+  n3["<b>4. Map an org group</b><br/>Warehouse becomes inventory management"]:::core
+  n4["<b>5. Cross-check the domain model</b><br/>Order object becomes order management"]:::step
+  n5["<b>6. Record the expertise</b><br/>expertise none becomes warehouse operations"]:::step
+  n6["<b>7. Two capabilities found</b><br/>inventory management and order management"]:::stop
+  n7["<b>A capability is missed</b><br/>2 becomes 3 on a later pass, iterative"]:::warn
+  n0 -->|"1. org structure"| n1
+  n1 -->|"2. domain model"| n2
+  n2 -->|"3. group to capability"| n3
+  n3 -->|"4. object to capability"| n4
+  n4 -->|"5. expertise"| n5
+  n5 -->|"6. found"| n6
+  n5 -->|"7. iterate again"| n7
 ```
 
 1. **Understand the business first** — Identifying business capabilities requires understanding the organization's purpose, structure, business processes and areas of expertise.

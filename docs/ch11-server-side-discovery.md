@@ -12,16 +12,26 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 11 · microservice
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Call the router</b><br/>The client makes a request via a router (load balancer) at a well-k…"]:::start
-  s0n1["<b>2. Router queries the registry</b><br/>The router queries a service registry, which might be built into th…"]:::step
-  s0n2["<b>3. Forward to an instance</b><br/>The router forwards the request to an available service instance."]:::step
-  s0n3["<b>4. Client stays simple</b><br/>The client never performs discovery — it just calls the router."]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
-  s0n2 --> s0n3
+  n0["<b>1. Client calls a well-known router</b><br/>POST http://router.example.com/orders"]:::start
+  n1["<b>2. Router queries the registry</b><br/>lookup empty becomes 10.0.1.7 and 10.0.1.8"]:::step
+  n2["<b>3. Registry may be built in</b><br/>the router hides the instances"]:::core
+  n3["<b>4. Pick an instance</b><br/>router_target unset becomes 10.0.1.7:8080"]:::step
+  n4["<b>5. Forward to the instance</b><br/>forwarded none becomes 10.0.1.7:8080"]:::step
+  n5["<b>6. POST http://10.0.1.7:8080/orders</b><br/>the client never resolved the instance itself"]:::stop
+  n6["<b>Client stays simple</b><br/>never performs discovery, just calls the router"]:::warn
+  n7["<b>Or pick 10.0.1.8</b><br/>the router may forward to the other instance"]:::step
+  n0 -->|"1. one well-known address"| n1
+  n1 -->|"2. router asks the registry"| n2
+  n2 -->|"3. choose a target"| n3
+  n3 -->|"4. forward here"| n4
+  n4 -->|"5. request relayed"| n5
+  n3 -->|"6. load-balance to the other"| n7
+  n0 -->|"7. no discovery in the client"| n6
 ```
 
 1. **Call the router** — The client makes a request via a router (load balancer) at a well-known location.
@@ -56,16 +66,26 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. ELB as router</b><br/>A client makes HTTP(s) requests or TCP connections to the ELB, whic…"]:::start
-  s1n1["<b>2. ELB as registry</b><br/>The ELB also functions as a Service Registry."]:::step
-  s1n2["<b>3. External or internal</b><br/>An ELB can load-balance Internet traffic or, in a VPC, internal tra…"]:::step
-  s1n3["<b>4. Two ways to register</b><br/>EC2 instances are registered with the ELB explicitly via an API cal…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
-  s1n2 --> s1n3
+  n0["<b>1. Client sends requests to the ELB</b><br/>HTTP or TCP"]:::start
+  n1["<b>2. ELB as router</b><br/>load-balances across EC2 instances"]:::step
+  n2["<b>3. ELB as registry</b><br/>also a Service Registry"]:::core
+  n3["<b>4. External or internal</b><br/>Internet traffic or VPC internal"]:::step
+  n4["<b>5. Autoscaling group registers</b><br/>i-ghi at 10.0.3.3 added"]:::step
+  n5["<b>6. Target count 2 becomes 3</b><br/>elb_targets grows"]:::core
+  n6["<b>7. Spread across 10.0.3.1, 10.0.3.2, 10.0.3.3</b><br/>three instances now"]:::stop
+  n7["<b>Explicit API call</b><br/>operator registers i-ghi via the register-target API"]:::warn
+  n0 -->|"1. HTTP or TCP to ELB"| n1
+  n1 -->|"2. doubles as"| n2
+  n2 -->|"3. Internet or internal"| n3
+  n3 -->|"4. scale out"| n4
+  n4 -->|"5. new target"| n5
+  n5 -->|"6. traffic spreads wider"| n6
+  n3 -->|"7. manual registration"| n7
 ```
 
 1. **ELB as router** — A client makes HTTP(s) requests or TCP connections to the ELB, which load-balances across EC2 instances.
@@ -96,14 +116,24 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. A proxy on each host</b><br/>Kubernetes and Marathon run a proxy on each host that acts as a ser…"]:::start
-  s2n1["<b>2. Connect to the local port</b><br/>The client connects to the local proxy using the port assigned to t…"]:::step
-  s2n2["<b>3. Proxy forwards</b><br/>The proxy forwards the request to a service instance running somewh…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+  n0["<b>1. Client connects to the local proxy</b><br/>localhost:8080"]:::start
+  n1["<b>2. A proxy on each host</b><br/>Kubernetes and Marathon run one per host"]:::step
+  n2["<b>3. Resolve the port</b><br/>port 8080 is assigned to order-service"]:::step
+  n3["<b>4. Proxy finds an instance</b><br/>selected becomes 10.0.4.9:8080"]:::core
+  n4["<b>5. Proxy forwards</b><br/>forwarded none becomes 10.0.4.9:8080"]:::step
+  n5["<b>6. POST http://10.0.4.9:8080/orders</b><br/>the client only ever spoke to localhost:8080"]:::stop
+  n6["<b>Another host</b><br/>its proxy forwards the same port to pod 10.0.4.12"]:::warn
+  n0 -->|"1. dial a local port"| n1
+  n1 -->|"2. port maps to a service"| n2
+  n2 -->|"3. lookup in the cluster"| n3
+  n3 -->|"4. relay the request"| n4
+  n4 -->|"5. forwarded into the cluster"| n5
+  n3 -->|"6. different host, different pod"| n6
 ```
 
 1. **A proxy on each host** — Kubernetes and Marathon run a proxy on each host that acts as a server-side discovery router.
@@ -138,16 +168,27 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. Extra hop</b><br/>More network hops are required than with client-side discovery."]:::start
-  s3n1["<b>2. Install and configure</b><br/>Unless part of the cloud, the router is another component to instal…"]:::step
-  s3n2["<b>3. Replicate it</b><br/>The router must be replicated for availability and capacity."]:::step
-  s3n3["<b>4. Protocol support</b><br/>The router must support the needed protocols (HTTP, gRPC, Thrift) u…"]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
-  s3n2 --> s3n3
+  n0["<b>1. Server-side discovery adds cost</b><br/>measure one request through the router"]:::start
+  n1["<b>2. Extra hop</b><br/>CLI to RTR to REG to SVC, hops 0 becomes 3"]:::warn
+  n2["<b>3. Install and configure</b><br/>another component unless part of the cloud"]:::warn
+  n3["<b>4. Replicate it</b><br/>router_replicas 1 becomes 2 for availability"]:::warn
+  n4["<b>5. Protocol support</b><br/>supported http becomes http and tcp"]:::warn
+  n5["<b>6. More moving parts than client-side</b><br/>3 hops, 2 replicas, protocols http and tcp"]:::stop
+  n6["<b>Cloud-managed ELB</b><br/>part of the cloud, the operational cost is removed"]:::step
+  n0 -->|"1. one more hop than client-side"| n1
+  n0 -->|"2. router is another component"| n2
+  n0 -->|"3. needs availability and capacity"| n3
+  n0 -->|"4. must speak client protocols"| n4
+  n1 -->|"5. cost totals up"| n5
+  n2 -->|"6. cost totals up"| n5
+  n3 -->|"7. cost totals up"| n5
+  n4 -->|"8. cost totals up"| n5
+  n2 -->|"9. managed option"| n6
 ```
 
 1. **Extra hop** — More network hops are required than with client-side discovery.

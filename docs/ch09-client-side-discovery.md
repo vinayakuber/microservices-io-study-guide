@@ -12,16 +12,24 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 9 · microservices
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. From method calls to fixed endpoints</b><br/>Monoliths used language-level calls; traditional deployments used f…"]:::start
-  s0n1["<b>2. Dynamic IPs</b><br/>VMs and containers are usually assigned dynamic IP addresses."]:::step
-  s0n2["<b>3. Varying instance counts</b><br/>An EC2 Autoscaling Group adjusts the number of instances based on l…"]:::step
-  s0n3["<b>4. A lookup is needed</b><br/>Clients need a mechanism to reach a dynamically changing set of eph…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
-  s0n2 --> s0n3
+  n0["<b>1. Monoliths used language-level calls</b><br/>no network location to track"]:::start
+  n1["<b>2. Traditional deployments used fixed hosts</b><br/>a well-known host and port"]:::step
+  n2["<b>3. Containers get dynamic IPs</b><br/>the autoscaler varies the instance count"]:::core
+  n3["<b>4. Autoscaling replaces the VM</b><br/>instance_ip 10.0.1.7 becomes 10.0.1.9"]:::step
+  n4["<b>5. The fixed endpoint goes stale</b><br/>still dials the dead 10.0.1.7"]:::warn
+  n5["<b>6. connection refused</b><br/>the client never learned the new location"]:::stop
+  n6["<b>With discovery</b><br/>CLI queries a registry, endpoint becomes 10.0.1.9:8080"]:::warn
+  n0 -->|"1. the monolith splits up"| n1
+  n1 -->|"2. assumed a stable location"| n2
+  n2 -->|"3. scale event"| n3
+  n3 -->|"4. client still points at the old IP"| n4
+  n4 -->|"5. call fails"| n5
+  n3 -->|"6. lookup mechanism instead"| n6
 ```
 
 1. **From method calls to fixed endpoints** — Monoliths used language-level calls; traditional deployments used fixed, well-known hosts and ports.
@@ -57,16 +65,26 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Ask the registry</b><br/>The client queries the Service Registry, which knows the locations…"]:::start
-  s1n1["<b>2. Get a location</b><br/>The registry returns the network location (host and port) of an ava…"]:::step
-  s1n2["<b>3. Call the instance directly</b><br/>The client sends the request straight to that instance over HTTP/RE…"]:::step
-  s1n3["<b>4. Chassis does the work</b><br/>This lookup is typically handled by a microservice chassis framework."]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
-  s1n2 --> s1n3
+  n0["<b>1. Client wants to call order-service</b><br/>POST /orders"]:::start
+  n1["<b>2. Ask the registry</b><br/>CLI queries REG for order-service"]:::step
+  n2["<b>3. Get the locations</b><br/>resolved becomes 10.0.1.7:8080 and 10.0.1.8:8080"]:::core
+  n3["<b>4. Pick one</b><br/>target none becomes 10.0.1.7:8080"]:::step
+  n4["<b>5. Call the instance directly</b><br/>no router in the middle"]:::step
+  n5["<b>6. POST http://10.0.1.7:8080/orders</b><br/>the client resolves and calls itself"]:::stop
+  n6["<b>First instance busy</b><br/>target switches to 10.0.1.8:8080"]:::warn
+  n7["<b>Chassis does the work</b><br/>a microservice chassis framework performs the lookup"]:::step
+  n0 -->|"1. the client needs a location"| n1
+  n1 -->|"2. the chassis performs this"| n7
+  n7 -->|"3. registry returns all instances"| n2
+  n2 -->|"4. client load-balances across the set"| n3
+  n3 -->|"5. first instance busy"| n6
+  n3 -->|"6. call it directly"| n4
+  n4 -->|"7. request lands on the instance"| n5
 ```
 
 1. **Ask the registry** — The client queries the Service Registry, which knows the locations of all instances.
@@ -99,16 +117,26 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Logical name, not IP</b><br/>user_registration_url is set to http://REGISTRATION-SERVICE/user —…"]:::start
-  s2n1["<b>2. Enable the Eureka client</b><br/>@EnableEurekaClient turns on the Eureka client in the chassis."]:::step
-  s2n2["<b>3. Load-balance with Ribbon</b><br/>@LoadBalanced configures the RestTemplate to use Ribbon, which quer…"]:::step
-  s2n3["<b>4. Resolve and call</b><br/>The RestTemplate resolves the logical name to a network location an…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
-  s2n2 --> s2n3
+  n0["<b>1. Proxy registers a user</b><br/>http://REGISTRATION-SERVICE/user"]:::start
+  n1["<b>2. Logical name, not IP</b><br/>REGISTRATION-SERVICE is the host in the URL"]:::step
+  n2["<b>3. Enable the Eureka client</b><br/>@EnableEurekaClient in the chassis"]:::step
+  n3["<b>4. @LoadBalanced intercepts</b><br/>restTemplate_target becomes REGISTRATION-SERVICE"]:::core
+  n4["<b>5. Ribbon asks Eureka</b><br/>instances becomes 10.0.2.4:8080"]:::step
+  n5["<b>6. Resolve and call</b><br/>target becomes 10.0.2.4:8080"]:::step
+  n6["<b>7. POST http://10.0.2.4:8080/user</b><br/>the request hits a real instance"]:::stop
+  n7["<b>No instance found</b><br/>Ribbon gets empty, target stays unresolved, the call fails"]:::warn
+  n0 -->|"1. URL host is a logical name"| n1
+  n1 -->|"2. chassis enables the client"| n2
+  n2 -->|"3. RestTemplate intercepted"| n3
+  n3 -->|"4. query Eureka"| n4
+  n4 -->|"5. rewrite to a location"| n5
+  n5 -->|"6. real instance reached"| n6
+  n4 -->|"7. empty result"| n7
 ```
 
 1. **Logical name, not IP** — user_registration_url is set to http://REGISTRATION-SERVICE/user — a logical service name.
@@ -143,16 +171,27 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. Fewer moving parts</b><br/>Client-side discovery has fewer moving parts and network hops than…"]:::start
-  s3n1["<b>2. Coupled to the registry</b><br/>The client is coupled to the Service Registry."]:::step
-  s3n2["<b>3. Per-language logic</b><br/>Discovery logic must be implemented per language/framework, such as…"]:::step
-  s3n3["<b>4. Prana for non-JVM</b><br/>Netflix Prana offers an HTTP-proxy approach to discovery for non-JV…"]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
-  s3n2 --> s3n3
+  n0["<b>1. Measure one request's cost</b><br/>POST /orders"]:::start
+  n1["<b>2. Client-side path</b><br/>CLI to REG to SVC, hops 0 becomes 2"]:::step
+  n2["<b>3. Server-side path</b><br/>CLI to RTR to REG to SVC, hops 0 becomes 3"]:::step
+  n3["<b>4. Fewer moving parts</b><br/>2 parts vs 3 parts"]:::core
+  n4["<b>5. Coupled to the registry</b><br/>the client must know the registry"]:::warn
+  n5["<b>6. Per-language logic</b><br/>Java and Scala, also JavaScript and NodeJS"]:::warn
+  n6["<b>7. Verdict 2 hops vs 3 hops</b><br/>client-side wins on hops, loses on coupling"]:::stop
+  n7["<b>Prana for non-JVM</b><br/>a local HTTP proxy keeps the 2-hop path"]:::step
+  n0 -->|"1. client-side"| n1
+  n0 -->|"2. server-side"| n2
+  n1 -->|"3. two hops"| n3
+  n2 -->|"4. three hops"| n3
+  n3 -->|"5. wins on hops but"| n4
+  n4 -->|"6. must be re-implemented"| n5
+  n5 -->|"7. tradeoff"| n6
+  n1 -->|"8. non-JVM client"| n7
 ```
 
 1. **Fewer moving parts** — Client-side discovery has fewer moving parts and network hops than server-side discovery.

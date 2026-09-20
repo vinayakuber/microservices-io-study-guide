@@ -12,14 +12,22 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 24 · microservice
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Clients have different needs</b><br/>A desktop page is more elaborate than a mobile page, so each wants…"]:::start
-  s0n1["<b>2. One API must serve all</b><br/>A single shared gateway returns the same shape to every client that…"]:::step
-  s0n2["<b>3. The mismatch wastes the slowest link</b><br/>A mobile client downloads fields it never renders, over a slow mobi…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. Two clients, different needs</b><br/>WEB wants an elaborate page, MOB wants a lean one"]:::start
+  n1["<b>2. Shared gateway sends the full shape</b><br/>fields becomes title, author, price, reviews, buying_options, 5 fields"]:::step
+  n2["<b>3. Mobile renders only two</b><br/>needed becomes title and price"]:::step
+  n3["<b>4. Count the waste</b><br/>extra becomes 3, the gateway sent 5 fields, mobile uses 2"]:::core
+  n4["<b>5. Waste travels the slowest link</b><br/>3 fields ride a slow mobile network for nothing"]:::stop
+  n5["<b>Alt - a dedicated mobile gateway</b><br/>fields becomes title and price only, extra stays 0"]:::warn
+  n0 -->|"1. one API serves all"| n1
+  n1 -->|"2. mobile uses less"| n2
+  n2 -->|"3. tally the extra"| n3
+  n3 -->|"4. paid on mobile"| n4
+  n3 -->|"5. alt - per-client shape"| n5
 ```
 
 1. **Clients have different needs** — A desktop page is more elaborate than a mobile page, so each wants different data.
@@ -50,14 +58,23 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Give each client type its own gateway</b><br/>The web, mobile, and third-party clients each get their own API gat…"]:::start
-  s1n1["<b>2. Shape each API for its owner</b><br/>Each gateway exposes an API that is best suited to its one client."]:::step
-  s1n2["<b>3. The client team owns its module</b><br/>Each API module is developed and operated by the team that owns the…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+  n0["<b>1. Each client type gets its own gateway</b><br/>GW-W owned by the public API team, GW-M owned by the mobile team"]:::start
+  n1["<b>2. WEB hits GW-W</b><br/>gw_web hits 0 becomes 1, payload gets title POJOs in Action, author Chris Richardson, price 39.99, reviews 12"]:::step
+  n2["<b>3. MOB hits GW-M</b><br/>gw_mobile hits 0 becomes 1, payload gets title POJOs in Action and price 39.99"]:::step
+  n3["<b>4. Each API shaped for its owner</b><br/>GW-W returns 4 fields, GW-M returns 2 fields"]:::core
+  n4["<b>5. Each client gets exactly its own API</b><br/>no compromise shape"]:::stop
+  n5["<b>Alt - a single shared gateway</b><br/>both requests hit one process returning one compromise shape"]:::warn
+  n0 -->|"1. fork by client type"| n1
+  n0 -->|"2. fork by client type"| n2
+  n1 -->|"3. web response"| n3
+  n2 -->|"4. mobile response"| n3
+  n3 -->|"5. done"| n4
+  n3 -->|"6. alt - shared process"| n5
 ```
 
 1. **Give each client type its own gateway** — The web, mobile, and third-party clients each get their own API gateway.
@@ -90,14 +107,22 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Separate processes per API</b><br/>Each API module runs as its own process, isolated from the others."]:::start
-  s2n1["<b>2. A fault stays contained</b><br/>One misbehaving API cannot easily impact other APIs."]:::step
-  s2n2["<b>3. Observe and scale independently</b><br/>Different modules are different processes, so they are observable a…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+  n0["<b>1. Separate processes per API</b><br/>GW-M and GW-W run as their own isolated processes"]:::start
+  n1["<b>2. GW-M hits an out-of-memory fault</b><br/>gw_mobile status running becomes crashed"]:::warn
+  n2["<b>3. Error count rises</b><br/>gw_mobile errors 0 becomes 1"]:::step
+  n3["<b>4. GW-W still serves</b><br/>gw_web hits 0 becomes 1, the web gateway never saw the fault"]:::core
+  n4["<b>5. Crash stays contained</b><br/>GW-W returns a page while GW-M is down, the fault isolated to one process"]:::stop
+  n5["<b>Alt - one shared process</b><br/>the same fault crashes the single gateway, every client loses its API at once"]:::warn
+  n0 -->|"1. fault hits mobile"| n1
+  n1 -->|"2. record the fault"| n2
+  n2 -->|"3. web unaffected"| n3
+  n3 -->|"4. contained"| n4
+  n0 -->|"5. alt - shared process"| n5
 ```
 
 1. **Separate processes per API** — Each API module runs as its own process, isolated from the others.
@@ -127,14 +152,24 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. Common code can be duplicated</b><br/>Different gateways may each re-implement common functionality such…"]:::start
-  s3n1["<b>2. Share the common library</b><br/>Ideally all gateways use the same stack, with common functionality…"]:::step
-  s3n2["<b>3. Keep updates lightweight</b><br/>If updating the gateway is slow, developers are forced to wait in l…"]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
+  n0["<b>1. Both gateways need the same function</b><br/>verify_access_token, a common edge function"]:::start
+  n1["<b>2. GW-M implements it</b><br/>edge_fn owner becomes mobile team"]:::warn
+  n2["<b>3. GW-W copies it</b><br/>edge_fn owner becomes web team, code is a copy 2, a duplicate"]:::warn
+  n3["<b>4. Refactor into the shared library</b><br/>edge_fn owner becomes shared library"]:::step
+  n4["<b>5. One shared implementation</b><br/>the duplicate is removed, both gateways use LIB"]:::core
+  n5["<b>6. Bottleneck avoided</b><br/>lightweight shared code, no developer waiting in line"]:::stop
+  n6["<b>Alt - two different stacks</b><br/>the code cannot be shared, the function stays duplicated in two places"]:::warn
+  n0 -->|"1. first team writes it"| n1
+  n1 -->|"2. second team copies it"| n2
+  n2 -->|"3. deduplicate"| n3
+  n3 -->|"4. shared once"| n4
+  n4 -->|"5. updates stay light"| n5
+  n2 -->|"6. alt - stacks differ"| n6
 ```
 
 1. **Common code can be duplicated** — Different gateways may each re-implement common functionality such as edge functions.

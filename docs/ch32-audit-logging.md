@@ -12,14 +12,23 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 32 (p.377) · micr
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Record in a database</b><br/>The solution is to record user activity in a database."]:::start
-  s0n1["<b>2. One row per action</b><br/>Each action a user performs is written as an audit record."]:::step
-  s0n2["<b>3. Widely used</b><br/>The reference notes this pattern is widely used."]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+n0["<b>1. User acts</b><br/>alice performs view_order on PO-2001"]:::start
+  n1["<b>2. Write one row per action</b><br/>INSERT audit row id=1, action view_order"]:::step
+  n2["<b>3. Next action, next row</b><br/>INSERT id=2 create_order, then id=3 pay_order"]:::step
+  n3["<b>4. Audit log accumulates</b><br/>audit_log holds 3 rows, WHO=alice, WHEN=now"]:::core
+  n4["<b>5. Behavior reconstructable</b><br/>the DB records who did what and when"]:::stop
+  n5["<b>Missed write</b><br/>an action with no row leaves no trace"]:::warn
+  n0 -->|"1. action to record"| n1
+  n1 -->|"2. next action"| n2
+  n2 -->|"3. more actions"| n1
+  n2 -->|"4. rows accumulate"| n3
+  n3 -->|"5. reconstruct later"| n4
+  n2 -->|"6. write fails - no trace"| n5
 ```
 
 1. **Record in a database** — The solution is to record user activity in a database.
@@ -50,14 +59,28 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Three readers</b><br/>Customer support, compliance, and security all want to know what ac…"]:::start
-  s1n1["<b>2. Reconstruct behavior</b><br/>Querying the log by user returns that user's actions in order."]:::step
-  s1n2["<b>3. Answer questions</b><br/>The same rows can answer &quot;what did alice do&quot; or &quot;who touched PO-2001&quot;."]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+n0["<b>1. One audit log, three questions</b><br/>SUP wants to know what alice recently did"]:::start
+  n1["<b>2. Query by user</b><br/>match the rows for alice, in order"]:::step
+  n2["<b>3. Answer holds the rows</b><br/>3 rows, row id=3 is the payment"]:::core
+  n3["<b>4. Support asks</b><br/>did alice pay? - yes, at t3"]:::step
+  n4["<b>5. Compliance asks</b><br/>who touched PO-2001?"]:::step
+  n5["<b>6. Security asks</b><br/>which pay_order actions happened?"]:::step
+  n6["<b>7. One log, three readers</b><br/>the same rows answer all three"]:::stop
+  n7["<b>Query misses</b><br/>no match returns nothing"]:::warn
+  n0 -->|"1. choose a question"| n1
+  n1 -->|"2. match rows by user"| n2
+  n2 -->|"3. support"| n3
+  n2 -->|"4. compliance"| n4
+  n2 -->|"5. security"| n5
+  n3 -->|"6. merge answers"| n6
+  n4 -->|"7. merge answers"| n6
+  n5 -->|"8. merge answers"| n6
+  n1 -->|"9. no match - empty"| n7
 ```
 
 1. **Three readers** — Customer support, compliance, and security all want to know what actions a user recently performed.
@@ -88,14 +111,26 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Intertwined code</b><br/>The drawback is that auditing code is intertwined with the business…"]:::start
-  s2n1["<b>2. Inline audit calls</b><br/>audit() calls sit between business statements inside a method."]:::step
-  s2n2["<b>3. Event sourcing alternative</b><br/>Event Sourcing is a reliable way to implement auditing — the event…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+n0["<b>1. Request arrives</b><br/>create_order for PO-2001"]:::start
+  n1["<b>2. Save, then audit</b><br/>save the order, then call audit - row 1"]:::step
+  n2["<b>3. Publish, then audit</b><br/>publish, then call audit - row 2"]:::step
+  n3["<b>4. Inline audit path</b><br/>inline_audit holds 2 hand-written rows"]:::core
+  n4["<b>5. Drawback - intertwined</b><br/>audit calls sit between business statements"]:::warn
+  n5["<b>6. Event sourcing path</b><br/>append 2 domain events OrderCreated, OrderPublished"]:::core
+  n6["<b>7. Event log IS the audit trail</b><br/>audit becomes a read of event_log, no audit calls"]:::stop
+  n7["<b>Missed audit call</b><br/>an action is left unrecorded"]:::warn
+  n0 -->|"1. method runs"| n1
+  n1 -->|"2. second audit call"| n2
+  n2 -->|"3. inline approach"| n3
+  n3 -->|"4. drawback - intertwined"| n4
+  n2 -->|"5. event sourcing instead"| n5
+  n5 -->|"6. reliable audit"| n6
+  n1 -->|"7. missed call - unrecorded"| n7
 ```
 
 1. **Intertwined code** — The drawback is that auditing code is intertwined with the business logic, making it more complicated.

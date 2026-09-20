@@ -12,14 +12,22 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. · microservices.i
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. The client is the subject</b><br/>The client is the service's caller — the side that forms requests a…"]:::start
-  s0n1["<b>2. Communicate means two directions</b><br/>Communication means sending a well-formed request and consuming the…"]:::step
-  s0n2["<b>3. Contrast with consumer-driven</b><br/>The consumer-driven test checks the provider meets expectations; th…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. The client is the subject</b><br/>OrderServiceProxy is under test, not the service"]:::start
+  n1["<b>2. Form the request</b><br/>GET /orders/ORD-4007, the service expected method and path"]:::step
+  n2["<b>3. Send and receive</b><br/>response status 200, the service answers the well-formed request"]:::step
+  n3["<b>4. Parse the body</b><br/>body orderId ORD-4007 state CREATED"]:::step
+  n4["<b>5. Verdict pass</b><br/>the client sent a valid request and consumed the reply"]:::stop
+  n5["<b>Client cannot communicate</b><br/>a malformed path yields status 500, verdict fail"]:::warn
+  n0 -->|"1. exercise the client"| n1
+  n1 -->|"2. valid path"| n2
+  n2 -->|"3. read the reply"| n3
+  n3 -->|"4. consumed correctly"| n4
+  n1 -->|"5. malformed path - fail"| n5
 ```
 
 1. **The client is the subject** — The client is the service's caller — the side that forms requests and reads replies — and it is what the test verifies.
@@ -50,14 +58,22 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Method</b><br/>The client must use the HTTP method the service's contract specifie…"]:::start
-  s1n1["<b>2. Path</b><br/>The client must substitute the concrete id into the path template,…"]:::step
-  s1n2["<b>3. Headers</b><br/>The client must advertise the format it can read, such as an Accept…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+  n0["<b>1. Build the outgoing request</b><br/>the client must form what the service expects"]:::start
+  n1["<b>2. Set the method</b><br/>GET, per the contract"]:::step
+  n2["<b>3. Substitute into the path</b><br/>/orders/ORD-4007, the order id filled into the template"]:::step
+  n3["<b>4. Advertise the headers</b><br/>Accept application/json"]:::step
+  n4["<b>5. Request well-formed</b><br/>method, path, and headers all match the contract"]:::stop
+  n5["<b>Wrong path</b><br/>/order/ORD-4007 drops the plural, the service expects /orders, verdict fail"]:::warn
+  n0 -->|"1. method first"| n1
+  n1 -->|"2. path next"| n2
+  n2 -->|"3. headers last"| n3
+  n3 -->|"4. all match"| n4
+  n2 -->|"5. typo - fail"| n5
 ```
 
 1. **Method** — The client must use the HTTP method the service's contract specifies, such as GET.
@@ -88,14 +104,22 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Read the status</b><br/>The client must confirm the call succeeded before trying to parse a…"]:::start
-  s2n1["<b>2. Read the headers</b><br/>The client must check the content type so it decodes the body the r…"]:::step
-  s2n2["<b>3. Decode the body</b><br/>The client must turn the reply body into its own fields, such as or…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+  n0["<b>1. The reply arrives</b><br/>raw_reply status 200, Content-Type application/json, body orderId ORD-4007 state CREATED"]:::start
+  n1["<b>2. Read the status</b><br/>received status becomes 200, the call succeeded before parsing"]:::step
+  n2["<b>3. Read the headers</b><br/>Content-Type application/json, the body is JSON before decoding"]:::step
+  n3["<b>4. Decode the body</b><br/>parsed orderId becomes ORD-4007, state becomes CREATED"]:::core
+  n4["<b>5. Response consumed correctly</b><br/>the client fields match the service reply"]:::stop
+  n5["<b>Unexpected body</b><br/>an error shape not found, parsed orderId stays empty, no field to decode"]:::warn
+  n0 -->|"1. status before parse"| n1
+  n1 -->|"2. type before decode"| n2
+  n2 -->|"3. JSON body"| n3
+  n3 -->|"4. fields extracted"| n4
+  n2 -->|"5. error body - misparse"| n5
 ```
 
 1. **Read the status** — The client must confirm the call succeeded before trying to parse anything.
@@ -126,14 +150,22 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. Assert on the client's own behavior</b><br/>The test checks what the client sends and what it reads, not the pr…"]:::start
-  s3n1["<b>2. Both assertions must hold</b><br/>A passing test means the request assertion and the response asserti…"]:::step
-  s3n2["<b>3. A wrong path fails fast</b><br/>If the client forms the wrong path, it cannot reach the service's e…"]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
+  n0["<b>1. The client is the subject</b><br/>the test asserts what the client sends and reads, not provider internals"]:::start
+  n1["<b>2. Check outgoing</b><br/>cli_behavior sends GET /orders/ORD-4007"]:::step
+  n2["<b>3. Check incoming</b><br/>cli_behavior reads orderId and state"]:::step
+  n3["<b>4. Both assertions hold</b><br/>checks 0 becomes 2, request and response both pass"]:::core
+  n4["<b>5. Client can communicate</b><br/>failures stays 0"]:::stop
+  n5["<b>Wrong path fails fast</b><br/>sends GET /order/ORD-4007, failures 0 becomes 1, endpoint unreachable"]:::warn
+  n0 -->|"1. assert the send"| n1
+  n1 -->|"2. correct path"| n2
+  n2 -->|"3. assert the read"| n3
+  n3 -->|"4. both pass"| n4
+  n1 -->|"5. wrong path - fail"| n5
 ```
 
 1. **Assert on the client's own behavior** — The test checks what the client sends and what it reads, not the provider's internals.

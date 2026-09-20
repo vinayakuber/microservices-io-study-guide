@@ -12,14 +12,32 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 6 · microservices
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Send a request</b><br/>The client uses a request/reply protocol (REST, gRPC, or Apache Thr…"]:::start
-  s0n1["<b>2. Wait for the reply</b><br/>The client blocks until the reply arrives, then carries on."]:::step
-  s0n2["<b>3. Map the response</b><br/>A 200 OK yields the new id; RegistrationServiceProxy returns Right(…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. Request/reply protocol, no broker</b><br/>pick how to invoke the remote service"]:::start
+  n1["<b>2a. REST</b><br/>HTTP request and response"]:::step
+  n2["<b>2b. gRPC</b><br/>binary RPC"]:::step
+  n3["<b>2c. Apache Thrift</b><br/>cross-language RPC"]:::step
+  n4["<b>3. CLIENT POSTs the request</b><br/>email ada example, password s3cret"]:::step
+  n5["<b>4. SVC creates the user and answers</b><br/>status PENDING becomes 200"]:::core
+  n6["<b>5. CLIENT reads the status code</b><br/>verdict UNSET becomes OK"]:::step
+  n7["<b>6. CLIENT returns the new id</b><br/>result null becomes user-9"]:::step
+  n8["<b>7. Reply user-9, Right</b><br/>one request, one prompt reply over HTTP"]:::stop
+  n9["<b>No reply arrives</b><br/>the client blocks, both sides must be up"]:::warn
+  n0 -->|"1a. protocol one"| n1
+  n0 -->|"1b. protocol two"| n2
+  n0 -->|"1c. protocol three"| n3
+  n1 -->|"2. send the call"| n4
+  n2 -->|"2. send the call"| n4
+  n3 -->|"2. send the call"| n4
+  n4 -->|"3. wait"| n5
+  n5 -->|"4. read code"| n6
+  n6 -->|"5. map"| n7
+  n7 -->|"6. reply"| n8
+  n5 -->|"7. if service down"| n9
 ```
 
 1. **Send a request** — The client uses a request/reply protocol (REST, gRPC, or Apache Thrift) to call a service.
@@ -52,14 +70,25 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Catch the status</b><br/>The proxy inspects the HTTP status code of the response."]:::start
-  s1n1["<b>2. Map 200 to success</b><br/>An HttpStatus.OK returns Right(id)."]:::step
-  s1n2["<b>3. Map CONFLICT to an error</b><br/>An HttpClientErrorException with CONFLICT becomes Left(DuplicateReg…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+  n0["<b>1. Proxy inspects the HTTP status</b><br/>the response code decides the result type"]:::start
+  n1["<b>2. Client POSTs the request</b><br/>same email, ada example, signs up again"]:::step
+  n2["<b>3. Service answers</b><br/>status PENDING becomes a code"]:::core
+  n3["<b>4a. 200 OK path</b><br/>verdict OK, return Right id"]:::step
+  n4["<b>4b. 409 CONFLICT path</b><br/>verdict CONFLICT, Left DuplicateRegistrationError"]:::step
+  n5["<b>5. Typed result</b><br/>Right or Left, not an unhandled exception"]:::stop
+  n6["<b>Service down</b><br/>no reply at all, both sides must be up"]:::warn
+  n0 -->|"1. send the call"| n1
+  n1 -->|"2. code comes back"| n2
+  n2 -->|"3a. status is 200"| n3
+  n2 -->|"3b. status is 409"| n4
+  n3 -->|"4. typed"| n5
+  n4 -->|"4. typed"| n5
+  n2 -->|"5. no answer"| n6
 ```
 
 1. **Catch the status** — The proxy inspects the HTTP status code of the response.
@@ -93,14 +122,24 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Both sides must be available</b><br/>Client and service must be available for the duration of the intera…"]:::start
-  s2n1["<b>2. Threads wait</b><br/>The caller thread is held while it waits for the reply."]:::step
-  s2n2["<b>3. Only request/reply</b><br/>RPI usually cannot express notifications, publish/subscribe, or asy…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+  n0["<b>1. Both sides must be available</b><br/>client and service for the whole interaction"]:::start
+  n1["<b>2. CLIENT blocks its thread</b><br/>thread FREE becomes WAITING"]:::step
+  n2["<b>3. SVC is down, no reply arrives</b><br/>elapsed_ms 0 becomes 800"]:::core
+  n3["<b>4. The timer expires</b><br/>verdict UNSET becomes TIMEOUT"]:::step
+  n4["<b>5. The thread is released</b><br/>thread WAITING becomes FREE"]:::step
+  n5["<b>6. TIMEOUT after 800 ms</b><br/>800 ms of the caller thread spent waiting"]:::stop
+  n6["<b>SVC slow but alive</b><br/>the reply arrives late, no broker to buffer"]:::warn
+  n0 -->|"1. thread waits"| n1
+  n1 -->|"2. no answer"| n2
+  n2 -->|"3. timer fires"| n3
+  n3 -->|"4. release"| n4
+  n4 -->|"5. timeout"| n5
+  n2 -->|"6. if merely slow"| n6
 ```
 
 1. **Both sides must be available** — Client and service must be available for the duration of the interaction.
@@ -133,14 +172,24 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. Discover the instance</b><br/>The client needs to discover locations of service instances, via cl…"]:::start
-  s3n1["<b>2. Resolve the URL from config</b><br/>Externalized configuration supplies the network location (the user_…"]:::step
-  s3n2["<b>3. Guard with a circuit breaker</b><br/>A client typically uses a Circuit Breaker to improve reliability (t…"]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
+  n0["<b>1. The client must find an instance</b><br/>discovery resolves the location"]:::start
+  n1["<b>2. CLIENT asks the registry</b><br/>lookup null becomes user-registration"]:::step
+  n2["<b>3. Registry returns a network location</b><br/>location null becomes 10.0.0.7 8080"]:::core
+  n3["<b>4. CLIENT builds the URL from config</b><br/>url null becomes http 10.0.0.7 8080 register"]:::step
+  n4["<b>5. Invoke behind a circuit breaker</b><br/>request null becomes email ada example"]:::step
+  n5["<b>6. Reply user-9</b><br/>URL from discovery, call guarded by a breaker"]:::stop
+  n6["<b>Breaker open</b><br/>the call fails fast without touching SVC"]:::warn
+  n0 -->|"1. lookup"| n1
+  n1 -->|"2. answer"| n2
+  n2 -->|"3. build URL"| n3
+  n3 -->|"4. invoke"| n4
+  n4 -->|"5. reply"| n5
+  n4 -->|"6. if breaker open"| n6
 ```
 
 1. **Discover the instance** — The client needs to discover locations of service instances, via client-side or server-side discovery.

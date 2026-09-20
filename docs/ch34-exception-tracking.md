@@ -12,14 +12,24 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 34 · microservice
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Throw on failure</b><br/>A service instance handling a request throws an exception when an e…"]:::start
-  s0n1["<b>2. Carry message and stack trace</b><br/>The exception object holds an error message and a stack trace; both…"]:::step
-  s0n2["<b>3. Catch in the handler</b><br/>The handler catches the exception and packages the message plus the…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+n0["<b>1. Request fails</b><br/>GET /orders for REQ-2001"]:::start
+  n1["<b>2. Look up the customer</b><br/>returns null, req status OPEN becomes FAILED"]:::step
+  n2["<b>3. Throw</b><br/>NullPointerException, customer is null"]:::warn
+  n3["<b>4. Catch in the handler</b><br/>package message plus stack trace"]:::step
+  n4["<b>5. Report record formed</b><br/>msg customer is null, stack SVC.doGet line 42, ts 19"]:::core
+  n5["<b>6. Exception in hand</b><br/>1 captured exception"]:::stop
+  n6["<b>No catch in place</b><br/>the thread dies with no record, the error is invisible"]:::warn
+  n0 -->|"1. request fails"| n1
+  n1 -->|"2. error thrown"| n2
+  n2 -->|"3. handler catches"| n3
+  n3 -->|"4. package the record"| n4
+  n4 -->|"5. captured"| n5
+  n2 -->|"6. no catch - invisible"| n6
 ```
 
 1. **Throw on failure** — A service instance handling a request throws an exception when an error occurs.
@@ -49,16 +59,24 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Point at the tracking service</b><br/>The service sends each caught exception to the centralized exceptio…"]:::start
-  s1n1["<b>2. Send message and stack trace</b><br/>The report carries the error message and the stack trace so the tra…"]:::step
-  s1n2["<b>3. Get an acknowledgement</b><br/>The service receives an acknowledgement once the tracker has stored…"]:::step
-  s1n3["<b>4. Also log it</b><br/>Exceptions should be logged as well as reported to the tracking ser…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
-  s1n2 --> s1n3
+n0["<b>1. Exception caught</b><br/>report EX-1001 ready"]:::start
+  n1["<b>2. Serialize the report</b><br/>into the request body"]:::step
+  n2["<b>3. POST to the tracker</b><br/>POST /exceptions over HTTP"]:::step
+  n3["<b>4. Tracker stores it</b><br/>tracker holds EX-1001"]:::core
+  n4["<b>5. Ack returned</b><br/>tracker returns 200, SVC marks it sent"]:::step
+  n5["<b>6. Reported centrally</b><br/>the exception lives in the central tracker, not just the local service"]:::stop
+  n6["<b>Tracker unreachable</b><br/>SVC writes the same line to its local log file"]:::warn
+  n0 -->|"1. transmit the report"| n1
+  n1 -->|"2. send over HTTP"| n2
+  n2 -->|"3. stored"| n3
+  n3 -->|"4. ack returned"| n4
+  n4 -->|"5. reported"| n5
+  n2 -->|"6. unreachable - log locally"| n6
 ```
 
 1. **Point at the tracking service** — The service sends each caught exception to the centralized exception tracking service.
@@ -90,16 +108,28 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Fingerprint by stack trace</b><br/>The tracker keys each exception on a fingerprint of its stack trace."]:::start
-  s2n1["<b>2. Create the issue on first sight</b><br/>The first report with a new fingerprint creates a new tracked issue."]:::step
-  s2n2["<b>3. Increment on repeat</b><br/>Later reports with the same fingerprint are folded into the existin…"]:::step
-  s2n3["<b>4. Track resolution state</b><br/>The issue records its state so developers can track it from open to…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
-  s2n2 --> s2n3
+n0["<b>1. Report arrives</b><br/>EX-1001, msg customer is null"]:::start
+  n1["<b>2. Fingerprint the stack</b><br/>hash the stack trace becomes FP-77A3"]:::step
+  n2["<b>3. Look up the fingerprint</b><br/>is the FP-77A3 issue already present?"]:::core
+  n3["<b>4. First sighting</b><br/>not found, create the issue, count 1"]:::step
+  n4["<b>5. Repeat report</b><br/>SVC2 same bug, found, count 1 becomes 2"]:::step
+  n5["<b>6. One issue per bug</b><br/>issues holds FP-77A3 with count 2"]:::core
+  n6["<b>7. Noise collapses</b><br/>2 exceptions deduplicated into 1 issue"]:::stop
+  n7["<b>New fingerprint</b><br/>FP-1B20 not seen, a 2nd distinct issue"]:::warn
+  n0 -->|"1. hash the stack"| n1
+  n1 -->|"2. key on the fingerprint"| n2
+  n2 -->|"3. not found"| n3
+  n2 -->|"4. found"| n4
+  n3 -->|"5. new issue"| n5
+  n4 -->|"6. increment"| n5
+  n5 -->|"7. deduplicated"| n6
+  n2 -->|"8. unrelated bug"| n7
+  n7 -->|"9. separate issue"| n5
 ```
 
 1. **Fingerprint by stack trace** — The tracker keys each exception on a fingerprint of its stack trace.
@@ -130,14 +160,25 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. Notify on the issue</b><br/>The tracking service notifies developers when an issue needs attent…"]:::start
-  s3n1["<b>2. Investigate</b><br/>A developer reads the error message and the stack trace to find the…"]:::step
-  s3n2["<b>3. Resolve the underlying issue</b><br/>The developer fixes the cause and marks the issue resolved."]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
+n0["<b>1. Issue crosses threshold</b><br/>FP-77A3 count 2, state OPEN, threshold 1"]:::start
+  n1["<b>2. Notify the developer</b><br/>alert FP-77A3 goes to DEV"]:::step
+  n2["<b>3. Investigate</b><br/>DEV finds the null-customer path"]:::step
+  n3["<b>4. Fix the cause</b><br/>commit 9f2c lands"]:::step
+  n4["<b>5. Mark resolved</b><br/>state OPEN becomes RESOLVED"]:::core
+  n5["<b>6. Issue closed</b><br/>the cause is fixed, not just the symptom"]:::stop
+  n6["<b>Bug reappears</b><br/>new report, count 2 becomes 3, state RESOLVED becomes OPEN"]:::warn
+  n0 -->|"1. threshold crossed"| n1
+  n1 -->|"2. developer reads the trace"| n2
+  n2 -->|"3. root cause found"| n3
+  n3 -->|"4. fix committed"| n4
+  n4 -->|"5. closed"| n5
+  n5 -->|"6. later report"| n6
+  n6 -->|"7. reopens and re-notifies"| n1
 ```
 
 1. **Notify on the issue** — The tracking service notifies developers when an issue needs attention.

@@ -12,14 +12,27 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.15 (p.114) · micro
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Database per Service</b><br/>Orders and Customers each live in their own database, owned by diff…"]:::start
-  s0n1["<b>2. A transaction spans services</b><br/>Creating an order must also check that the total does not exceed th…"]:::step
-  s0n2["<b>3. No local ACID, no 2PC</b><br/>One local transaction cannot reach the database of another service,…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. Database per Service</b><br/>Orders and Customers live in separate databases owned by different services"]:::start
+  n1["<b>2. A transaction spans services</b><br/>creating order PO-2001, total 100.00, must check the credit limit"]:::step
+  n2["<b>3. Begin local tx on ORDDB</b><br/>the broker and CSDB are not enlisted"]:::step
+  n3["<b>4. Insert the order</b><br/>orders : empty becomes PO-2001 PENDING"]:::step
+  n4["<b>5. Deduct credit fails</b><br/>customer_credit errors no such table, customers lives in CSDB not ORDDB"]:::warn
+  n5["<b>6. Transaction aborts</b><br/>orders rolls back to empty, outcome ROLLBACK"]:::warn
+  n6["<b>7. 2PC is not an option</b><br/>would enlist both databases but couples services and can block"]:::core
+  n7["<b>8. A saga replaces one tx</b><br/>a sequence of local transactions with compensating steps"]:::stop
+  n0 -->|"each service owns its database"| n1
+  n1 -->|"the order must check credit"| n2
+  n2 -->|"try a local ACID transaction"| n3
+  n3 -->|"update the credit limit"| n4
+  n4 -->|"no such table"| n5
+  n5 -->|"local tx cannot span services"| n6
+  n2 -->|"alt - enlist both databases"| n6
+  n6 -->|"so use a saga"| n7
 ```
 
 1. **Database per Service** — Orders and Customers each live in their own database, owned by different services.
@@ -51,18 +64,33 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Create the saga orchestrator</b><br/>The Order Service receives POST /orders and creates the Create Orde…"]:::start
-  s1n1["<b>2. Create the order PENDING</b><br/>The orchestrator creates the Order in the PENDING state."]:::step
-  s1n2["<b>3. Send the Reserve Credit command</b><br/>The orchestrator sends a Reserve Credit command to the Customer Ser…"]:::step
-  s1n3["<b>4. Reserve credit and reply</b><br/>The Customer Service attempts to reserve credit and sends back a re…"]:::step
-  s1n4["<b>5. Approve, reject, or compensate</b><br/>The orchestrator approves or rejects the Order; on failure it runs…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
-  s1n2 --> s1n3
-  s1n3 --> s1n4
+  n0["<b>1. Client POSTs /orders</b><br/>Order Service creates the create-order saga orchestrator"]:::start
+  n1["<b>2. LT1 create order PENDING</b><br/>orders : empty becomes PO-2001 PENDING"]:::step
+  n2["<b>3. Send ReserveCredit</b><br/>orchestrator sends ReserveCredit saga SAGA-1 amount 100.00 to Customer Service"]:::step
+  n3["<b>4. LT2 reserve credit</b><br/>reserved becomes SAGA-1, credit 500.00 becomes 400.00"]:::core
+  n4["<b>5. CS replies credit_reserved</b><br/>orchestrator sends CreateTicket to Kitchen Service"]:::step
+  n5["<b>6. LT3 ticket rejected</b><br/>item not available, tickets stays empty"]:::warn
+  n6["<b>7. Compensate LT2</b><br/>ReleaseCredit returns the held 100.00, credit 400.00 becomes 500.00"]:::warn
+  n7["<b>8. Compensate LT1</b><br/>order PENDING becomes REJECTED"]:::warn
+  n8["<b>9. Outcome OrderRejected</b><br/>order REJECTED, credit fully released, no ticket created"]:::stop
+  n9["<b>10. Alt success path</b><br/>KIT replies ticket_created, order PENDING becomes APPROVED, no compensation"]:::stop
+  n10["<b>11. Idempotent retry guard</b><br/>a retried ReserveCredit SAGA-1 is skipped because already in reserved"]:::core
+  n0 -->|"create the orchestrator"| n1
+  n1 -->|"orchestrator commands CS"| n2
+  n2 -->|"CS reserves credit"| n3
+  n3 -->|"retried command arrives"| n10
+  n10 -->|"already reserved - skip"| n3
+  n3 -->|"reply credit_reserved"| n4
+  n4 -->|"send CreateTicket to KIT"| n5
+  n4 -->|"alt - KIT accepts"| n9
+  n5 -->|"ticket_rejected - compensate"| n6
+  n6 -->|"release credit"| n7
+  n7 -->|"reject order"| n8
 ```
 
 1. **Create the saga orchestrator** — The Order Service receives POST /orders and creates the Create Order saga orchestrator.
@@ -105,18 +133,26 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Create the order PENDING</b><br/>The Order Service receives POST /orders and creates an Order in the…"]:::start
-  s2n1["<b>2. Emit Order Created</b><br/>It emits an Order Created event."]:::step
-  s2n2["<b>3. Reserve credit on the event</b><br/>The Customer Service event handler attempts to reserve credit."]:::step
-  s2n3["<b>4. Emit the outcome</b><br/>It emits an event indicating the outcome."]:::step
-  s2n4["<b>5. Approve or reject</b><br/>The Order Service event handler either approves or rejects the Order."]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
-  s2n2 --> s2n3
-  s2n3 --> s2n4
+  n0["<b>1. POST /orders</b><br/>total 100.00, no central orchestrator"]:::start
+  n1["<b>2. LT1 create order PENDING</b><br/>orders : empty becomes PO-2001 PENDING"]:::step
+  n2["<b>3. Publish OrderCreated</b><br/>the event triggers the next local transaction in CS"]:::step
+  n3["<b>4. CS handler reserves credit</b><br/>credit 500.00 becomes 400.00, 100.00 reserved"]:::core
+  n4["<b>5. Publish CreditReserved</b><br/>credit_events : empty becomes CreditReserved"]:::step
+  n5["<b>6. ORD handler approves</b><br/>orders PENDING becomes APPROVED"]:::step
+  n6["<b>7. Order approved</b><br/>each event is the trigger for the next step"]:::stop
+  n7["<b>8. Failure mid-chain</b><br/>a failed step needs a compensating event, no coordinator tracks the whole saga"]:::warn
+  n0 -->|"start the handler chain"| n1
+  n1 -->|"emit OrderCreated"| n2
+  n2 -->|"event reaches CS"| n3
+  n3 -->|"emit CreditReserved"| n4
+  n3 -->|"credit check fails"| n7
+  n4 -->|"event reaches ORD"| n5
+  n5 -->|"order approved"| n6
 ```
 
 1. **Create the order PENDING** — The Order Service receives POST /orders and creates an Order in the PENDING state.
@@ -154,16 +190,31 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. No automatic rollback</b><br/>A developer must design compensating transactions that explicitly u…"]:::start
-  s3n1["<b>2. No isolation</b><br/>Concurrent sagas can cause data anomalies, so countermeasures that…"]:::step
-  s3n2["<b>3. Atomic update and publish</b><br/>A service must atomically update its database and publish its messa…"]:::step
-  s3n3["<b>4. Tell the client the outcome</b><br/>A synchronous initiator learns the result by waiting, by polling GE…"]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
-  s3n2 --> s3n3
+  n0["<b>1. POST returns id while saga runs</b><br/>orders PO-2001 status PENDING"]:::start
+  n1["<b>2. No automatic rollback</b><br/>developer designs compensating transactions that undo earlier changes"]:::warn
+  n2["<b>3. No isolation</b><br/>concurrent sagas cause anomalies, countermeasures are needed"]:::warn
+  n3["<b>4. Atomic update and publish</b><br/>service uses Transactional Outbox to commit state and event together"]:::core
+  n4["<b>5. Poll one, GET /orders</b><br/>poll_count : 0 becomes 1"]:::step
+  n5["<b>6. Status PENDING</b><br/>the saga has not finished, credit not yet reserved"]:::step
+  n6["<b>7. Background saga completes</b><br/>credit reserved then approved, status becomes APPROVED"]:::core
+  n7["<b>8. Poll two, GET again</b><br/>poll_count : 1 becomes 2"]:::step
+  n8["<b>9. Status APPROVED</b><br/>the client learns the outcome"]:::stop
+  n9["<b>Alt outcome signals</b><br/>reply only when complete, or push OrderApproved over a websocket or webhook"]:::warn
+  n0 -->|"three resulting forces first"| n1
+  n1 -->|"design undo steps"| n2
+  n2 -->|"add countermeasures"| n3
+  n3 -->|"outbox gives atomic publish"| n4
+  n4 -->|"first poll"| n5
+  n5 -->|"still PENDING - poll again"| n4
+  n5 -->|"saga completes in background"| n6
+  n6 -->|"status now APPROVED"| n7
+  n7 -->|"second poll"| n8
+  n0 -->|"alt - wait for reply or webhook"| n9
 ```
 
 1. **No automatic rollback** — A developer must design compensating transactions that explicitly undo earlier changes.

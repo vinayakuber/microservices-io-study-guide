@@ -12,16 +12,24 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 30 (p.379) · micr
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Build logic</b><br/>Builds, tests, and packages into a production-ready format such as…"]:::start
-  s0n1["<b>2. Cross-cutting concerns</b><br/>Security via an Access Token, externalized configuration, logging,…"]:::step
-  s0n2["<b>3. Microservice extras</b><br/>Service registration and discovery, plus circuit breakers for parti…"]:::step
-  s0n3["<b>4. Days per service</b><br/>Setup takes one to two days per service — affordable for a monolith…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
-  s0n2 --> s0n3
+  n0["<b>1. The setup tax</b><br/>build, test, package before any business logic"]:::start
+  n1["<b>2. Cross-cutting concerns</b><br/>security, config, logging, health, metrics, tracing"]:::step
+  n2["<b>3. Microservice extras</b><br/>registration, discovery, circuit breakers"]:::step
+  n3["<b>4. Six concerns, three services</b><br/>3 times 6 equals 18 wirings by hand"]:::core
+  n4["<b>5. Days per service</b><br/>one to two days each, unaffordable across tens of services"]:::warn
+  n5["<b>6. Chassis instead</b><br/>wire the 6 concerns once, services inherit - 6 not 18"]:::core
+  n6["<b>7. Minutes per service</b><br/>new service adopts wiring instead of re-building it"]:::stop
+  n0 -->|"1. build, test, package"| n1
+  n1 -->|"2. add registration and breakers"| n2
+  n2 -->|"3. multiply by hand"| n3
+  n3 -->|"4. cost explodes"| n4
+  n3 -->|"5. centralize the wiring"| n5
+  n5 -->|"6. inherit instead of re-wire"| n6
 ```
 
 1. **Build logic** — Builds, tests, and packages into a production-ready format such as a Docker image — in Java, Gradle or Maven plus CI config (CircleCI, GitHub Actions).
@@ -58,16 +66,28 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Reusable build logic</b><br/>The chassis ships build plugins (for example Gradle plugins) that b…"]:::start
-  s1n1["<b>2. Cross-cutting mechanisms</b><br/>It assembles and configures a collection of frameworks and librarie…"]:::step
-  s1n2["<b>3. Technology-specific boilerplate</b><br/>It also supplies a database connection pool and HTTP request boiler…"]:::step
-  s1n3["<b>4. Service Template on top</b><br/>The Service Template is a sample service that uses the chassis, hol…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
-  s1n2 --> s1n3
+  n0["<b>1. Adopt chassis 2.4.0</b><br/>svc.build : none becomes gradle-plugin:2.4.0"]:::start
+  n1["<b>2. Security inherited</b><br/>svc.security : none becomes access-token-check"]:::step
+  n2["<b>3. Metrics inherited</b><br/>svc.metrics : none becomes counter:orders_created"]:::step
+  n3["<b>4. Tracing inherited</b><br/>svc.tracing : none becomes trace-id-filter"]:::step
+  n4["<b>5. Registration inherited</b><br/>svc.registered : false becomes true"]:::step
+  n5["<b>6. Boilerplate included</b><br/>database connection pool and HTTP request code shipped"]:::core
+  n6["<b>7. Service Template on top</b><br/>sample service holding code that does not belong in the chassis"]:::step
+  n7["<b>8. Production-ready service</b><br/>all concerns inherited at once, no re-wiring"]:::stop
+  n8["<b>9. Concern omitted</b><br/>an unwired mechanism leaves the service incomplete"]:::warn
+  n0 -->|"1. build plugin added"| n1
+  n1 -->|"2. access-token check"| n2
+  n2 -->|"3. metrics counter"| n3
+  n3 -->|"4. tracing filter"| n4
+  n4 -->|"5. self-register with the registry"| n5
+  n5 -->|"6. boilerplate supplied"| n6
+  n6 -->|"7. template layers on top"| n7
+  n0 -->|"8. a concern left unwired"| n8
 ```
 
 1. **Reusable build logic** — The chassis ships build plugins (for example Gradle plugins) that build, test, and package a service.
@@ -99,16 +119,22 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Release once</b><br/>Release a new version of the chassis framework containing the neede…"]:::start
-  s2n1["<b>2. Bump each service</b><br/>Update each service to use the new chassis version."]:::step
-  s2n2["<b>3. Everything stays current</b><br/>Dependencies, build logic, and cross-cutting logic are kept up to d…"]:::step
-  s2n3["<b>4. Contrast: template</b><br/>A Service Template is copy/paste programming — each service must be…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
-  s2n2 --> s2n3
+  n0["<b>1. Release chassis once</b><br/>new version 2.4.0 carrying a logging fix"]:::start
+  n1["<b>2. Bump Order Service</b><br/>deps.SVC1 : chassis:2.3.0 becomes chassis:2.4.0"]:::step
+  n2["<b>3. Bump Customer Service</b><br/>deps.SVC2 : chassis:2.3.0 becomes chassis:2.4.0"]:::step
+  n3["<b>4. Bump Kitchen Service</b><br/>deps.SVC3 : chassis:2.3.0 becomes chassis:2.4.0"]:::step
+  n4["<b>5. Fix reaches all three</b><br/>dependencies, build logic, cross-cutting logic stay current together"]:::stop
+  n5["<b>6. Service Template</b><br/>copy-and-paste the fix into each codebase, one edit per service"]:::warn
+  n0 -->|"1. one release"| n1
+  n1 -->|"2. version bump"| n2
+  n2 -->|"3. version bump"| n3
+  n3 -->|"4. all three current"| n4
+  n0 -->|"5. template alternative - per-service edits"| n5
 ```
 
 1. **Release once** — Release a new version of the chassis framework containing the needed change.
@@ -140,14 +166,26 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. Language-specific frameworks</b><br/>Java starts from Spring Boot/Spring Cloud or Dropwizard; Go starts…"]:::start
-  s3n1["<b>2. Second language, second chassis</b><br/>Each programming language/framework you want to use needs its own c…"]:::step
-  s3n2["<b>3. Adoption obstacle</b><br/>Building a second chassis is work, so it can block adopting a new l…"]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
+  n0["<b>1. Chassis is language-bound</b><br/>Java starts from Spring Boot, Spring Cloud, or Dropwizard"]:::start
+  n1["<b>2. Java chassis in place</b><br/>chassis.JVM = chassis-java:2.4.0"]:::core
+  n2["<b>3. Team adds a Go service</b><br/>the JVM chassis cannot run Go"]:::warn
+  n3["<b>4. Build a second chassis</b><br/>chassis_count : 1 becomes 2, chassis-go:1.0.0 on Gizmo, Micro, or Go kit"]:::step
+  n4["<b>5. Re-implement six concerns</b><br/>concerns_in_go : 0 becomes 6"]:::core
+  n5["<b>6. Two chassis to maintain</b><br/>upkeep doubles"]:::stop
+  n6["<b>7. Adoption obstacle</b><br/>building a second chassis can block a new language"]:::warn
+  n7["<b>8. Stay single-language</b><br/>one chassis, but Go adoption stays blocked"]:::stop
+  n0 -->|"1. framework-specific base"| n1
+  n1 -->|"2. team wants Go"| n2
+  n2 -->|"3. JVM chassis cannot serve Go"| n3
+  n3 -->|"4. repeat security, config, logging, health, metrics, tracing"| n4
+  n4 -->|"5. double the upkeep"| n5
+  n5 -->|"6. the main issue of the pattern"| n6
+  n1 -->|"7. stay single-language - Go blocked"| n7
 ```
 
 1. **Language-specific frameworks** — Java starts from Spring Boot/Spring Cloud or Dropwizard; Go starts from Gizmo, Micro, or Go kit.

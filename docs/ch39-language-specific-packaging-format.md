@@ -12,14 +12,20 @@ _Also known as: Chris Richardson · Microservice Patterns p.387 · microservices
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Build the native artifact</b><br/>A Spring Boot Java service builds to an executable JAR file, or a W…"]:::start
-  s0n1["<b>2. Know the per-language shape</b><br/>For Node.js a service is a directory of source code and modules; fo…"]:::step
-  s0n2["<b>3. Hand off to the pipeline</b><br/>The deployment pipeline builds the JAR or WAR and invokes the produ…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. Build the native artifact</b><br/>artifact : null becomes restaurant-service-3.1.0.jar"]:::start
+  n1["<b>2. Know the per-language shape</b><br/>format : unknown becomes jar, Node.js is a directory, Go is an executable"]:::step
+  n2["<b>3. Hand off to the pipeline</b><br/>pipeline : 0 becomes 1, the service management interface is invoked"]:::step
+  n3["<b>4. One executable JAR to deploy</b><br/>restaurant-service-3.1.0.jar ships"]:::stop
+  n4["<b>WAR packaging instead</b><br/>artifact : null becomes restaurant-service-3.1.0.war, needs a web container"]:::warn
+  n0 -->|"1. compile the service"| n1
+  n1 -->|"2. pick the format"| n2
+  n2 -->|"3. hand to production"| n3
+  n1 -->|"4. the WAR variant"| n4
 ```
 
 1. **Build the native artifact** — A Spring Boot Java service builds to an executable JAR file, or a WAR file.
@@ -49,14 +55,21 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Install the runtime</b><br/>For a Java service you install the JDK first; a WAR additionally ne…"]:::start
-  s1n1["<b>2. Copy the package</b><br/>Once the machine is configured, you copy the package to the machine."]:::step
-  s1n2["<b>3. Start the service</b><br/>Each service instance runs as a JVM process."]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+  n0["<b>1. Install the runtime</b><br/>runtime : empty becomes jdk 17"]:::start
+  n1["<b>2. Copy the package</b><br/>process : null becomes pending, the JAR is copied onto the machine"]:::step
+  n2["<b>3. Start the service</b><br/>process : pending becomes jvm-8121, a JVM process"]:::core
+  n3["<b>4. One JVM, one instance</b><br/>the service is running"]:::stop
+  n4["<b>WAR path needs Tomcat</b><br/>runtime : jdk 17 becomes jdk 17 plus tomcat 10"]:::warn
+  n0 -->|"1. JDK first"| n1
+  n1 -->|"2. put the JAR on the machine"| n2
+  n2 -->|"3. run as a JVM"| n3
+  n0 -->|"4. a WAR adds a web container"| n4
+  n4 -->|"5. then copy and start"| n1
 ```
 
 1. **Install the runtime** — For a Java service you install the JDK first; a WAR additionally needs Apache Tomcat.
@@ -86,14 +99,20 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Launch multiple JVMs</b><br/>Each JVM runs a single service instance, and a machine can host sev…"]:::start
-  s2n1["<b>2. Bind separate ports</b><br/>Each instance binds its own port on the shared machine."]:::step
-  s2n2["<b>3. Recall instance shapes</b><br/>An instance is usually a single process, but a Node.js service may…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+  n0["<b>1. Launch multiple JVMs</b><br/>jvms : empty becomes jvm-1, jvm-2, jvm-3"]:::start
+  n1["<b>2. Bind separate ports</b><br/>ports : 0 becomes 3, one port per instance"]:::step
+  n2["<b>3. Recall instance shapes</b><br/>serving : 0 becomes 3, three instances share one machine and JDK"]:::core
+  n3["<b>4. Several instances on one machine</b><br/>a Node.js service may spawn multiple workers"]:::stop
+  n4["<b>Or keep one instance per machine</b><br/>instance_count : 3 becomes 1"]:::warn
+  n0 -->|"1. one JVM per instance"| n1
+  n1 -->|"2. each binds a port"| n2
+  n2 -->|"3. shared machine and JDK"| n3
+  n2 -->|"4. coarser sharing"| n4
 ```
 
 1. **Launch multiple JVMs** — Each JVM runs a single service instance, and a machine can host several JVMs.
@@ -123,14 +142,20 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. Configure the machine by hand</b><br/>The JDK and, for a WAR, Tomcat must be installed and pinned before…"]:::start
-  s3n1["<b>2. Notice the stack is not encapsulated</b><br/>Unlike a VM or container image, the package does not carry its tech…"]:::step
-  s3n2["<b>3. Prefer the encapsulating options</b><br/>The book recommends one of the other options; this pattern's drawba…"]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
+  n0["<b>1. Configure the machine by hand</b><br/>setup : empty becomes install jdk, install tomcat"]:::start
+  n1["<b>2. Notice the stack is not encapsulated</b><br/>jdk : null becomes 17, pinned by hand"]:::warn
+  n2["<b>3. Prefer the encapsulating options</b><br/>stack_encapsulated : 0 becomes 1, a VM or container image WOULD carry the stack"]:::core
+  n3["<b>4. The drawback motivates the others</b><br/>the unmanaged runtime is the whole problem"]:::stop
+  n4["<b>VM packaging fixes it</b><br/>setup : install jdk, install tomcat becomes empty, the image encapsulates everything"]:::warn
+  n0 -->|"1. manual steps before it runs"| n1
+  n1 -->|"2. the package carries no runtime"| n2
+  n2 -->|"3. recommend VM or container"| n3
+  n2 -->|"4. a VM image absorbs the steps"| n4
 ```
 
 1. **Configure the machine by hand** — The JDK and, for a WAR, Tomcat must be installed and pinned before the service runs.

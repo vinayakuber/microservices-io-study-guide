@@ -12,16 +12,22 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 4 · microservices
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. The domain is the problem space</b><br/>DDD refers to the application's problem space — the business — as t…"]:::start
-  s0n1["<b>2. A domain has multiple subdomains</b><br/>A domain consists of multiple subdomains, and each subdomain corres…"]:::step
-  s0n2["<b>3. Subdomains are the service boundaries</b><br/>Define services corresponding to DDD subdomains, so each part of th…"]:::step
-  s0n3["<b>4. An online store example</b><br/>The subdomains of an online store include product catalog, inventor…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
-  s0n2 --> s0n3
+  n0["<b>1. The domain is the problem space</b><br/>DDD calls the business the domain"]:::start
+  n1["<b>2. Split the problem space into parts</b><br/>domain parts empty becomes catalog, inventory, orders, delivery"]:::core
+  n2["<b>3. Each part becomes a subdomain</b><br/>subdomains empty becomes the four named subdomains"]:::step
+  n3["<b>4. Tag each as distinct</b><br/>distinct_areas 0 becomes 4"]:::step
+  n4["<b>5. Four subdomains</b><br/>the domain holds multiple subdomains"]:::stop
+  n5["<b>A part is really two subdomains</b><br/>subdomain_count 4 becomes 5, found by iteration"]:::warn
+  n0 -->|"1. split"| n1
+  n1 -->|"2. name them"| n2
+  n2 -->|"3. distinct areas"| n3
+  n3 -->|"4. count"| n4
+  n3 -->|"5. if one splits"| n5
 ```
 
 1. **The domain is the problem space** — DDD refers to the application's problem space — the business — as the domain.
@@ -53,16 +59,22 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Core subdomains</b><br/>Core subdomains are the key differentiator for the business and the…"]:::start
-  s1n1["<b>2. Supporting subdomains</b><br/>Supporting subdomains relate to what the business does but are not…"]:::step
-  s1n2["<b>3. Generic subdomains</b><br/>Generic subdomains are not specific to the business and are ideally…"]:::step
-  s1n3["<b>4. Invest where it matters</b><br/>The classification tells you where to concentrate in-house effort v…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
-  s1n2 --> s1n3
+  n0["<b>1. Classify by business value</b><br/>not every subdomain deserves equal effort"]:::start
+  n1["<b>2. A differentiator is CORE</b><br/>recommendations unset becomes core"]:::core
+  n2["<b>3. Related but not differentiating is SUPPORTING</b><br/>accounting unset becomes supporting"]:::step
+  n3["<b>4. Not business-specific is GENERIC</b><br/>email unset becomes generic"]:::step
+  n4["<b>5. Three classes set</b><br/>invest in core first, outsource or buy the rest"]:::stop
+  n5["<b>Every subdomain marked core</b><br/>prioritize 1 becomes 3, no differentiator"]:::warn
+  n0 -->|"1. rate it"| n1
+  n1 -->|"2. next"| n2
+  n2 -->|"3. next"| n3
+  n3 -->|"4. priorities"| n4
+  n1 -->|"5. if all core"| n5
 ```
 
 1. **Core subdomains** — Core subdomains are the key differentiator for the business and the most valuable part of the application.
@@ -93,16 +105,22 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. One service per subdomain</b><br/>The corresponding microservice architecture has services correspond…"]:::start
-  s2n1["<b>2. Cohesive services</b><br/>Each service implements a small set of strongly related functions,…"]:::step
-  s2n2["<b>3. Loosely coupled services</b><br/>Each service encapsulates its implementation behind an API, so serv…"]:::step
-  s2n3["<b>4. Teams around business value</b><br/>Development teams are cross-functional, autonomous and organized ar…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
-  s2n2 --> s2n3
+  n0["<b>1. One service per subdomain</b><br/>services correspond to each subdomain"]:::start
+  n1["<b>2. Build the four services</b><br/>services empty becomes catalog, inventory, order, delivery"]:::step
+  n2["<b>3. Keep each service cohesive</b><br/>cohesion unknown becomes strong"]:::core
+  n3["<b>4. Keep services loosely coupled</b><br/>coupling unknown becomes loose"]:::step
+  n4["<b>5. Four services</b><br/>mapped to subdomains, not technical layers"]:::stop
+  n5["<b>Merge two subdomains</b><br/>services 4 becomes 3, one may hold more"]:::warn
+  n0 -->|"1. build"| n1
+  n1 -->|"2. cohesion"| n2
+  n2 -->|"3. coupling"| n3
+  n3 -->|"4. count"| n4
+  n2 -->|"5. or merge"| n5
 ```
 
 1. **One service per subdomain** — The corresponding microservice architecture has services corresponding to each subdomain.
@@ -134,16 +152,26 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. Understand the business</b><br/>Identifying subdomains requires understanding the business, its org…"]:::start
-  s3n1["<b>2. Start from the organization structure</b><br/>Different groups within an organization might correspond to subdoma…"]:::step
-  s3n2["<b>3. Start from the domain model</b><br/>Subdomains often have a key domain object in the high-level domain…"]:::step
-  s3n3["<b>4. Iterate</b><br/>Subdomains are best identified using an iterative process, refining…"]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
-  s3n2 --> s3n3
+  n0["<b>1. Understand the business</b><br/>its structure and areas of expertise"]:::start
+  n1["<b>2. Start from the organization structure</b><br/>groups may be subdomains"]:::step
+  n2["<b>3. Start from the domain model</b><br/>subdomains often have a key domain object"]:::step
+  n3["<b>4. An org group suggests one</b><br/>Fulfillment Team becomes fulfillment"]:::core
+  n4["<b>5. A domain object suggests another</b><br/>Order becomes order management"]:::step
+  n5["<b>6. Confirm the expertise</b><br/>expertise none becomes fulfillment operations"]:::step
+  n6["<b>7. Two subdomains found</b><br/>from org structure and domain model"]:::stop
+  n7["<b>A subdomain is missed</b><br/>2 becomes 3 on a later pass, iterative"]:::warn
+  n0 -->|"1. org structure"| n1
+  n1 -->|"2. domain model"| n2
+  n2 -->|"3. group"| n3
+  n3 -->|"4. object"| n4
+  n4 -->|"5. expertise"| n5
+  n5 -->|"6. found"| n6
+  n5 -->|"7. iterate"| n7
 ```
 
 1. **Understand the business** — Identifying subdomains requires understanding the business, its organizational structure and the different areas of expertise.

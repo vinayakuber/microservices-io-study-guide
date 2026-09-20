@@ -12,16 +12,27 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 10 · microservice
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Register on startup</b><br/>The instance registers its host and IP address with the registry an…"]:::start
-  s0n1["<b>2. Renew periodically</b><br/>The client typically renews its registration so the registry knows…"]:::step
-  s0n2["<b>3. Unregister on shutdown</b><br/>The instance unregisters itself from the registry on shutdown."]:::step
-  s0n3["<b>4. Chassis handles it</b><br/>This is typically handled by a microservice chassis framework."]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
-  s0n2 --> s0n3
+  n0["<b>1. Service boots on host 10.0.1.7</b><br/>port 8080"]:::start
+  n1["<b>2. Register itself on startup</b><br/>registry order-service empty becomes 10.0.1.7:8080"]:::step
+  n2["<b>3. Mark itself available</b><br/>self_state DOWN becomes AVAILABLE"]:::core
+  n3["<b>4. Renew periodically</b><br/>heartbeat keeps the registry fresh"]:::step
+  n4["<b>5. Unregister on shutdown</b><br/>graceful stop removes the entry"]:::step
+  n5["<b>6. Chassis handles it</b><br/>a microservice chassis framework does the work"]:::step
+  n6["<b>7. Discoverable, removed on exit</b><br/>the registry reflects reality"]:::stop
+  n7["<b>Crash without shutdown</b><br/>no unregister runs, a stale entry stays"]:::warn
+  n0 -->|"1. the instance knows its own location"| n1
+  n1 -->|"2. now discoverable"| n2
+  n2 -->|"3. lease renews"| n3
+  n3 -->|"4. heartbeat cycle repeats"| n3
+  n3 -->|"5. graceful stop"| n4
+  n4 -->|"6. the chassis performs this"| n5
+  n5 -->|"7. done"| n6
+  n2 -->|"8. hard kill"| n7
 ```
 
 1. **Register on startup** — The instance registers its host and IP address with the registry and makes itself available.
@@ -53,16 +64,25 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Heartbeat timer</b><br/>The instance renews its registration before the lease expires."]:::start
-  s1n1["<b>2. Registry stays fresh</b><br/>The registry keeps the entry alive for as long as renewals arrive."]:::step
-  s1n2["<b>3. Crash detection</b><br/>If renewals stop, the registry drops the entry and stops routing to…"]:::step
-  s1n3["<b>4. Eureka in the example</b><br/>The @EnableEurekaClient annotation registers the instance with the…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
-  s1n2 --> s1n3
+  n0["<b>1. Lease approaches expiry</b><br/>entry ttl 30"]:::start
+  n1["<b>2. Heartbeat timer fires</b><br/>renew_count 0 becomes 1"]:::step
+  n2["<b>3. Eureka in the example</b><br/>@EnableEurekaClient registers the instance"]:::step
+  n3["<b>4. Registry extends the entry</b><br/>ttl 30 becomes 60"]:::core
+  n4["<b>5. Entry stays alive</b><br/>as long as renewals keep arriving"]:::stop
+  n5["<b>Missed renewal</b><br/>no heartbeat, ttl 60 counts down"]:::warn
+  n6["<b>Eviction</b><br/>registry drops the entry, stops routing to it"]:::warn
+  n0 -->|"1. timer sends a heartbeat"| n1
+  n1 -->|"2. the Eureka client does this"| n2
+  n2 -->|"3. lease pushed out"| n3
+  n3 -->|"4. renewal cycle repeats"| n1
+  n3 -->|"5. renewals keep arriving"| n4
+  n3 -->|"6. a heartbeat is missed"| n5
+  n5 -->|"7. ttl reaches 0"| n6
 ```
 
 1. **Heartbeat timer** — The instance renews its registration before the lease expires.
@@ -93,16 +113,26 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Knows its own state</b><br/>The instance can model more than UP/DOWN, such as STARTING or AVAIL…"]:::start
-  s2n1["<b>2. Steer traffic away</b><br/>The instance can rewrite its registry entry to reflect its current…"]:::step
-  s2n2["<b>3. The blind spot</b><br/>A running but broken instance often cannot unregister itself."]:::step
-  s2n3["<b>4. Still coupled</b><br/>Self-registration couples the service to the registry and is re-imp…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
-  s2n2 --> s2n3
+  n0["<b>1. Instance degrades internally</b><br/>dependency timeout"]:::start
+  n1["<b>2. Models its own state</b><br/>self_state AVAILABLE becomes STARTING"]:::step
+  n2["<b>3. Richer than UP/DOWN</b><br/>STARTING or AVAILABLE"]:::core
+  n3["<b>4. Rewrite its entry</b><br/>registry state AVAILABLE becomes STARTING"]:::step
+  n4["<b>5. Steer traffic away</b><br/>traffic_routed all becomes none"]:::step
+  n5["<b>6. Callers skip the instance</b><br/>registry row shows STARTING"]:::stop
+  n6["<b>No self-awareness</b><br/>running but broken, never unregisters, stale entry stays"]:::warn
+  n7["<b>Still coupled</b><br/>registry coupling plus per-language logic"]:::warn
+  n0 -->|"1. the instance knows its own state"| n1
+  n1 -->|"2. richer state model"| n2
+  n2 -->|"3. update the registry"| n3
+  n3 -->|"4. callers skip STARTING"| n4
+  n4 -->|"5. traffic steered away"| n5
+  n0 -->|"6. too broken to notice"| n6
+  n1 -->|"7. drawback"| n7
 ```
 
 1. **Knows its own state** — The instance can model more than UP/DOWN, such as STARTING or AVAILABLE.

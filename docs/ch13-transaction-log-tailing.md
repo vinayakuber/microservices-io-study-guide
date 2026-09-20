@@ -12,14 +12,26 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.13 · microservices
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Read the log</b><br/>The relay tails the database transaction log: MySQL binlog, Postgre…"]:::start
-  s0n1["<b>2. Find outbox inserts</b><br/>Each outbox insert shows up as a log entry the relay can recognize."]:::step
-  s0n2["<b>3. Publish each entry</b><br/>The relay publishes the message embedded in each outbox insert to t…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
+  n0["<b>1. Order Service commits</b><br/>SVC commits a transaction that inserts outbox row 1, E1"]:::start
+  n1["<b>2. WAL records the commit</b><br/>log becomes one entry, op insert, table outbox, row E1"]:::core
+  n2["<b>3. Tailer reads at position 0</b><br/>next unread WAL entry is found"]:::step
+  n3["<b>4. Publish E1</b><br/>published : empty becomes E1"]:::step
+  n4["<b>5. Advance position</b><br/>position : 0 becomes 1"]:::core
+  n5["<b>6. Broker receives E1</b><br/>tailer position now 1"]:::stop
+  n6["<b>No new log entry</b><br/>position already at the tail, nothing to publish"]:::warn
+  n0 -->|"commit appends to the log"| n1
+  n1 -->|"tailer polls the log"| n2
+  n2 -->|"entry found"| n3
+  n2 -->|"no entry yet - wait"| n6
+  n3 -->|"send E1"| n4
+  n4 -->|"position saved"| n5
+  n5 -->|"keep tailing the next entry"| n2
+  n6 -->|"retry the read"| n2
 ```
 
 1. **Read the log** — The relay tails the database transaction log: MySQL binlog, Postgres WAL, or DynamoDB streams.
@@ -55,14 +67,25 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. The log records commits only</b><br/>A rolled-back transaction's outbox insert never appears in the comm…"]:::start
-  s1n1["<b>2. Relay publishes committed rows</b><br/>Every message the relay publishes is backed by a committed outbox row."]:::step
-  s1n2["<b>3. No broker enlistment</b><br/>The broker is never part of the database transaction, so no 2PC is…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+  n0["<b>1. Service commits transaction T1</b><br/>inserts outbox row E1"]:::start
+  n1["<b>2. Binlog records the commit</b><br/>binlog becomes seq 10, write to outbox, row E1"]:::core
+  n2["<b>3. Tailer sees seq 10</b><br/>publishes E1 to BRK"]:::step
+  n3["<b>4. Broker never enlisted</b><br/>no 2PC needed, BRK receives E1"]:::core
+  n4["<b>5. Another transaction rolls back</b><br/>outbox row E2 inserted then undone"]:::warn
+  n5["<b>6. Binlog unchanged</b><br/>a rolled-back write is never committed to the log"]:::warn
+  n6["<b>7. E2 never published</b><br/>BRK receives only E1, zero copies of E2"]:::stop
+  n0 -->|"commit path"| n1
+  n1 -->|"tailer reads committed row"| n2
+  n2 -->|"publish E1"| n3
+  n0 -->|"rollback path, second tx"| n4
+  n4 -->|"insert E2 then undo"| n5
+  n5 -->|"no committed entry"| n6
+  n3 -->|"only committed writes reach the broker"| n6
 ```
 
 1. **The log records commits only** — A rolled-back transaction's outbox insert never appears in the committed log.
@@ -97,14 +120,29 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. One reader per database</b><br/>The tailer must understand MySQL binlog, Postgres WAL, or DynamoDB…"]:::start
-  s2n1["<b>2. Track the log position</b><br/>The tailer records how far it has read so a restart can resume."]:::step
-  s2n2["<b>3. Dedupe on the consumer</b><br/>A crash between publish and position-write re-reads an entry, so co…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+  n0["<b>1. Tailer reads an entry</b><br/>seq 10, row E1, saved position 9"]:::start
+  n1["<b>2. One reader per database</b><br/>must speak MySQL binlog, Postgres WAL, or DynamoDB streams"]:::warn
+  n2["<b>3. Publish E1</b><br/>published : empty becomes E1"]:::step
+  n3["<b>4. Crash before saving</b><br/>position stays 9, tailer dies"]:::warn
+  n4["<b>5. Restart resumes at 9</b><br/>reads seq 10 again"]:::step
+  n5["<b>6. Re-publish E1</b><br/>published : E1 becomes E1, E1, duplicate"]:::warn
+  n6["<b>7. Save position 10</b><br/>position : 9 becomes 10"]:::step
+  n7["<b>8. Consumer dedupes</b><br/>processed becomes E1 true, INSERT ON CONFLICT DO NOTHING"]:::core
+  n8["<b>9. Delivered twice, handled once</b><br/>CNS skips the second copy"]:::stop
+  n0 -->|"read the log"| n1
+  n1 -->|"recognize the insert"| n2
+  n2 -->|"crash before save"| n3
+  n2 -->|"no crash - save position"| n6
+  n3 -->|"restart from saved position"| n4
+  n4 -->|"same entry re-read"| n5
+  n5 -->|"save position now"| n6
+  n6 -->|"consumer receives copies"| n7
+  n7 -->|"duplicate skipped"| n8
 ```
 
 1. **One reader per database** — The tailer must understand MySQL binlog, Postgres WAL, or DynamoDB streams specifically.

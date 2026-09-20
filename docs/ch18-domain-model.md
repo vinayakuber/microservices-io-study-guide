@@ -12,16 +12,26 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.5 · microservices.
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. Resist the procedural default</b><br/>A script per request only works while logic stays simple; its class…"]:::start
-  s0n1["<b>2. Build a network of small classes</b><br/>Each class corresponds directly to a concept from the problem domai…"]:::step
-  s0n2["<b>3. Let a class own both state and behavior</b><br/>Most classes hold state and the methods that change it — the hallma…"]:::step
-  s0n3["<b>4. Delegate from thin service classes</b><br/>OrderService still exposes create/revise/cancel, but it forwards to…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
-  s0n2 --> s0n3
+  n0["<b>1. Resist the procedural default</b><br/>a script per request tangles as logic grows"]:::start
+  n1["<b>2. Build a network of small classes</b><br/>each class maps to a domain concept, not a table"]:::step
+  n2["<b>3. A class owns state and behavior</b><br/>the hallmark of a well-designed class"]:::core
+  n3["<b>4. Factory constructs the aggregate</b><br/>Order.create with PO-100 and line S1 qty 2 unit 25.00"]:::step
+  n4["<b>5. Attach lines and compute the total</b><br/>total 0.00 becomes 50.00"]:::step
+  n5["<b>6. Thin service delegates</b><br/>OrderService exposes create, revise, cancel but forwards"]:::step
+  n6["<b>7. Aggregate owns data and rules</b><br/>order PO-100 total 50.00"]:::stop
+  n7["<b>Empty order</b><br/>lineItems empty returns an Order with total 0.00 and no lines"]:::warn
+  n0 -->|"1. procedural scripts sprawl"| n1
+  n1 -->|"2. concepts become classes"| n2
+  n2 -->|"3. factory builds the object"| n3
+  n3 -->|"4. lines attached"| n4
+  n4 -->|"5. service only forwards"| n5
+  n5 -->|"6. aggregate complete"| n6
+  n3 -->|"7. no lines - empty order"| n7
 ```
 
 1. **Resist the procedural default** — A script per request only works while logic stays simple; its classes split behavior from state and rely on few OOP capabilities.
@@ -52,14 +62,24 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Put the mutation on the object</b><br/>A method such as revise() lives on Order, not in OrderService."]:::start
-  s1n1["<b>2. Check the invariant first</b><br/>The method tests its own status before touching its data, so invali…"]:::step
-  s1n2["<b>3. Re-derive dependent state</b><br/>After mutating a line item, the aggregate recomputes the total from…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
+  n0["<b>1. Mutation lives on the object</b><br/>the revise method sits on Order, not OrderService"]:::start
+  n1["<b>2. Check the invariant first</b><br/>guard false becomes true, status CREATED is revisable"]:::step
+  n2["<b>3. Mutate the line item</b><br/>qty 2 becomes 5"]:::step
+  n3["<b>4. Re-derive dependent state</b><br/>total 50.00 becomes 125.00 from its own lines"]:::core
+  n4["<b>5. Persist the aggregate</b><br/>the repository saves the changed order"]:::step
+  n5["<b>6. Rule lives in one place</b><br/>no caller duplicates the transition logic"]:::stop
+  n6["<b>Revise a cancelled order</b><br/>guard fails, no mutation, total stays 50.00"]:::warn
+  n0 -->|"1. service delegates to the aggregate"| n1
+  n1 -->|"2. invariant holds"| n2
+  n2 -->|"3. line changes"| n3
+  n3 -->|"4. total recomputed"| n4
+  n4 -->|"5. saved back"| n5
+  n1 -->|"6. guard fails - unchanged"| n6
 ```
 
 1. **Put the mutation on the object** — A method such as revise() lives on Order, not in OrderService.
@@ -89,14 +109,22 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Name the valid transition</b><br/>cancel() is only valid from the CREATED state, and the method check…"]:::start
-  s2n1["<b>2. Transition the aggregate state</b><br/>The method flips status CREATED to CANCELLED itself."]:::step
-  s2n2["<b>3. Make invalid calls fail fast</b><br/>Calling cancel() on an already-cancelled order throws, leaving the…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
+  n0["<b>1. Name the valid transition</b><br/>the cancel method is valid only from CREATED"]:::start
+  n1["<b>2. Check the transition</b><br/>guard false becomes true"]:::step
+  n2["<b>3. Flip the state</b><br/>order.status CREATED becomes CANCELLED"]:::step
+  n3["<b>4. Persist the aggregate</b><br/>store gains PO-100 status CANCELLED total 125.00"]:::core
+  n4["<b>5. Transition enforced in one place</b><br/>callers cannot bypass the state machine"]:::stop
+  n5["<b>Already cancelled</b><br/>calling cancel again throws, object left unchanged"]:::warn
+  n0 -->|"1. service locates the aggregate"| n1
+  n1 -->|"2. valid from-state"| n2
+  n2 -->|"3. the method owns the flip"| n3
+  n3 -->|"4. save the object"| n4
+  n1 -->|"5. invalid from-state - throws"| n5
 ```
 
 1. **Name the valid transition** — cancel() is only valid from the CREATED state, and the method checks it.
@@ -127,14 +155,26 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. Keep value objects as state only</b><br/>DeliveryInformation holds deliveryTime and deliveryAddress and no b…"]:::start
-  s3n1["<b>2. Keep repositories as behavior only</b><br/>OrderRepository exposes findOrderById() and holds no business state."]:::step
-  s3n2["<b>3. Let the aggregate hold both</b><br/>Order carries orderId and orderLineItems plus create(), revise() an…"]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
+  n0["<b>1. Three class roles by concept</b><br/>match the weight to what the concept needs"]:::start
+  n1["<b>2. Value object - state only</b><br/>DeliveryInformation holds deliveryTime and deliveryAddress, no methods"]:::core
+  n2["<b>3. Repository - behavior only</b><br/>OrderRepository exposes findOrderById, no business state"]:::step
+  n3["<b>4. Aggregate - both</b><br/>Order carries orderId and lines plus create, revise, cancel"]:::core
+  n4["<b>5. Roles cooperate on one request</b><br/>service, repository, value object combine"]:::step
+  n5["<b>6. Right weight per concept</b><br/>dumb data stays dumb, the aggregate owns its transitions"]:::stop
+  n6["<b>Forcing full objects</b><br/>ceremony on a dumb value adds cost without benefit"]:::warn
+  n0 -->|"1. split by what the concept needs"| n1
+  n0 -->|"1. split by what the concept needs"| n2
+  n0 -->|"1. split by what the concept needs"| n3
+  n1 -->|"2. state only"| n4
+  n2 -->|"2. behavior only"| n4
+  n3 -->|"2. both"| n4
+  n4 -->|"3. cooperate on one request"| n5
+  n0 -->|"4. over-modeling - wasted ceremony"| n6
 ```
 
 1. **Keep value objects as state only** — DeliveryInformation holds deliveryTime and deliveryAddress and no behavior.

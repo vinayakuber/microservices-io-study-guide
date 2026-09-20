@@ -12,16 +12,32 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 1 · microservices
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s0n0["<b>1. A subdomain is business functionality</b><br/>A subdomain is an implementable model of a slice of business functi…"]:::start
-  s0n1["<b>2. Business logic is entities plus adapters</b><br/>It consists of business logic — business entities (DDD aggregates)…"]:::step
-  s0n2["<b>3. Operations are the behavior</b><br/>The subdomains implement the application's behavior, a set of syste…"]:::step
-  s0n3["<b>4. Operations arrive three ways</b><br/>An operation is invoked by a synchronous or asynchronous client req…"]:::stop
-  s0n0 --> s0n1
-  s0n1 --> s0n2
-  s0n2 --> s0n3
+  n0["<b>1. A subdomain is business functionality</b><br/>a slice of the business, a.k.a. a business capability"]:::start
+  n1["<b>2. Business logic is entities plus adapters</b><br/>DDD aggregates hold the rules, adapters talk outside"]:::step
+  n2["<b>3. Operations are the behavior</b><br/>placeOrder mutates and queries entities"]:::core
+  n3["<b>4a. Invoked by a client request</b><br/>CLI sends a synchronous request to APP"]:::step
+  n4["<b>4b. Invoked by an event</b><br/>another application or service emits it"]:::step
+  n5["<b>4c. Invoked by time</b><br/>the passing of time triggers it"]:::step
+  n6["<b>5. Reserve stock locally</b><br/>SKU-77 qty 5 becomes 3"]:::step
+  n7["<b>6. Mark the order</b><br/>PO-2001 status DRAFT becomes CONFIRMED"]:::step
+  n8["<b>7. Record the credit check</b><br/>credit none becomes approved, same process"]:::step
+  n9["<b>8. Order confirmed locally</b><br/>0 network hops, all subdomains share one component"]:::stop
+  n0 -->|"1. what gets organized"| n1
+  n1 -->|"2. behavior to build"| n2
+  n2 -->|"3a. arrives by request"| n3
+  n2 -->|"3b. arrives by event"| n4
+  n2 -->|"3c. arrives by clock"| n5
+  n3 -->|"4. one way in"| n6
+  n4 -->|"4. one way in"| n6
+  n5 -->|"4. one way in"| n6
+  n6 -->|"5. then the order"| n7
+  n7 -->|"6. same process"| n8
+  n8 -->|"7. local result"| n9
 ```
 
 1. **A subdomain is business functionality** — A subdomain is an implementable model of a slice of business functionality, a.k.a. a business capability.
@@ -55,18 +71,38 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s1n0["<b>1. Simple components</b><br/>Simple components consisting of few subdomains are easier to unders…"]:::start
-  s1n1["<b>2. Team autonomy</b><br/>A team needs to develop, test and deploy its software independently…"]:::step
-  s1n2["<b>3. Fast deployment pipeline</b><br/>Fast feedback and high deployment frequency require components that…"]:::step
-  s1n3["<b>4. Support multiple technology stacks</b><br/>Subdomains are sometimes implemented in a variety of technologies,…"]:::step
-  s1n4["<b>5. Segregate by characteristics</b><br/>Subdomains may need different resource, availability and security c…"]:::stop
-  s1n0 --> s1n1
-  s1n1 --> s1n2
-  s1n2 --> s1n3
-  s1n3 --> s1n4
+  n0["<b>1. Five forces push toward many components</b><br/>the reasons a monolith eventually hurts"]:::start
+  n1["<b>2a. Simple components</b><br/>few subdomains are easier to maintain"]:::step
+  n2["<b>2b. Team autonomy</b><br/>develop, test and deploy independently"]:::step
+  n3["<b>2c. Fast deployment pipeline</b><br/>fast build and test for feedback"]:::step
+  n4["<b>2d. Multiple technology stacks</b><br/>evolve the stack per subdomain"]:::step
+  n5["<b>2e. Segregate by characteristics</b><br/>resources, availability, security"]:::step
+  n6["<b>3. The monolith pays the price</b><br/>one fix rebuilds the whole artifact"]:::core
+  n7["<b>4. Build scope balloons</b><br/>Orders only becomes Orders + Billing, entire WAR"]:::step
+  n8["<b>5. Every subdomain retests</b><br/>tests_run 20 becomes 200"]:::step
+  n9["<b>6. All instances redeploy</b><br/>instances_restarted 0 becomes 4"]:::step
+  n10["<b>7. app.war ships together</b><br/>both teams' code goes out as one"]:::stop
+  n11["<b>Blocked by a broken test</b><br/>TBL's failing test stalls TA's fix, autonomy lost"]:::warn
+  n0 -->|"1. force one"| n1
+  n0 -->|"1. force two"| n2
+  n0 -->|"1. force three"| n3
+  n0 -->|"1. force four"| n4
+  n0 -->|"1. force five"| n5
+  n1 -->|"2. all converge"| n6
+  n2 -->|"2. all converge"| n6
+  n3 -->|"2. all converge"| n6
+  n4 -->|"2. all converge"| n6
+  n5 -->|"2. all converge"| n6
+  n6 -->|"3. rebuild"| n7
+  n7 -->|"4. retest"| n8
+  n8 -->|"5. redeploy"| n9
+  n9 -->|"6. one release"| n10
+  n9 -->|"7. unless a test fails"| n11
 ```
 
 1. **Simple components** — Simple components consisting of few subdomains are easier to understand and maintain than complex components.
@@ -102,18 +138,40 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s2n0["<b>1. Simple interactions</b><br/>An operation that is local to a component, or a few simple interact…"]:::start
-  s2n1["<b>2. Efficient interactions</b><br/>A distributed operation with many network round trips and large dat…"]:::step
-  s2n2["<b>3. Prefer ACID over BASE</b><br/>It is easier to implement an operation as an ACID transaction than…"]:::step
-  s2n3["<b>4. Minimize runtime coupling</b><br/>Less runtime coupling maximizes availability and reduces the latenc…"]:::step
-  s2n4["<b>5. Minimize design-time coupling</b><br/>Less design-time coupling reduces lockstep changes across services,…"]:::stop
-  s2n0 --> s2n1
-  s2n1 --> s2n2
-  s2n2 --> s2n3
-  s2n3 --> s2n4
+  n0["<b>1. Five forces pull toward few components</b><br/>the monolith wins on every one"]:::start
+  n1["<b>2a. Simple interactions</b><br/>local beats distributed to understand"]:::step
+  n2["<b>2b. Efficient interactions</b><br/>avoid many round trips and big transfers"]:::step
+  n3["<b>2c. Prefer ACID over BASE</b><br/>one transaction beats a saga"]:::step
+  n4["<b>2d. Minimize runtime coupling</b><br/>more availability, less latency"]:::step
+  n5["<b>2e. Minimize design-time coupling</b><br/>fewer lockstep changes"]:::step
+  n6["<b>3. One database, one transaction</b><br/>BEGIN local transaction T1 on DB"]:::core
+  n7["<b>4. Write the order</b><br/>PO-2001 status DRAFT becomes PLACED"]:::step
+  n8["<b>5. Record the total</b><br/>PO-2001 total 0 becomes 40"]:::step
+  n9["<b>6. Consume credit</b><br/>CUST-9 used 100 becomes 140, same database"]:::step
+  n10["<b>7. COMMIT T1</b><br/>both writes durable together, atomic"]:::step
+  n11["<b>8. COMMITTED</b><br/>no eventual consistency, no distributed transaction"]:::stop
+  n12["<b>Credit limit exceeded</b><br/>ROLLBACK T1, total back to 0, used back to 100"]:::warn
+  n0 -->|"1. force one"| n1
+  n0 -->|"1. force two"| n2
+  n0 -->|"1. force three"| n3
+  n0 -->|"1. force four"| n4
+  n0 -->|"1. force five"| n5
+  n1 -->|"2. all converge"| n6
+  n2 -->|"2. all converge"| n6
+  n3 -->|"2. all converge"| n6
+  n4 -->|"2. all converge"| n6
+  n5 -->|"2. all converge"| n6
+  n6 -->|"3. write order"| n7
+  n7 -->|"4. record total"| n8
+  n8 -->|"5. consume credit"| n9
+  n9 -->|"6. commit"| n10
+  n10 -->|"7. atomic result"| n11
+  n9 -->|"8. if limit exceeded"| n12
 ```
 
 1. **Simple interactions** — An operation that is local to a component, or a few simple interactions, is easier to understand and troubleshoot than a distributed one.
@@ -152,16 +210,30 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,stroke-width:1px,rx:6
+  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
+  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
+  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  s3n0["<b>1. Single component, single database</b><br/>Structure the application as one deployable/executable component us…"]:::start
-  s3n1["<b>2. All operations are local</b><br/>Because there is a single component, interactions are local, effici…"]:::step
-  s3n2["<b>3. Drawbacks grow with size</b><br/>The drawbacks — complexity, less team autonomy, a slow pipeline, on…"]:::step
-  s3n3["<b>4. Contain with a modular monolith</b><br/>Organize subdomains into vertical slices of presentation, business…"]:::stop
-  s3n0 --> s3n1
-  s3n1 --> s3n2
-  s3n2 --> s3n3
+  n0["<b>1. Single component, single database</b><br/>one deployable unit holds all subdomains"]:::start
+  n1["<b>2. All operations are local</b><br/>interactions are local, efficient, typically ACID"]:::step
+  n2["<b>3. Drawbacks grow with size</b><br/>complexity, less autonomy, slow pipeline, one stack"]:::warn
+  n3["<b>4. Contain with a modular monolith</b><br/>vertical slices of presentation, business, persistence"]:::step
+  n4["<b>5. Detect the dirty module</b><br/>orders changed false becomes true"]:::core
+  n5["<b>6. Incremental build</b><br/>rebuilt_modules empty becomes orders"]:::step
+  n6["<b>7. Skip the clean module</b><br/>skipped_modules 0 becomes 1"]:::step
+  n7["<b>8. Run only orders tests</b><br/>tests_run 200 becomes 20"]:::step
+  n8["<b>9. orders rebuilt, billing skipped</b><br/>one vertical slice localized"]:::stop
+  n9["<b>Layered monolith instead</b><br/>rebuild ALL slices, tests_run 20 becomes 200"]:::warn
+  n0 -->|"1. consequence"| n1
+  n1 -->|"2. as it grows"| n2
+  n2 -->|"3. choose to contain"| n3
+  n3 -->|"4. a file changes"| n4
+  n4 -->|"5. rebuild only it"| n5
+  n5 -->|"6. others skipped"| n6
+  n6 -->|"7. narrow test"| n7
+  n7 -->|"8. fast feedback"| n8
+  n3 -->|"9. if not modular"| n9
 ```
 
 1. **Single component, single database** — Structure the application as one deployable/executable component using a single database, containing all subdomains.
