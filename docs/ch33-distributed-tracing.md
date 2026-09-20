@@ -17,21 +17,19 @@ flowchart TD
   classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
   classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
   classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. External request arrives</b><br/>GET /orders/PO-2001 hits the API gateway"]:::start
-  n1["<b>2. Assign a unique request id</b><br/>trace_id = 4bf92f3577b34da6a3ce90d0e2b88a4d, once per request"]:::step
-  n2["<b>3. Attach the id to the header</b><br/>header.trace_id : empty becomes 4bf92f3577b34da6a3ce90d0e2b88a4d"]:::step
-  n3["<b>4. Open the root span</b><br/>span 6f9a3c1b8e2d4001, parent empty, start 100"]:::core
-  n4["<b>5. Index the trace by id</b><br/>trace_registry : empty becomes one entry keyed by trace_id"]:::core
-  n5["<b>6. Chassis provides the wiring</b><br/>one framework runs steps 2-4 for every service"]:::step
-  n6["<b>7. Request enters the first service</b><br/>carries trace_id plus the open root span"]:::stop
-  n7["<b>No id assigned</b><br/>later hops cannot be reassembled into one trace"]:::warn
+  n0["<b>1. External request arrives</b><br/>GET /orders/PO-2001, no traceparent header"]:::start
+  n1["<b>2. Filter mints the ids</b><br/>TraceIdGenerator: 128 bits = 32 hex chars, 64 bits = 16 hex chars"]:::step
+  n2["<b>3. Build the root span</b><br/>Span 6f9a3c1b8e2d4001, parent null, name GET /orders/PO-2001, start 100"]:::core
+  n3["<b>4. Inject the wire header</b><br/>traceparent: 00-4bf92f3577b34da6a3ce90d0e2b88a4d-6f9a3c1b8e2d4001-01"]:::step
+  n4["<b>5. Finish and report</b><br/>span.finish at 104, Reporter sends to RabbitMQ then Zipkin"]:::step
+  n5["<b>6. First service receives it</b><br/>request carries traceparent, no local registry on the gateway"]:::stop
+  n6["<b>No id assigned</b><br/>later hops cannot be reassembled into one trace"]:::warn
   n0 -->|"1. request needs a label"| n1
-  n1 -->|"2. id travels on the request"| n2
+  n1 -->|"2. ids exist"| n2
   n2 -->|"3. first unit of work opens"| n3
-  n3 -->|"4. span stored under its trace"| n4
-  n4 -->|"5. chassis centralizes this"| n5
-  n5 -->|"6. hand off downstream"| n6
-  n1 -->|"7. skipped - request untraceable"| n7
+  n3 -->|"4. header carries the context"| n4
+  n4 -->|"5. span ships to Zipkin"| n5
+  n1 -->|"6. skipped - request untraceable"| n6
 ```
 
 1. **Unique external request id** — Instrument services with code that assigns each external request a unique external request id.
@@ -41,22 +39,28 @@ flowchart TD
 3. **Chassis-provided** — This instrumentation might be part of the functionality provided by a Microservice Chassis framework.
 
 ```java
-// API GATEWAY SIDE — each external request is assigned a unique id before entering the services
-// PARTIES: GW = API gateway · SVC = first service
-// DEF: trace — the entire journey of ONE external request = every span that shares one trace_id; here trace "4bf92f3577b34da6a3ce90d0e2b88a4d" = the GW->ORD->KIT->PAY chain
-// DEF: span — ONE unit of work (a single service operation) with a span_id, a parent span_id and start/end times; here ("6f9a3c1b8e2d4001", parent="", start=100)
-// DEF: trace_id — the id shared by every span of one trace, attached to the request header; here "4bf92f3577b34da6a3ce90d0e2b88a4d"
-// DEF: root_span — the FIRST span of a trace, with parent="" (no parent); here "6f9a3c1b8e2d4001"
+// API GATEWAY SIDE — the servlet filter that starts a trace when no upstream span exists (Spring Cloud Sleuth / Brave)
+// PARTIES: GW = API gateway (gateway JVM) · SVC = first service JVM · BRK = RabbitMQ broker · ZIP = Zipkin server JVM
+// DEF: Span — one unit of work = value object {traceId, spanId, parentId, name, timestamp, duration}; here ("4bf92f3577b34da6a3ce90d0e2b88a4d","6f9a3c1b8e2d4001",null,"GET /orders/PO-2001",100,4)
+// DEF: Tracer — the instrumentation object, OWNED BY the GW JVM, CREATED once (1 per process) at startup by Tracer.newBuilder().build()
+// DEF: TraceIdGenerator — mints ids from randomness: 128 bits = 16 bytes x 8 bits/byte = 32 hex chars x 4 bits/char (trace_id) · 64 bits = 8 bytes x 8 = 16 hex chars x 4 (span_id); CALLED BY the tracer
+// DEF: Reporter — async sender, OWNED BY the GW JVM; ships each finished span (1 here) to ZIP via BRK queue "zipkin"
 // STATE (before):
-//    trace_registry : {}                  // trace_id -> spans
-//    spans : []                           // spans recorded so far for this request
-// DEF: receive_request · CALLED BY: a client HTTP request arriving at GW
-// -> request : "GET /orders/PO-2001"
-//    step 1 · generate the external request id   trace_id = "4bf92f3577b34da6a3ce90d0e2b88a4d"
-//    step 2 · attach it to the outbound header   header.trace_id : "" -> "4bf92f3577b34da6a3ce90d0e2b88a4d"
-//    step 3 · open the root span                 spans : [] -> [("6f9a3c1b8e2d4001", parent="", start=100)]
-//    step 4 · index the trace by its id          trace_registry : {} -> {"4bf92f3577b34da6a3ce90d0e2b88a4d": spans}
-// <- outcome : the request carries trace_id "4bf92f3577b34da6a3ce90d0e2b88a4d" into SVC · root span "6f9a3c1b8e2d4001" opened
+//    tracer : Tracer = Tracer.newBuilder().build()    // one per process, reused by every request
+//    spans  : []                                       // List<Span> — the spans this request's thread has started
+// DEF: TracingFilter.doFilter · CALLED BY: the servlet container thread on each HTTP request
+// -> request  : HttpServletRequest  ("GET /orders/PO-2001", inbound header "traceparent" absent)
+// -> response : HttpServletResponse (status 200; will carry the injected "traceparent" header)
+//    step 1 · extract inbound context    parent : null  BECAUSE no "traceparent" header -> this request is the ROOT of the trace
+//    step 2 · mint the ids    traceId = TraceIdGenerator.nextId() = 16 random bytes -> "4bf92f3577b34da6a3ce90d0e2b88a4d" · spanId = 8 random bytes -> "6f9a3c1b8e2d4001"
+//    step 3 · build the root span    span = Span.newBuilder().traceId("4bf92f3577b34da6a3ce90d0e2b88a4d").id("6f9a3c1b8e2d4001").parentId(null).name("GET /orders/PO-2001").timestamp(100).build()
+//    step 4 · start it    spans : [] -> [ span ] · span.state : NEW -> STARTED
+//    step 5 · inject the wire header    request.setHeader("traceparent", "00-4bf92f3577b34da6a3ce90d0e2b88a4d-6f9a3c1b8e2d4001-01")  // version 00 - traceId - spanId - flags 01(sampled)
+//    step 6 · finish + report    span.finish(104) -> duration = 104 - 100 = 4 · Reporter.report(span) -> BRK queue "zipkin" (async, does not block the response)
+// <- outcome : SVC receives traceparent "00-4bf92f3577b34da6a3ce90d0e2b88a4d-6f9a3c1b8e2d4001-01" · the finished span is en route to ZIP (GW keeps NO trace registry)
+// CALL GRAPH: servlet container -> TracingFilter.doFilter -> TraceIdGenerator.nextId -> Span.newBuilder -> Reporter.report
+// OWNED BY: Tracer/Reporter = GW JVM · the finished span = ZIP (via BRK) · the queue = BRK
+//    alt Sleuth B3 header : "X-B3-TraceId: 4bf92f3577b34da6a3ce90d0e2b88a4d" + "X-B3-SpanId: 6f9a3c1b8e2d4001" (same ids, different header names)
 ```
 
 ### Propagating through services
@@ -94,21 +98,28 @@ flowchart TD
 3. **One trace, many operations** — Each service performs one or more operations — database queries, message publishes — captured as spans.
 
 ```java
-// SERVICE SIDE — one request traverses 3 services, each opening a child span of the previous hop
-// PARTIES: GW = API gateway · ORD = Order Service · KIT = Kitchen Service · PAY = Payment Service
-// DEF: span — ONE unit of work with a span_id, a parent span_id and start/end; here ("6f9a3c1b8e2d4001", parent="", svc="GW", start=100, end=104)
-// DEF: parent — a span's parent span_id (which span invoked it); here parent="6f9a3c1b8e2d4001" for a child, "" for the root_span
-// DEF: header — the key-value carrier that passes trace_id and the last span_id between hops; here {trace_id:"4bf92f3577b34da6a3ce90d0e2b88a4d", span_id:""}
+// SERVICE SIDE — each hop's filter extracts the inbound trace context, opens a child span, and injects the outbound header (Spring Cloud Sleuth / Brave)
+// PARTIES: GW = API gateway JVM · ORD = Order Service JVM · KIT = Kitchen Service JVM · PAY = Payment Service JVM
+// DEF: Span — one unit of work = value object {traceId, spanId, parentId, name, timestamp, duration}; here ("4bf92f3577b34da6a3ce90d0e2b88a4d","6f9a3c1b8e2d4002","6f9a3c1b8e2d4001","GET /orders/PO-2001",105,15)
+// DEF: TraceContext — what a hop extracts from "traceparent" {traceId, spanId, sampled}; here ("4bf92f3577b34da6a3ce90d0e2b88a4d","6f9a3c1b8e2d4001","01")
+// DEF: header — the in-memory carrier {trace_id, span_id} read from / written to the wire "traceparent"; here { trace_id:"4bf92f3577b34da6a3ce90d0e2b88a4d", span_id:"6f9a3c1b8e2d4001" }
+// DEF: Propagation — the wire codec: extracts "traceparent" on entry, injects "00-<traceId>-<spanId>-<flags>" on exit
 // STATE (before):
-//    spans : [("6f9a3c1b8e2d4001", parent="", svc="GW", start=100, end=104)]
-//    header : { trace_id: "4bf92f3577b34da6a3ce90d0e2b88a4d", span_id: "" }
-// DEF: handle_request · CALLED BY: the request moving GW -> ORD -> KIT -> PAY
-// -> trace_id : "4bf92f3577b34da6a3ce90d0e2b88a4d"
-//    step 1 · GW forwards to ORD, header carries the parent span   header.span_id : "" -> "6f9a3c1b8e2d4001"
-//    step 2 · ORD opens child span, forwards to KIT    spans : [1 span] -> [1 span, ("6f9a3c1b8e2d4002", parent="6f9a3c1b8e2d4001", svc="ORD", start=105, end=120)]
-//    step 3 · KIT opens child span, calls PAY          spans : [2 spans] -> [2 spans, ("6f9a3c1b8e2d4003", parent="6f9a3c1b8e2d4002", svc="KIT", start=121, end=135)]
-//    step 4 · PAY opens child span, replies            spans : [3 spans] -> [3 spans, ("6f9a3c1b8e2d4004", parent="6f9a3c1b8e2d4003", svc="PAY", start=136, end=150)]
-// <- outcome : 4 spans chained by parent/child span ids, all carrying trace_id "4bf92f3577b34da6a3ce90d0e2b88a4d"
+//    spans  : []                                        // List<Span> — spans THIS service's thread has opened
+//    header : { trace_id: "4bf92f3577b34da6a3ce90d0e2b88a4d", span_id: "6f9a3c1b8e2d4001" }  // what the inbound request carried
+// DEF: TracingFilter.doFilter · CALLED BY: the servlet container thread of ORD, then KIT, then PAY
+// -> request  : HttpServletRequest  ("GET /orders/PO-2001", inbound header "traceparent: 00-4bf92f3577b34da6a3ce90d0e2b88a4d-6f9a3c1b8e2d4001-01")
+// -> response : HttpServletResponse (status 200; outbound "traceparent" will hold the CHILD span id)
+//    step 1 · extract inbound context    parent : null -> TraceContext{ traceId="4bf92f3577b34da6a3ce90d0e2b88a4d", spanId="6f9a3c1b8e2d4001" }
+//    step 2 · mint the child id    childId = TraceIdGenerator.nextId() = 8 random bytes -> "6f9a3c1b8e2d4002"  (trace_id stays the SAME across all hops)
+//    step 3 · build the child span    span = Span.newBuilder().traceId("4bf92f3577b34da6a3ce90d0e2b88a4d").id("6f9a3c1b8e2d4002").parentId("6f9a3c1b8e2d4001").name("GET /orders/PO-2001").timestamp(105).build()
+//    step 4 · open + close the hop    span.start() · span.finish(120) -> duration = 120 - 105 = 15 · spans : [] -> [ span ]
+//    step 5 · inject the child into the outbound header    request.setHeader("traceparent", "00-4bf92f3577b34da6a3ce90d0e2b88a4d-6f9a3c1b8e2d4002-01")
+//    step 6 · report    Reporter.report(span) -> BRK queue "zipkin"
+// <- outcome : each hop forwards "traceparent: 00-4bf92f3577b34da6a3ce90d0e2b88a4d-<new child span>-01"; the chain is 6f9a...001 -> ...002 -> ...003 -> ...004
+// CALL GRAPH: servlet container -> TracingFilter.doFilter -> Propagation.extract -> TraceIdGenerator.nextId -> Span.newBuilder -> Reporter.report
+// OWNED BY: Tracer/Reporter = each service JVM · finished spans = ZIP (via BRK) · the queue = BRK
+//    alt 3 hops : ORD builds child "...002" (parent "...001", 105..120) · KIT builds "...003" (parent "...002", 121..135) · PAY builds "...004" (parent "...003", 136..150)
 ```
 
 ### Collecting spans in the trace store
@@ -149,19 +160,23 @@ flowchart TD
 4. **Latency from times** — Start and end times per span let Zipkin derive per-operation latency.
 
 ```java
-// TRACE STORE SIDE — the spans from all 4 hops land in one centralized trace server (Zipkin)
-// PARTIES: GW = gateway · ORD = Order Service · ZIP = Zipkin server · BRK = RabbitMQ broker
+// TRACE STORE SIDE — finished spans arrive at Zipkin via RabbitMQ and are stored per trace; latency = end - start
+// PARTIES: GW = gateway JVM · ORD = Order Service JVM · BRK = RabbitMQ broker · ZIP = Zipkin server JVM (owns the trace store = MySQL 8 @ zipkin-db-1)
 // DEF: trace — the set of all spans sharing one trace_id; here trace "4bf92f3577b34da6a3ce90d0e2b88a4d" = 4 spans
-// DEF: span — ONE unit of work with span_id, parent, start and end; here ("6f9a3c1b8e2d4001",parent="",start=100,end=104)
-// DEF: latency — how long one span took = end - start; here 104-100 = 4 ms
+// DEF: Span — one unit of work = value object {traceId, spanId, parentId, name, timestamp, duration}; here ("4bf92f3577b34da6a3ce90d0e2b88a4d","6f9a3c1b8e2d4001",null,"GET /orders/PO-2001",100,4)
+// DEF: latency — how long one span took = end - start; here 104 - 100 = 4
+// DEF: SpanConsumer — a listener on BRK queue "zipkin", OWNED BY the ZIP JVM; deserializes each span and writes it into trace_store
 // STATE (before):
-//    trace_store : {}                        // trace_id -> spans, as ZIP holds them
-// DEF: collect_spans · CALLED BY: each service finishing its operation
-//    step 1 · GW span arrives via BRK    trace_store : {} -> {"4bf92f3577b34da6a3ce90d0e2b88a4d":[("6f9a3c1b8e2d4001",parent="",start=100,end=104)]}
-//    step 2 · ORD span arrives via BRK   trace_store : {"4bf9...":[1 span]} -> {"4bf9...":[("6f9a3c1b8e2d4001",start=100,end=104),("6f9a3c1b8e2d4002",parent="6f9a3c1b8e2d4001",start=105,end=120)]}
-//    step 3 · KIT span arrives via BRK   trace_store : {"4bf9...":[2 spans]} -> {"4bf9...":[2 spans, ("6f9a3c1b8e2d4003",parent="6f9a3c1b8e2d4002",start=121,end=135)]}
-//    step 4 · PAY span arrives via BRK   trace_store : {"4bf9...":[3 spans]} -> {"4bf9...":[3 spans, ("6f9a3c1b8e2d4004",parent="6f9a3c1b8e2d4003",start=136,end=150)]}
-// <- outcome : trace_store : 4 spans for trace "4bf92f3577b34da6a3ce90d0e2b88a4d" · ZIP derives latency = end - start: 104-100=4, 120-105=15, 135-121=14, 150-136=14
+//    trace_store : {}   // Map<traceId, List<Span>> — OWNED BY ZIP, keyed by trace id
+// DEF: consume · CALLED BY: BRK delivering a span to SpanConsumer
+// -> span1 : Span("4bf92f3577b34da6a3ce90d0e2b88a4d", "6f9a3c1b8e2d4001", null, "GET /orders/PO-2001", 100, 104)
+//    step 1 · store the root span    trace_store : {} -> {"4bf92f3577b34da6a3ce90d0e2b88a4d" : [ Span("6f9a3c1b8e2d4001", null, 100, 104) ]}
+//    step 2 · store the 2nd hop      trace_store : {"4bf92f3577b34da6a3ce90d0e2b88a4d" : 1 span} -> {"4bf92f3577b34da6a3ce90d0e2b88a4d" : [ Span("6f9a3c1b8e2d4001", null, 100, 104), Span("6f9a3c1b8e2d4002", "6f9a3c1b8e2d4001", 105, 120) ]}
+//    step 3 · store the 3rd hop      trace_store : {"4bf92f3577b34da6a3ce90d0e2b88a4d" : 2 spans} -> {"4bf92f3577b34da6a3ce90d0e2b88a4d" : [ 2 spans, Span("6f9a3c1b8e2d4003", "6f9a3c1b8e2d4002", 121, 135) ]}
+//    step 4 · store the 4th hop      trace_store : {"4bf92f3577b34da6a3ce90d0e2b88a4d" : 3 spans} -> {"4bf92f3577b34da6a3ce90d0e2b88a4d" : [ 3 spans, Span("6f9a3c1b8e2d4004", "6f9a3c1b8e2d4003", 136, 150) ]}
+// <- outcome : trace_store holds 4 spans for trace "4bf92f3577b34da6a3ce90d0e2b88a4d" · ZIP derives latency = end - start: 104-100=4, 120-105=15, 135-121=14, 150-136=14
+// CALL GRAPH: BRK -> SpanConsumer.consume -> trace_store.put(traceId, span) -> ZIP UI reads trace_store
+// OWNED BY: trace_store = ZIP JVM (MySQL 8 @ zipkin-db-1) · spans = produced by services, consumed by ZIP · the queue = BRK
 ```
 
 ### Searching logs by request id
@@ -199,19 +214,23 @@ flowchart TD
 4. **Infrastructure cost** — The issue is that aggregating and storing traces can require significant infrastructure.
 
 ```java
-// OPERATOR SIDE — the request id links a request's scattered log lines so one search reassembles it
-// PARTIES: OP = operator · LOGS = log-aggregation index · ZIP = Zipkin trace server
-// DEF: trace_id — the id shared by every log line of one request; here "4bf92f3577b34da6a3ce90d0e2b88a4d"
+// OPERATOR SIDE — the trace id is written into every log line, so one search reassembles a request across machines
+// PARTIES: OP = operator · LOGS = log-aggregation index (Elasticsearch 8 @ logs-es-1) · ZIP = Zipkin server JVM
+// DEF: trace_id — the id printed in every log line of one request; here "4bf92f3577b34da6a3ce90d0e2b88a4d"
 // DEF: match — one stored log line that satisfies the search; here 3 lines for one trace_id
+// DEF: LogAppender — the logging code that formats each line as "<timestamp> [trace_id] <message>"; OWNED BY each service JVM
 // STATE (before):
-//    log_index : []                       // every stored log line, tagged with its trace id
-//    matches : []                         // what a search returns
+//    log_index : []   // the aggregated index of every log line, each tagged with its trace id (OWNED BY LOGS)
+//    matches   : []   // List<String> — what a query returns
 // DEF: search · CALLED BY: OP debugging one slow request
 // -> trace_id : "4bf92f3577b34da6a3ce90d0e2b88a4d"
-//    step 1 · each service logs with the trace id inline   log_index : [] -> [3 lines tagged "4bf92f3577b34da6a3ce90d0e2b88a4d"]
-//    step 2 · OP queries the index for the id               matches : [] -> [ORD line, KIT line, PAY line]
-//    step 3 · OP orders the 3 lines by timestamp            matches : [3 lines] -> [ORD@105, KIT@121, PAY@136]
-// <- outcome : matches : 3 lines for one id · the slow hop is KIT (135-121=14 ms)   BECAUSE the id links logs on 3 different machines
+//    step 1 · each service logs with the id inline    LogAppender.format("order fetched", trace_id) -> "2026-09-20T10:00:01Z [4bf92f3577b34da6a3ce90d0e2b88a4d] order fetched"
+//    step 2 · LOGS indexes the 3 lines    log_index : [] -> [ "[4bf92f3577b34da6a3ce90d0e2b88a4d] ORD line", "[4bf92f3577b34da6a3ce90d0e2b88a4d] KIT line", "[4bf92f3577b34da6a3ce90d0e2b88a4d] PAY line" ]
+//    step 3 · OP queries for the id    matches : [] -> [ ORD line @105, KIT line @121, PAY line @136 ]
+//    step 4 · OP orders by timestamp    matches : [3 lines] -> [ ORD@105, KIT@121, PAY@136 ]
+// <- outcome : matches = 3 lines for one id · slow hop = KIT (135 - 121 = 14 ms)   BECAUSE the id links log lines on 3 different machines
+// CALL GRAPH: service LogAppender.format -> LOGS index -> OP search -> order by timestamp
+// OWNED BY: log_index = LOGS (Elasticsearch 8 @ logs-es-1) · LogAppender = each service JVM
 //    alt infra cost : at scale N requests x M spans = N x M records -> needs real storage infrastructure
 ```
 
@@ -235,27 +254,36 @@ External monitoring reports only overall response time and invocation counts, so
 ```mermaid
 flowchart LR
   C["Client"] -->|"GET /orders/PO-2001"| G["API gateway"]
-  G -->|"assign trace_id"| T["4bf92f3577..."]
-  G -->|"open root span"| S["6f9a3c1b8e2d4001 (parent empty)"]
-  T --> R["trace_registry"]
-  S --> R
+  G -->|"TraceIdGenerator: 128 bits = 32 hex"| T["trace_id 4bf92f3577b34da6a3ce90d0e2b88a4d"]
+  G -->|"Span.newBuilder, parent null"| S["root span 6f9a3c1b8e2d4001"]
+  G -->|"setHeader"| H["traceparent 00-4bf92f3577b34da6a3ce90d0e2b88a4d-6f9a3c1b8e2d4001-01"]
+  S -->|"Reporter.report"| Z["Zipkin via RabbitMQ"]
+  H --> Z
 ```
 
 ```java
-// API GATEWAY SIDE — each external request is assigned a unique id before entering the services
-// PARTIES: GW = API gateway · SVC = first service
-// DEF: trace_id — the id shared by every span of one trace, attached to the request header; here "4bf92f3577b34da6a3ce90d0e2b88a4d"
-// DEF: root_span — the FIRST span of a trace, with parent="" (no parent); here "6f9a3c1b8e2d4001"
+// API GATEWAY SIDE — the servlet filter that starts a trace when no upstream span exists (Spring Cloud Sleuth / Brave)
+// PARTIES: GW = API gateway (gateway JVM) · SVC = first service JVM · BRK = RabbitMQ broker · ZIP = Zipkin server JVM
+// DEF: Span — one unit of work = value object {traceId, spanId, parentId, name, timestamp, duration}; here ("4bf92f3577b34da6a3ce90d0e2b88a4d","6f9a3c1b8e2d4001",null,"GET /orders/PO-2001",100,4)
+// DEF: Tracer — the instrumentation object, OWNED BY the GW JVM, CREATED once (1 per process) at startup by Tracer.newBuilder().build()
+// DEF: TraceIdGenerator — mints ids from randomness: 128 bits = 16 bytes x 8 bits/byte = 32 hex chars x 4 bits/char (trace_id) · 64 bits = 8 bytes x 8 = 16 hex chars x 4 (span_id); CALLED BY the tracer
+// DEF: Reporter — async sender, OWNED BY the GW JVM; ships each finished span (1 here) to ZIP via BRK queue "zipkin"
 // STATE (before):
-//    trace_registry : {}                  // trace_id -> spans
-//    spans : []                           // spans recorded so far for this request
-// DEF: receive_request · CALLED BY: a client HTTP request arriving at GW
-// -> request : "GET /orders/PO-2001"
-//    step 1 · generate the external request id   trace_id = "4bf92f3577b34da6a3ce90d0e2b88a4d"
-//    step 2 · attach it to the outbound header   header.trace_id : "" -> "4bf92f3577b34da6a3ce90d0e2b88a4d"
-//    step 3 · open the root span                 spans : [] -> [("6f9a3c1b8e2d4001", parent="", start=100)]
-//    step 4 · index the trace by its id          trace_registry : {} -> {"4bf92f3577b34da6a3ce90d0e2b88a4d": spans}
-// <- outcome : the request carries trace_id "4bf92f3577b34da6a3ce90d0e2b88a4d" into SVC · root span "6f9a3c1b8e2d4001" opened
+//    tracer : Tracer = Tracer.newBuilder().build()    // one per process, reused by every request
+//    spans  : []                                       // List<Span> — the spans this request's thread has started
+// DEF: TracingFilter.doFilter · CALLED BY: the servlet container thread on each HTTP request
+// -> request  : HttpServletRequest  ("GET /orders/PO-2001", inbound header "traceparent" absent)
+// -> response : HttpServletResponse (status 200; will carry the injected "traceparent" header)
+//    step 1 · extract inbound context    parent : null  BECAUSE no "traceparent" header -> this request is the ROOT of the trace
+//    step 2 · mint the ids    traceId = TraceIdGenerator.nextId() = 16 random bytes -> "4bf92f3577b34da6a3ce90d0e2b88a4d" · spanId = 8 random bytes -> "6f9a3c1b8e2d4001"
+//    step 3 · build the root span    span = Span.newBuilder().traceId("4bf92f3577b34da6a3ce90d0e2b88a4d").id("6f9a3c1b8e2d4001").parentId(null).name("GET /orders/PO-2001").timestamp(100).build()
+//    step 4 · start it    spans : [] -> [ span ] · span.state : NEW -> STARTED
+//    step 5 · inject the wire header    request.setHeader("traceparent", "00-4bf92f3577b34da6a3ce90d0e2b88a4d-6f9a3c1b8e2d4001-01")  // version 00 - traceId - spanId - flags 01(sampled)
+//    step 6 · finish + report    span.finish(104) -> duration = 104 - 100 = 4 · Reporter.report(span) -> BRK queue "zipkin" (async, does not block the response)
+// <- outcome : SVC receives traceparent "00-4bf92f3577b34da6a3ce90d0e2b88a4d-6f9a3c1b8e2d4001-01" · the finished span is en route to ZIP (GW keeps NO trace registry)
+// CALL GRAPH: servlet container -> TracingFilter.doFilter -> TraceIdGenerator.nextId -> Span.newBuilder -> Reporter.report
+// OWNED BY: Tracer/Reporter = GW JVM · the finished span = ZIP (via BRK) · the queue = BRK
+//    alt Sleuth B3 header : "X-B3-TraceId: 4bf92f3577b34da6a3ce90d0e2b88a4d" + "X-B3-SpanId: 6f9a3c1b8e2d4001" (same ids, different header names)
 ```
 
 _This is the chapter's assign-the-request-id step: a unique id plus the root span begin the trace._
@@ -287,19 +315,28 @@ flowchart LR
 ```
 
 ```java
-// SERVICE SIDE — one request traverses 3 services, each opening a child span of the previous hop
-// PARTIES: GW = API gateway · ORD = Order Service · KIT = Kitchen Service · PAY = Payment Service
-// DEF: parent — a span's parent span_id (which span invoked it); here parent="6f9a3c1b8e2d4001" for a child, "" for the root_span
+// SERVICE SIDE — each hop's filter extracts the inbound trace context, opens a child span, and injects the outbound header (Spring Cloud Sleuth / Brave)
+// PARTIES: GW = API gateway JVM · ORD = Order Service JVM · KIT = Kitchen Service JVM · PAY = Payment Service JVM
+// DEF: Span — one unit of work = value object {traceId, spanId, parentId, name, timestamp, duration}; here ("4bf92f3577b34da6a3ce90d0e2b88a4d","6f9a3c1b8e2d4002","6f9a3c1b8e2d4001","GET /orders/PO-2001",105,15)
+// DEF: TraceContext — what a hop extracts from "traceparent" {traceId, spanId, sampled}; here ("4bf92f3577b34da6a3ce90d0e2b88a4d","6f9a3c1b8e2d4001","01")
+// DEF: header — the in-memory carrier {trace_id, span_id} read from / written to the wire "traceparent"; here { trace_id:"4bf92f3577b34da6a3ce90d0e2b88a4d", span_id:"6f9a3c1b8e2d4001" }
+// DEF: Propagation — the wire codec: extracts "traceparent" on entry, injects "00-<traceId>-<spanId>-<flags>" on exit
 // STATE (before):
-//    spans : [("6f9a3c1b8e2d4001", parent="", svc="GW", start=100, end=104)]
-//    header : { trace_id: "4bf92f3577b34da6a3ce90d0e2b88a4d", span_id: "" }
-// DEF: handle_request · CALLED BY: the request moving GW -> ORD -> KIT -> PAY
-// -> trace_id : "4bf92f3577b34da6a3ce90d0e2b88a4d"
-//    step 1 · GW forwards to ORD, header carries the parent span   header.span_id : "" -> "6f9a3c1b8e2d4001"
-//    step 2 · ORD opens child span, forwards to KIT    spans : [1 span] -> [1 span, ("6f9a3c1b8e2d4002", parent="6f9a3c1b8e2d4001", svc="ORD", start=105, end=120)]
-//    step 3 · KIT opens child span, calls PAY          spans : [2 spans] -> [2 spans, ("6f9a3c1b8e2d4003", parent="6f9a3c1b8e2d4002", svc="KIT", start=121, end=135)]
-//    step 4 · PAY opens child span, replies            spans : [3 spans] -> [3 spans, ("6f9a3c1b8e2d4004", parent="6f9a3c1b8e2d4003", svc="PAY", start=136, end=150)]
-// <- outcome : 4 spans chained by parent/child span ids, all carrying trace_id "4bf92f3577b34da6a3ce90d0e2b88a4d"
+//    spans  : []                                        // List<Span> — spans THIS service's thread has opened
+//    header : { trace_id: "4bf92f3577b34da6a3ce90d0e2b88a4d", span_id: "6f9a3c1b8e2d4001" }  // what the inbound request carried
+// DEF: TracingFilter.doFilter · CALLED BY: the servlet container thread of ORD, then KIT, then PAY
+// -> request  : HttpServletRequest  ("GET /orders/PO-2001", inbound header "traceparent: 00-4bf92f3577b34da6a3ce90d0e2b88a4d-6f9a3c1b8e2d4001-01")
+// -> response : HttpServletResponse (status 200; outbound "traceparent" will hold the CHILD span id)
+//    step 1 · extract inbound context    parent : null -> TraceContext{ traceId="4bf92f3577b34da6a3ce90d0e2b88a4d", spanId="6f9a3c1b8e2d4001" }
+//    step 2 · mint the child id    childId = TraceIdGenerator.nextId() = 8 random bytes -> "6f9a3c1b8e2d4002"  (trace_id stays the SAME across all hops)
+//    step 3 · build the child span    span = Span.newBuilder().traceId("4bf92f3577b34da6a3ce90d0e2b88a4d").id("6f9a3c1b8e2d4002").parentId("6f9a3c1b8e2d4001").name("GET /orders/PO-2001").timestamp(105).build()
+//    step 4 · open + close the hop    span.start() · span.finish(120) -> duration = 120 - 105 = 15 · spans : [] -> [ span ]
+//    step 5 · inject the child into the outbound header    request.setHeader("traceparent", "00-4bf92f3577b34da6a3ce90d0e2b88a4d-6f9a3c1b8e2d4002-01")
+//    step 6 · report    Reporter.report(span) -> BRK queue "zipkin"
+// <- outcome : each hop forwards "traceparent: 00-4bf92f3577b34da6a3ce90d0e2b88a4d-<new child span>-01"; the chain is 6f9a...001 -> ...002 -> ...003 -> ...004
+// CALL GRAPH: servlet container -> TracingFilter.doFilter -> Propagation.extract -> TraceIdGenerator.nextId -> Span.newBuilder -> Reporter.report
+// OWNED BY: Tracer/Reporter = each service JVM · finished spans = ZIP (via BRK) · the queue = BRK
+//    alt 3 hops : ORD builds child "...002" (parent "...001", 105..120) · KIT builds "...003" (parent "...002", 121..135) · PAY builds "...004" (parent "...003", 136..150)
 ```
 
 _This is the chapter's propagate-through-services step: each hop opens a child span of the previous one, forming the trace chain._
@@ -331,18 +368,23 @@ flowchart LR
 ```
 
 ```java
-// TRACE STORE SIDE — the spans from all 4 hops land in one centralized trace server (Zipkin)
-// PARTIES: GW = gateway · ORD = Order Service · ZIP = Zipkin server · BRK = RabbitMQ broker
-// DEF: latency — how long one span took = end - start; here 104-100 = 4 ms
+// TRACE STORE SIDE — finished spans arrive at Zipkin via RabbitMQ and are stored per trace; latency = end - start
+// PARTIES: GW = gateway JVM · ORD = Order Service JVM · BRK = RabbitMQ broker · ZIP = Zipkin server JVM (owns the trace store = MySQL 8 @ zipkin-db-1)
+// DEF: trace — the set of all spans sharing one trace_id; here trace "4bf92f3577b34da6a3ce90d0e2b88a4d" = 4 spans
+// DEF: Span — one unit of work = value object {traceId, spanId, parentId, name, timestamp, duration}; here ("4bf92f3577b34da6a3ce90d0e2b88a4d","6f9a3c1b8e2d4001",null,"GET /orders/PO-2001",100,4)
+// DEF: latency — how long one span took = end - start; here 104 - 100 = 4
+// DEF: SpanConsumer — a listener on BRK queue "zipkin", OWNED BY the ZIP JVM; deserializes each span and writes it into trace_store
 // STATE (before):
-//    trace_store : {}                        // trace_id -> spans, as ZIP holds them
-// DEF: collect_spans · CALLED BY: each service finishing its operation
-// -> trace_id : "4bf92f3577b34da6a3ce90d0e2b88a4d" · -> span1 : ("6f9a3c1b8e2d4001", parent="", start=100, end=104)
-//    step 1 · GW span arrives via BRK    trace_store : {} -> {"4bf92f3577b34da6a3ce90d0e2b88a4d":[("6f9a3c1b8e2d4001",parent="",start=100,end=104)]}
-//    step 2 · ORD span arrives via BRK   trace_store : {"4bf9...":[1 span]} -> {"4bf9...":[("6f9a3c1b8e2d4001",start=100,end=104),("6f9a3c1b8e2d4002",parent="6f9a3c1b8e2d4001",start=105,end=120)]}
-//    step 3 · KIT span arrives via BRK   trace_store : {"4bf9...":[2 spans]} -> {"4bf9...":[2 spans, ("6f9a3c1b8e2d4003",parent="6f9a3c1b8e2d4002",start=121,end=135)]}
-//    step 4 · PAY span arrives via BRK   trace_store : {"4bf9...":[3 spans]} -> {"4bf9...":[3 spans, ("6f9a3c1b8e2d4004",parent="6f9a3c1b8e2d4003",start=136,end=150)]}
-// <- outcome : trace_store : 4 spans for trace "4bf92f3577b34da6a3ce90d0e2b88a4d" · ZIP derives latency = end - start: 104-100=4, 120-105=15, 135-121=14, 150-136=14
+//    trace_store : {}   // Map<traceId, List<Span>> — OWNED BY ZIP, keyed by trace id
+// DEF: consume · CALLED BY: BRK delivering a span to SpanConsumer
+// -> span1 : Span("4bf92f3577b34da6a3ce90d0e2b88a4d", "6f9a3c1b8e2d4001", null, "GET /orders/PO-2001", 100, 104)
+//    step 1 · store the root span    trace_store : {} -> {"4bf92f3577b34da6a3ce90d0e2b88a4d" : [ Span("6f9a3c1b8e2d4001", null, 100, 104) ]}
+//    step 2 · store the 2nd hop      trace_store : {"4bf92f3577b34da6a3ce90d0e2b88a4d" : 1 span} -> {"4bf92f3577b34da6a3ce90d0e2b88a4d" : [ Span("6f9a3c1b8e2d4001", null, 100, 104), Span("6f9a3c1b8e2d4002", "6f9a3c1b8e2d4001", 105, 120) ]}
+//    step 3 · store the 3rd hop      trace_store : {"4bf92f3577b34da6a3ce90d0e2b88a4d" : 2 spans} -> {"4bf92f3577b34da6a3ce90d0e2b88a4d" : [ 2 spans, Span("6f9a3c1b8e2d4003", "6f9a3c1b8e2d4002", 121, 135) ]}
+//    step 4 · store the 4th hop      trace_store : {"4bf92f3577b34da6a3ce90d0e2b88a4d" : 3 spans} -> {"4bf92f3577b34da6a3ce90d0e2b88a4d" : [ 3 spans, Span("6f9a3c1b8e2d4004", "6f9a3c1b8e2d4003", 136, 150) ]}
+// <- outcome : trace_store holds 4 spans for trace "4bf92f3577b34da6a3ce90d0e2b88a4d" · ZIP derives latency = end - start: 104-100=4, 120-105=15, 135-121=14, 150-136=14
+// CALL GRAPH: BRK -> SpanConsumer.consume -> trace_store.put(traceId, span) -> ZIP UI reads trace_store
+// OWNED BY: trace_store = ZIP JVM (MySQL 8 @ zipkin-db-1) · spans = produced by services, consumed by ZIP · the queue = BRK
 ```
 
 _This is the chapter's collect-spans-in-the-trace-store step: Zipkin gathers spans via RabbitMQ and derives per-operation latency._
@@ -373,18 +415,23 @@ flowchart LR
 ```
 
 ```java
-// OPERATOR SIDE — the request id links a request's scattered log lines so one search reassembles it
-// PARTIES: OP = operator · LOGS = log-aggregation index · ZIP = Zipkin trace server
+// OPERATOR SIDE — the trace id is written into every log line, so one search reassembles a request across machines
+// PARTIES: OP = operator · LOGS = log-aggregation index (Elasticsearch 8 @ logs-es-1) · ZIP = Zipkin server JVM
+// DEF: trace_id — the id printed in every log line of one request; here "4bf92f3577b34da6a3ce90d0e2b88a4d"
 // DEF: match — one stored log line that satisfies the search; here 3 lines for one trace_id
+// DEF: LogAppender — the logging code that formats each line as "<timestamp> [trace_id] <message>"; OWNED BY each service JVM
 // STATE (before):
-//    log_index : []                       // every stored log line, tagged with its trace id
-//    matches : []                         // what a search returns
+//    log_index : []   // the aggregated index of every log line, each tagged with its trace id (OWNED BY LOGS)
+//    matches   : []   // List<String> — what a query returns
 // DEF: search · CALLED BY: OP debugging one slow request
 // -> trace_id : "4bf92f3577b34da6a3ce90d0e2b88a4d"
-//    step 1 · each service logs with the trace id inline   log_index : [] -> [3 lines tagged "4bf92f3577b34da6a3ce90d0e2b88a4d"]
-//    step 2 · OP queries the index for the id               matches : [] -> [ORD line, KIT line, PAY line]
-//    step 3 · OP orders the 3 lines by timestamp            matches : [3 lines] -> [ORD@105, KIT@121, PAY@136]
-// <- outcome : matches : 3 lines for one id · the slow hop is KIT (135-121=14 ms)   BECAUSE the id links logs on 3 different machines
+//    step 1 · each service logs with the id inline    LogAppender.format("order fetched", trace_id) -> "2026-09-20T10:00:01Z [4bf92f3577b34da6a3ce90d0e2b88a4d] order fetched"
+//    step 2 · LOGS indexes the 3 lines    log_index : [] -> [ "[4bf92f3577b34da6a3ce90d0e2b88a4d] ORD line", "[4bf92f3577b34da6a3ce90d0e2b88a4d] KIT line", "[4bf92f3577b34da6a3ce90d0e2b88a4d] PAY line" ]
+//    step 3 · OP queries for the id    matches : [] -> [ ORD line @105, KIT line @121, PAY line @136 ]
+//    step 4 · OP orders by timestamp    matches : [3 lines] -> [ ORD@105, KIT@121, PAY@136 ]
+// <- outcome : matches = 3 lines for one id · slow hop = KIT (135 - 121 = 14 ms)   BECAUSE the id links log lines on 3 different machines
+// CALL GRAPH: service LogAppender.format -> LOGS index -> OP search -> order by timestamp
+// OWNED BY: log_index = LOGS (Elasticsearch 8 @ logs-es-1) · LogAppender = each service JVM
 //    alt infra cost : at scale N requests x M spans = N x M records -> needs real storage infrastructure
 ```
 
@@ -408,10 +455,11 @@ Instrument services to assign each external request a unique id, pass it to all 
 ```mermaid
 flowchart LR
   C["Client"] -->|"GET /orders/PO-2001"| G["API gateway"]
-  G -->|"assign trace_id"| T["4bf92f3577..."]
-  G -->|"open root span"| S["6f9a3c1b8e2d4001 (parent empty)"]
-  T --> R["trace_registry"]
-  S --> R
+  G -->|"TraceIdGenerator: 128 bits = 32 hex"| T["trace_id 4bf92f3577b34da6a3ce90d0e2b88a4d"]
+  G -->|"Span.newBuilder, parent null"| S["root span 6f9a3c1b8e2d4001"]
+  G -->|"setHeader"| H["traceparent 00-4bf92f3577b34da6a3ce90d0e2b88a4d-6f9a3c1b8e2d4001-01"]
+  S -->|"Reporter.report"| Z["Zipkin via RabbitMQ"]
+  H --> Z
 ```
 
 
