@@ -79,7 +79,7 @@ flowchart TD
 
 ```java
 // INVOKE SIDE — an event fires and the infrastructure runs enough isolated instances of your function
-// PARTIES: S3 = object store · LAMBDA = the deployment infrastructure · FUNC = the function instance
+// PARTIES: S3 = Amazon S3 @ orders-assets-bucket · LAMBDA = the deployment infrastructure · FUNC = the function instance
 // STATE (before):
 //    instances : {}                     // idle function instances, none yet
 //    handler_runs : 0                   // how many times the handler has executed
@@ -249,7 +249,7 @@ flowchart LR
 
 ```java
 // INVOKE SIDE — an event fires and the infrastructure runs enough isolated instances of your function
-// PARTIES: S3 = object store · LAMBDA = the deployment infrastructure · FUNC = the function instance
+// PARTIES: S3 = Amazon S3 @ orders-assets-bucket · LAMBDA = the deployment infrastructure · FUNC = the function instance
 // STATE (before):
 //    instances : {}                     // idle function instances, none yet
 //    handler_runs : 0                   // how many times the handler has executed

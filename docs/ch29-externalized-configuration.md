@@ -38,7 +38,7 @@ flowchart TD
 
 ```java
 // ORDER SERVICE SIDE — on startup, read DB credentials and location from the environment, not the code
-// PARTIES: SVC = order service · ENV = deployment environment (OS) · DB = database server
+// PARTIES: SVC = order service · ENV = deployment environment (OS) · DB = MySQL 8 @ prod-db
 // STATE (before):
 //    config : {}                          // SVC holds no DB settings yet at launch
 //    connection : ""                      // no DB connection established yet
@@ -84,7 +84,7 @@ flowchart TD
 
 ```java
 // DEPLOYMENT SIDE — the SAME build runs in QA and production because each environment supplies its own values
-// PARTIES: ENV-QA = QA environment · ENV-PROD = production environment · DB = database server
+// PARTIES: ENV-QA = QA environment · ENV-PROD = production environment · DB = MySQL 8 @ qa-db and prod-db
 // DEF: config — the key/value settings a service reads at startup; here qa_config = {"db_url":"jdbc:mysql://qa-db:3306/orders","db_password":"qa-secret"}
 // DEF: connection — the open link to a dependency, established from config; here connection = "qa-db"
 // STATE (before):
@@ -176,7 +176,7 @@ flowchart LR
 
 ```java
 // ORDER SERVICE SIDE — on startup, read DB credentials and location from the environment, not the code
-// PARTIES: SVC = order service · ENV = deployment environment (OS) · DB = database server
+// PARTIES: SVC = order service · ENV = deployment environment (OS) · DB = MySQL 8 @ prod-db
 // STATE (before):
 //    config : {}                               // SVC holds no DB settings yet at launch
 //    connection : ""                           // no DB connection established yet
@@ -219,7 +219,7 @@ flowchart LR
 
 ```java
 // DEPLOYMENT SIDE — the SAME build runs in QA and production because each environment supplies its own values
-// PARTIES: ENVQA = QA environment · ENVPROD = production environment · DB = database server
+// PARTIES: ENVQA = QA environment · ENVPROD = production environment · DB = MySQL 8 @ qa-db and prod-db
 // DEF: connection — the open link to a dependency, established from config; here "qa-db" or "prod-db"
 // STATE (before):
 //    artifact : "orders-service.jar"        // the identical, unmodified build
@@ -310,7 +310,7 @@ flowchart LR
 
 ```java
 // SERVICE SIDE — the environment supplied the wrong values, so the unchanged code fails to connect
-// PARTIES: SVC = order service · ENV = deployment environment · DB = database server
+// PARTIES: SVC = order service · ENV = deployment environment · DB = MySQL 8 @ prod-db
 // DEF: supplied — the configuration the environment injects at startup; here missing the DB_PASSWORD key
 // STATE (before):
 //    config : {}                              // what SVC resolves at startup

@@ -42,7 +42,7 @@ flowchart TD
 
 ```java
 // TAILER SIDE — the relay reads the database transaction log and publishes each committed outbox insert
-// PARTIES: SVC = Order Service · DB = PostgreSQL database · LOG = its write-ahead log (WAL) · TLR = log tailer · BRK = message broker
+// PARTIES: SVC = Order Service · DB = PostgreSQL 16 @ orders-db-1 · LOG = its write-ahead log (WAL) · TLR = log tailer · BRK = message broker
 // STATE (before):
 //    outbox : [ ]
 //    log : [ ]
@@ -96,7 +96,7 @@ flowchart TD
 
 ```java
 // TAILER SIDE — the log carries only committed writes, so a rolled-back event is never published
-// PARTIES: SVC = Order Service · DB = MySQL database · LOG = its binlog · TLR = log tailer · BRK = message broker
+// PARTIES: SVC = Order Service · DB = MySQL 8 @ orders-db-1 · LOG = its binlog · TLR = log tailer · BRK = message broker
 // STATE (before):
 //    outbox : [ ]
 //    binlog : [ ]
@@ -153,7 +153,7 @@ flowchart TD
 
 ```java
 // TAILER SIDE — a crash between publish and position-save re-reads an entry, so consumers dedupe
-// PARTIES: TLR = log tailer · DB = MySQL database · BRK = message broker · CNS = consumer service
+// PARTIES: TLR = log tailer · DB = MySQL 8 @ orders-db-1 · BRK = message broker · CNS = consumer service
 // STATE (before):
 //    binlog : [ { "seq":10, "row":(1,"E1") } ]
 //    position : 9
@@ -199,7 +199,7 @@ flowchart LR
 
 ```java
 // TAILER SIDE — the relay reads the WAL and publishes each committed outbox insert
-// PARTIES: SVC = Order Service · DB = PostgreSQL database · WAL = write-ahead log · TLR = log tailer · BRK = message broker
+// PARTIES: SVC = Order Service · DB = PostgreSQL 16 @ orders-db-1 · WAL = write-ahead log · TLR = log tailer · BRK = message broker
 // STATE (before):
 //    outbox : [ ]
 //    wal : [ ]
@@ -248,7 +248,7 @@ flowchart LR
 
 ```java
 // TAILER SIDE — the log carries only committed writes, so a rolled-back event is never published
-// PARTIES: SVC = Order Service · DB = MySQL database · LOG = binlog · TLR = log tailer · BRK = message broker
+// PARTIES: SVC = Order Service · DB = MySQL 8 @ orders-db-1 · LOG = binlog · TLR = log tailer · BRK = message broker
 // STATE (before):
 //    outbox : [ ]
 //    binlog : [ ]
@@ -297,7 +297,7 @@ flowchart LR
 
 ```java
 // TAILER SIDE — a crash between publish and position-save re-reads an entry, so consumers dedupe
-// PARTIES: TLR = log tailer · DB = MySQL database · BRK = message broker · CNS = consumer service
+// PARTIES: TLR = log tailer · DB = MySQL 8 @ orders-db-1 · BRK = message broker · CNS = consumer service
 // STATE (before):
 //    binlog : [ { "seq":70, "row":(70,"OrderCreated") } ]
 //    position : 69

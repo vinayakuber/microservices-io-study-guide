@@ -18,7 +18,7 @@ registerChapter({
         { num: 4, title: 'Operations arrive three ways', detail: 'An operation is invoked by a synchronous or asynchronous client request, by an event from another application or service, or by the passing of time.' }
       ],
       program: `// ORDER SIDE — one operation runs entirely inside ONE component (no network hops)
-// PARTIES: CLI = customer client · APP = the monolith · DB = its single database
+// PARTIES: CLI = customer client · APP = the monolith · DB = PostgreSQL 16 @ monolith-db-1
 // DEF: entity — a business entity (a DDD aggregate) that implements business rules and holds state; here order entity "PO-2001" = {status:"DRAFT"}
 // DEF: inventory — the Inventory subdomain's stock, keyed by SKU; here inventory entity "SKU-77" = {qty:5}
 // DEF: order — the Order subdomain's data, keyed by purchase-order id; here order "PO-2001" = {status:"DRAFT"}
@@ -70,7 +70,7 @@ registerChapter({
         { num: 5, title: 'Minimize design-time coupling', detail: 'Less design-time coupling reduces lockstep changes across services, which improves productivity.' }
       ],
       program: `// DATABASE SIDE — one operation spanning two subdomains stays ACID in ONE database
-// PARTIES: APP = the monolith · DB = its single database
+// PARTIES: APP = the monolith · DB = PostgreSQL 16 @ monolith-db-1
 // DEF: credit — the Credit subdomain's ledger, keyed by customer id; here credit entity "CUST-9" = {used:100}
 // DEF: entity — a business entity (a DDD aggregate) that implements business rules and holds state; here order entity "PO-2001" = {status:"DRAFT", total:0}
 // DEF: order — the Order subdomain's rows, keyed by purchase-order id; here order "PO-2001" = {status:"DRAFT", total:0}
@@ -128,7 +128,7 @@ registerChapter({
   O --> CM["COMMIT T1"]
   C --> CM`,
       code: `// DATABASE SIDE — one operation spanning Orders + Credit stays a single ACID transaction in one database
-// PARTIES: APP = the monolith · DB = its single Postgres database
+// PARTIES: APP = the monolith · DB = PostgreSQL 16 @ monolith-db-1
 // DEF: credit — the Credit subdomain's ledger, keyed by customer id; here credit entity "CUST-9" = {used:100}
 // DEF: order — the Order subdomain's row, keyed by purchase-order id; here order "PO-5002" = {status:"DRAFT", total:0}
 // STATE (before):
@@ -185,7 +185,7 @@ registerChapter({
   OP --> A["one ACID txn"]
   OP --> NC["no cross-service coupling"]`,
       code: `// OPERATION SIDE — the five dark-matter forces keep one operation local, efficient, and ACID
-// PARTIES: APP = the monolith · DB = its single database
+// PARTIES: APP = the monolith · DB = PostgreSQL 16 @ monolith-db-1
 // DEF: credit — the Credit subdomain's ledger; here credit entity "CUST-9" = {used:100}
 // DEF: order — the Order subdomain's row; here order "PO-5002" = {total:0}
 // STATE (before):

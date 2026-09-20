@@ -50,7 +50,7 @@ flowchart TD
 
 ```java
 // ORDER SIDE — one operation runs entirely inside ONE component (no network hops)
-// PARTIES: CLI = customer client · APP = the monolith · DB = its single database
+// PARTIES: CLI = customer client · APP = the monolith · DB = PostgreSQL 16 @ monolith-db-1
 // DEF: entity — a business entity (a DDD aggregate) that implements business rules and holds state; here order entity "PO-2001" = {status:"DRAFT"}
 // DEF: inventory — the Inventory subdomain's stock, keyed by SKU; here inventory entity "SKU-77" = {qty:5}
 // DEF: order — the Order subdomain's data, keyed by purchase-order id; here order "PO-2001" = {status:"DRAFT"}
@@ -186,7 +186,7 @@ flowchart TD
 
 ```java
 // DATABASE SIDE — one operation spanning two subdomains stays ACID in ONE database
-// PARTIES: APP = the monolith · DB = its single database
+// PARTIES: APP = the monolith · DB = PostgreSQL 16 @ monolith-db-1
 // DEF: credit — the Credit subdomain's ledger, keyed by customer id; here credit entity "CUST-9" = {used:100}
 // DEF: entity — a business entity (a DDD aggregate) that implements business rules and holds state; here order entity "PO-2001" = {status:"DRAFT", total:0}
 // DEF: order — the Order subdomain's rows, keyed by purchase-order id; here order "PO-2001" = {status:"DRAFT", total:0}
@@ -291,7 +291,7 @@ flowchart LR
 
 ```java
 // DATABASE SIDE — one operation spanning Orders + Credit stays a single ACID transaction in one database
-// PARTIES: APP = the monolith · DB = its single Postgres database
+// PARTIES: APP = the monolith · DB = PostgreSQL 16 @ monolith-db-1
 // DEF: credit — the Credit subdomain's ledger, keyed by customer id; here credit entity "CUST-9" = {used:100}
 // DEF: order — the Order subdomain's row, keyed by purchase-order id; here order "PO-5002" = {status:"DRAFT", total:0}
 // STATE (before):
@@ -382,7 +382,7 @@ flowchart LR
 
 ```java
 // OPERATION SIDE — the five dark-matter forces keep one operation local, efficient, and ACID
-// PARTIES: APP = the monolith · DB = its single database
+// PARTIES: APP = the monolith · DB = PostgreSQL 16 @ monolith-db-1
 // DEF: credit — the Credit subdomain's ledger; here credit entity "CUST-9" = {used:100}
 // DEF: order — the Order subdomain's row; here order "PO-5002" = {total:0}
 // STATE (before):

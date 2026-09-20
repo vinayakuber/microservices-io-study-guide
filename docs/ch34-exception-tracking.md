@@ -228,7 +228,7 @@ flowchart LR
 
 ```java
 // ORDER SERVICE SIDE — one request throws, and the handler captures the message plus stack trace before the thread dies
-// PARTIES: SVC = Order Service instance · U1 = the user calling the service · DB = the database that returns no row
+// PARTIES: SVC = Order Service instance · U1 = the user calling the service · DB = PostgreSQL 16 @ orders-db-1 (the table returns no row)
 // STATE (before):
 //    req : { id:"REQ-7001", path:"/orders", status:"OPEN" }
 //    report : {}

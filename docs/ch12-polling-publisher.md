@@ -44,7 +44,7 @@ flowchart TD
 
 ```java
 // RELAY SIDE — one poll cycle moves unsent outbox rows to the broker
-// PARTIES: RLY = relay · DB = relational database · BRK = message broker
+// PARTIES: RLY = relay · DB = PostgreSQL 16 @ orders-db-1 · BRK = message broker
 // STATE (before):
 //    outbox : [ (1, "E1", sent=false), (2, "E2", sent=false) ]
 //    published : [ ]
@@ -93,7 +93,7 @@ flowchart TD
 
 ```java
 // RELAY SIDE — the same aggregate's two events must reach the broker in commit order
-// PARTIES: RLY = relay · DB = relational database · BRK = message broker
+// PARTIES: RLY = relay · DB = PostgreSQL 16 @ orders-db-1 · BRK = message broker
 // STATE (before):
 //    outbox : [ (1, "E1", sent=false), (2, "E2", sent=false) ]
 //    published : [ ]
@@ -143,7 +143,7 @@ flowchart TD
 
 ```java
 // RELAY SIDE — polling needs a queryable outbox: any SQL database has it, some NoSQL stores do not
-// PARTIES: RLY = relay · SQLDB = MySQL database · NOSQL = NoSQL document store · BRK = message broker
+// PARTIES: RLY = relay · SQLDB = MySQL 8 @ orders-db-1 · NOSQL = MongoDB 7 @ orders-nosql-1 · BRK = message broker
 // DEF: outbox — the table of stored events awaiting publication to the broker = row (1, "E1", sent=false)
 // DEF: sql — the queryable relational access an SQL database gives the outbox = "SELECT * FROM outbox WHERE sent=false" returns 1 unsent row
 // STATE (before):
@@ -189,7 +189,7 @@ flowchart LR
 
 ```java
 // RELAY SIDE — one poll cycle drains two unsent outbox rows into the broker
-// PARTIES: RLY = relay process · DB = PostgreSQL outbox table · BRK = message broker
+// PARTIES: RLY = relay process · DB = PostgreSQL 16 @ orders-db-1 (outbox table) · BRK = message broker
 // DEF: outbox — the table of stored events awaiting publication = [ (10, "OrderCreated", sent=false), (11, "PaymentAuthorized", sent=false) ]
 // STATE (before):
 //    outbox : [ (10, "OrderCreated", sent=false), (11, "PaymentAuthorized", sent=false) ]
@@ -234,7 +234,7 @@ flowchart LR
 
 ```java
 // RELAY SIDE — ordering: the same order's two events must reach the broker in commit order
-// PARTIES: RLY = relay · DB = MySQL outbox table · BRK = message broker
+// PARTIES: RLY = relay · DB = MySQL 8 @ orders-db-1 (outbox table) · BRK = message broker
 // DEF: outbox — the table of stored events = [ (20, "OrderCreated", sent=false), (21, "OrderApproved", sent=false) ]
 // STATE (before):
 //    outbox : [ (20, "OrderCreated", sent=false), (21, "OrderApproved", sent=false) ]
@@ -280,7 +280,7 @@ flowchart LR
 
 ```java
 // RELAY SIDE — polling needs a queryable outbox: any SQL database has it, some NoSQL stores do not
-// PARTIES: RLY = relay · SQLDB = MySQL database · NOSQL = NoSQL document store · BRK = message broker
+// PARTIES: RLY = relay · SQLDB = MySQL 8 @ orders-db-1 · NOSQL = MongoDB 7 @ orders-nosql-1 · BRK = message broker
 // DEF: outbox_sql — the queryable table = [ (30, "OrderCreated", sent=false) ]
 // DEF: outbox_nosql — a per-record property with no global sent index = { "rec-9" : { "event" : "OrderCreated", "sent" : false } }
 // STATE (before):
@@ -329,7 +329,7 @@ flowchart LR
 
 ```java
 // RELAY SIDE — two consecutive polls: after a row is marked sent, the next poll skips it
-// PARTIES: RLY = relay · DB = MySQL outbox table · BRK = message broker
+// PARTIES: RLY = relay · DB = MySQL 8 @ orders-db-1 (outbox table) · BRK = message broker
 // DEF: outbox — the table of stored events = [ (40, "OrderCreated", sent=false) ]
 // STATE (before):
 //    outbox : [ (40, "OrderCreated", sent=false) ]

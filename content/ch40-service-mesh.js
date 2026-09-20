@@ -16,7 +16,7 @@ registerChapter({
         { num: 3, title: 'Apply the concern at the proxy', detail: 'Cross-cutting behavior is applied on the traffic, not inside the service.' }
       ],
       program: `// MESH SIDE — a proxy intercepts every call out of a service, mediating all communication
-// PARTIES: SVC = Order Service · PROXY = its sidecar proxy · DB = the database SVC calls
+// PARTIES: SVC = Order Service · PROXY = its sidecar proxy · DB = PostgreSQL 16 @ orders-db-1
 // STATE (before):
 //    request : {}                       // the outbound call, not yet intercepted
 //    trace_id : null                    // no distributed-tracing id yet
@@ -107,7 +107,7 @@ registerChapter({
   PROXY -->|"traced call"| DB["db:5432"]
   PROXY -->|"attaches"| ID["trace id"]`,
       code: `// MESH SIDE — a proxy intercepts every call out of a service, mediating all communication
-// PARTIES: SVC = Order Service · PROXY = its sidecar proxy · DB = the database SVC calls
+// PARTIES: SVC = Order Service · PROXY = its sidecar proxy · DB = PostgreSQL 16 @ orders-db-1
 // STATE (before):
 //    request : {}                       // the outbound call, not yet intercepted
 //    trace_id : null                    // no distributed-tracing id yet

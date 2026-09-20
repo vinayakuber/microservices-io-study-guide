@@ -16,7 +16,7 @@ registerChapter({
         { num: 3, title: 'The legacy model leaks in', detail: 'With no boundary, the raw legacy record is copied into the new service, whose code now depends on legacy names like <strong>cust_dob</strong> and <strong>status_cd</strong>.' }
       ],
       program: `// NEW SERVICE SIDE — a new Customer service reads a record straight from the legacy monolith, with no boundary
-// PARTIES: NEW = new Customer service · LEG = legacy monolith customer table
+// PARTIES: NEW = new Customer service · LEG = PostgreSQL 14 @ legacy-db-1 (customer table)
 // STATE (before):
 //    leg_customer : { "cust_id": "C-1042", "cust_dob": "1987-04-03", "status_cd": "A" }
 //    new_customer : {}
@@ -39,7 +39,7 @@ registerChapter({
         { num: 4, title: 'Keep the new model clean', detail: 'The service only ever receives its own model and never references legacy names.' }
       ],
       program: `// ACL SIDE — the anti-corruption layer translates a legacy record into the new service's own model
-// PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = legacy monolith
+// PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = PostgreSQL 14 @ legacy-db-1 (legacy monolith customer table)
 // STATE (before):
 //    legacy : { "cust_id": "C-1042", "cust_dob": "1987-04-03", "status_cd": "A" }
 //    domain : {}                              // the new service's model, empty before translation
@@ -61,7 +61,7 @@ registerChapter({
         { num: 3, title: 'The new service stays clean', detail: 'The service\'s model never absorbs the legacy names or codes.' }
       ],
       program: `// ACL SIDE — the legacy monolith renames its active-status code; the change stops inside the ACL
-// PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = legacy monolith
+// PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = PostgreSQL 14 @ legacy-db-1 (legacy monolith customer table)
 // STATE (before):
 //    mapping : { "status_cd": "A" }           // the ACL's translation table: legacy code -> word
 //    domain  : { "id": "C-1042", "status": "ACTIVE" }
@@ -85,7 +85,7 @@ registerChapter({
   NEW -->|"stores raw"| M["new_customer"]
   M -->|"polluted"| P["legacy names leak in"]`,
       code: `// NEW SERVICE SIDE — a new Customer service reads a record straight from the legacy monolith, with no boundary
-// PARTIES: NEW = new Customer service · LEG = legacy monolith customer table
+// PARTIES: NEW = new Customer service · LEG = PostgreSQL 14 @ legacy-db-1 (customer table)
 // STATE (before):
 //    leg_customer : { "cust_id": "C-3157", "cust_dob": "1999-06-14", "status_cd": "A" }
 //    new_customer : {}
@@ -109,7 +109,7 @@ registerChapter({
   ACL -->|"id, dateOfBirth, status"| NEW["New Customer service"]
   ACL -->|"A -> ACTIVE"| MAP["translation"]`,
       code: `// ACL SIDE — the anti-corruption layer translates a legacy record into the new service's own model
-// PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = legacy monolith
+// PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = PostgreSQL 14 @ legacy-db-1 (legacy monolith customer table)
 // STATE (before):
 //    legacy : { "cust_id": "C-3157", "cust_dob": "1999-06-14", "status_cd": "A" }
 //    domain : {}                              // the new service's model, empty before translation
@@ -133,7 +133,7 @@ registerChapter({
   ACL -->|"mapping updated"| MAP["status_cd -> stat_code, A -> 1"]
   MAP -->|"still yields"| NEW["New service status ACTIVE"]`,
       code: `// ACL SIDE — the legacy monolith renames its status field and changes its code; the change stops inside the ACL
-// PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = legacy monolith
+// PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = PostgreSQL 14 @ legacy-db-1 (legacy monolith customer table)
 // STATE (before):
 //    mapping : { "status_cd": "A" }           // the ACL's translation table: legacy field -> code
 //    domain  : { "id": "C-3157", "status": "ACTIVE" }
@@ -158,7 +158,7 @@ registerChapter({
   NEW -->|"polluted again"| P["legacy names leak in"]
   DEV -->|"should use"| ACL["Anti-corruption layer"]`,
       code: `// BOUNDARY SIDE — one direct read that skips the layer reintroduces the exact pollution the layer stops
-// PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = legacy monolith
+// PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = PostgreSQL 14 @ legacy-db-1 (legacy monolith customer table)
 // STATE (before):
 //    domain : { "id": "C-3157", "dateOfBirth": "1999-06-14", "status": "ACTIVE" }
 //    bypass_count : 0                      // how many reads skipped the layer

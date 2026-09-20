@@ -16,7 +16,7 @@ registerChapter({
         { num: 3, title: 'Reach the database through a DAO', detail: 'OrderDao exposes save(Order) and findOrderById(), keeping SQL out of the script.' }
       ],
       program: `// TRANSACTION SCRIPT SIDE — one procedural method per request; the script moves data, it does not own it
-// PARTIES: SVC = OrderService (holds the scripts, no state) · DAO = OrderDao (data access) · DB = the database
+// PARTIES: SVC = OrderService (holds the scripts, no state) · DAO = OrderDao (data access) · DB = PostgreSQL 16 @ orders-db-1
 // STATE (before):
 //    orders : {}                        // the data store, empty — Order is a pure data object
 // DEF: createOrder · CALLED BY: the presentation tier issuing a POST /orders request
@@ -37,7 +37,7 @@ registerChapter({
         { num: 3, title: 'The script does all mutation', detail: 'A change to a field is written by the script, never by the data object itself.' }
       ],
       program: `// TRANSACTION SCRIPT SIDE — the script mutates a data object; the object never mutates itself
-// PARTIES: SVC = OrderService (behavior, stateless) · DAO = OrderDao (find + save) · DB = the database
+// PARTIES: SVC = OrderService (behavior, stateless) · DAO = OrderDao (find + save) · DB = PostgreSQL 16 @ orders-db-1
 // STATE (before):
 //    orders : { "PO-100": { orderId:"PO-100", lineItems:[{sku:"S1",qty:2,unit:25.00}] } }
 // DEF: reviseOrder · CALLED BY: the presentation tier issuing a revise request

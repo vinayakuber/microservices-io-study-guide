@@ -40,7 +40,7 @@ n0["<b>1. Monitor polls</b><br/>MON calls GET /health every 30 s"]:::start
 
 ```java
 // ORDER SERVICE SIDE — the /health handler reports whether its database dependency is up
-// PARTIES: SVC = Order Service instance · DB = its database · MON = monitoring service
+// PARTIES: SVC = Order Service instance · DB = PostgreSQL 16 @ orders-db-1 · MON = monitoring service
 // STATE (before):
 //    health : { db:"UNKNOWN", status:null }
 // DEF: health_check · CALLED BY: MON polling GET /health every 30 s
@@ -88,7 +88,7 @@ n0["<b>1. One poll, three checks</b><br/>the /health handler runs on each poll"]
 
 ```java
 // ORDER SERVICE SIDE — one handler runs three checks: infra connections, host disk, app logic
-// PARTIES: SVC = Order Service instance · DB = its database · HOST = the machine it runs on
+// PARTIES: SVC = Order Service instance · DB = PostgreSQL 16 @ orders-db-1 · HOST = the machine it runs on
 // STATE (before):
 //    checks : { db:"UNKNOWN", disk:"UNKNOWN", app:"UNKNOWN" }
 // DEF: run_checks · CALLED BY: the /health handler on each poll
@@ -217,7 +217,7 @@ flowchart LR
 
 ```java
 // ORDER SERVICE SIDE — the /health handler probes its database dependency and returns a verdict a client can read
-// PARTIES: SVC = Order Service instance · DB = its database · MON = monitoring service
+// PARTIES: SVC = Order Service instance · DB = PostgreSQL 16 @ orders-db-1 · MON = monitoring service
 // STATE (before):
 //    health : { db:"UNKNOWN", status:null }
 // DEF: health_check · CALLED BY: MON polling GET /health every 30 s
@@ -261,7 +261,7 @@ flowchart LR
 
 ```java
 // ORDER SERVICE SIDE — one handler runs three checks: infra connections, host disk, and application logic
-// PARTIES: SVC = Order Service instance · DB = its database · HOST = the machine it runs on
+// PARTIES: SVC = Order Service instance · DB = PostgreSQL 16 @ orders-db-1 · HOST = the machine it runs on
 // STATE (before):
 //    checks : { db:"UNKNOWN", disk:"UNKNOWN", app:"UNKNOWN" }
 // DEF: run_checks · CALLED BY: the /health handler on each poll

@@ -43,7 +43,7 @@ flowchart TD
 
 ```java
 // ORDER SERVICE SIDE — a local ACID transaction cannot reach the credit data that lives in another service
-// PARTIES: ORD = Order Service · ORDDB = Orders database · CS = Customer Service · CSDB = Customers database
+// PARTIES: ORD = Order Service · ORDDB = PostgreSQL 16 @ orders-db-1 · CS = Customer Service · CSDB = PostgreSQL 16 @ customers-db-1
 // DEF: credit — the customer's spending limit owned by the Customer Service = 100.00 (the order total that must not exceed it)
 // STATE (before):
 //    orders : {}
@@ -268,7 +268,7 @@ flowchart LR
 
 ```java
 // ORDER SERVICE SIDE — a local ACID transaction cannot reach the credit data that lives in another service
-// PARTIES: ORD = Order Service · ORDDB = Orders database · CS = Customer Service · CSDB = Customers database
+// PARTIES: ORD = Order Service · ORDDB = PostgreSQL 16 @ orders-db-1 · CS = Customer Service · CSDB = PostgreSQL 16 @ customers-db-1
 // DEF: credit — the customer's spending limit owned by the Customer Service = 100.00 (the order total that must not exceed it)
 // STATE (before):
 //    orders : {}

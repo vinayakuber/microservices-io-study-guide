@@ -159,6 +159,30 @@ for (const ch of CHAPTERS) {
     }
     if (un12.size) probs.push(`R12 undefined concept(s): ${[...un12].sort().join(', ')} (define each at first use with a concrete value)`);
 
+    // R13: concrete datastore placement — a database/store symbol declared in a
+    // PARTIES line must name its concrete engine AND instance, never a bare
+    // "its database" / "database server" / "relational database". Naming the
+    // symbol is not defining it; the reader must know WHICH database and WHERE
+    // it lives (PostgreSQL 16 @ orders-db-1), including that the business table
+    // and the outbox table share the ONE instance that makes a COMMIT atomic.
+    const DB_ENGINES = /\b(postgres(ql)?|mysql|mariadb|oracle|sql ?server|sqlite|cassandra|scylladb|dynamodb|mongodb|couchbase|couchdb|redis|hbase|cockroachdb|bigtable|spanner|elasticsearch|rocksdb|leveldb|eventstoredb|s3)\b/i;
+    const DS_NAMES = /^(DB|SQLDB|NOSQL|VDB|RDB|WDB|AUDITDB|ORDDB|CSDB|ES|EVS|STORE|LEG|DB1|DB2|S3)$/i;
+    L.filter(l => /^\/\/\s*PARTIES:/.test(l)).forEach(pl => {
+      const body = pl.replace(/^\/\/\s*PARTIES:\s*/, '');
+      for (const b of body.split('·').map(s => s.trim())) {
+        const m = b.match(/^([A-Z][A-Z0-9_]*)\s*=\s*(.*)$/);
+        if (!m) continue;
+        const name = m[1], value = m[2];
+        const isDatastore = DS_NAMES.test(name) || /\b(database|datastore|store|table)\b/i.test(value);
+        if (!isDatastore) continue;
+        const hasEngine = DB_ENGINES.test(value);
+        const hasInstance = /@\s*[\w][\w.-]*|\binstance\b|\b[a-z][a-z0-9-]*-db\b|\bdb-\d+\b/i.test(value);
+        if (!hasEngine || !hasInstance) {
+          probs.push(`R13 datastore '${name}' not concrete ("${value}") — name the engine AND instance (e.g. PostgreSQL 16 @ orders-db-1)`);
+        }
+      }
+    });
+
 
 
     if (probs.length) failures.push({ id: ch.id, section: s.section, probs });

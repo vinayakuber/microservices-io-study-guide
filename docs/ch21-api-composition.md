@@ -351,7 +351,7 @@ flowchart LR
 
 ```java
 // API COMPOSER SIDE — the pattern degrades at scale: joining huge result sets in memory, where CQRS is the better fit
-// PARTIES: AC = the API Composer · DB1 = Order database · DB2 = Customer database
+// PARTIES: AC = the API Composer · DB1 = PostgreSQL 16 @ orders-db-1 · DB2 = PostgreSQL 16 @ customers-db-1
 // STATE (before):
 //    memory_used : 0
 //    kept : 0

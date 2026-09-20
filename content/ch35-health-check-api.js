@@ -16,7 +16,7 @@ registerChapter({
         { num: 3, title: 'Run it on every poll', detail: 'A health check client invokes the endpoint to check the health of the instance.' }
       ],
       program: `// ORDER SERVICE SIDE — the /health handler reports whether its database dependency is up
-// PARTIES: SVC = Order Service instance · DB = its database · MON = monitoring service
+// PARTIES: SVC = Order Service instance · DB = PostgreSQL 16 @ orders-db-1 · MON = monitoring service
 // STATE (before):
 //    health : { db:"UNKNOWN", status:null }
 // DEF: health_check · CALLED BY: MON polling GET /health every 30 s
@@ -37,7 +37,7 @@ registerChapter({
         { num: 3, title: 'Run application-specific logic', detail: 'The handler runs application-specific checks on top of the generic ones.' }
       ],
       program: `// ORDER SERVICE SIDE — one handler runs three checks: infra connections, host disk, app logic
-// PARTIES: SVC = Order Service instance · DB = its database · HOST = the machine it runs on
+// PARTIES: SVC = Order Service instance · DB = PostgreSQL 16 @ orders-db-1 · HOST = the machine it runs on
 // STATE (before):
 //    checks : { db:"UNKNOWN", disk:"UNKNOWN", app:"UNKNOWN" }
 // DEF: run_checks · CALLED BY: the /health handler on each poll
@@ -103,7 +103,7 @@ registerChapter({
   DB -->|"exhausted"| SVC
   SVC -->|"verdict"| R["status DOWN"]`,
       code: `// ORDER SERVICE SIDE — the /health handler probes its database dependency and returns a verdict a client can read
-// PARTIES: SVC = Order Service instance · DB = its database · MON = monitoring service
+// PARTIES: SVC = Order Service instance · DB = PostgreSQL 16 @ orders-db-1 · MON = monitoring service
 // STATE (before):
 //    health : { db:"UNKNOWN", status:null }
 // DEF: health_check · CALLED BY: MON polling GET /health every 30 s
@@ -130,7 +130,7 @@ registerChapter({
   DSK -->|"UP"| V
   APP -->|"DOWN"| V["Verdict DOWN"]`,
       code: `// ORDER SERVICE SIDE — one handler runs three checks: infra connections, host disk, and application logic
-// PARTIES: SVC = Order Service instance · DB = its database · HOST = the machine it runs on
+// PARTIES: SVC = Order Service instance · DB = PostgreSQL 16 @ orders-db-1 · HOST = the machine it runs on
 // STATE (before):
 //    checks : { db:"UNKNOWN", disk:"UNKNOWN", app:"UNKNOWN" }
 // DEF: run_checks · CALLED BY: the /health handler on each poll

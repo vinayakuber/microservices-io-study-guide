@@ -16,7 +16,7 @@ registerChapter({
         { num: 3, title: 'Mark the row sent', detail: 'The relay updates the row so the next poll skips it.' }
       ],
       program: `// RELAY SIDE — one poll cycle moves unsent outbox rows to the broker
-// PARTIES: RLY = relay · DB = relational database · BRK = message broker
+// PARTIES: RLY = relay · DB = PostgreSQL 16 @ orders-db-1 · BRK = message broker
 // STATE (before):
 //    outbox : [ (1, "E1", sent=false), (2, "E2", sent=false) ]
 //    published : [ ]
@@ -39,7 +39,7 @@ registerChapter({
         { num: 3, title: 'Add ORDER BY id', detail: 'Ordering the query by id makes the poll reproduce the insertion sequence.' }
       ],
       program: `// RELAY SIDE — the same aggregate's two events must reach the broker in commit order
-// PARTIES: RLY = relay · DB = relational database · BRK = message broker
+// PARTIES: RLY = relay · DB = PostgreSQL 16 @ orders-db-1 · BRK = message broker
 // STATE (before):
 //    outbox : [ (1, "E1", sent=false), (2, "E2", sent=false) ]
 //    published : [ ]
@@ -64,7 +64,7 @@ registerChapter({
         { num: 3, title: 'Use log tailing there', detail: 'For those stores, transaction log tailing is the alternative relay.' }
       ],
       program: `// RELAY SIDE — polling needs a queryable outbox: any SQL database has it, some NoSQL stores do not
-// PARTIES: RLY = relay · SQLDB = MySQL database · NOSQL = NoSQL document store · BRK = message broker
+// PARTIES: RLY = relay · SQLDB = MySQL 8 @ orders-db-1 · NOSQL = MongoDB 7 @ orders-nosql-1 · BRK = message broker
 // DEF: outbox — the table of stored events awaiting publication to the broker = row (1, "E1", sent=false)
 // DEF: sql — the queryable relational access an SQL database gives the outbox = "SELECT * FROM outbox WHERE sent=false" returns 1 unsent row
 // STATE (before):
@@ -100,7 +100,7 @@ registerChapter({
   RLY -->|publish each| BRK[("Message broker")]
   RLY -->|mark sent=true| DB`,
       code: `// RELAY SIDE — one poll cycle drains two unsent outbox rows into the broker
-// PARTIES: RLY = relay process · DB = PostgreSQL outbox table · BRK = message broker
+// PARTIES: RLY = relay process · DB = PostgreSQL 16 @ orders-db-1 (outbox table) · BRK = message broker
 // DEF: outbox — the table of stored events awaiting publication = [ (10, "OrderCreated", sent=false), (11, "PaymentAuthorized", sent=false) ]
 // STATE (before):
 //    outbox : [ (10, "OrderCreated", sent=false), (11, "PaymentAuthorized", sent=false) ]
@@ -133,7 +133,7 @@ registerChapter({
   DB -->|ORDER BY id ASC| GOOD["Publishes id 20 first"]
   GOOD --> BRK2[("Broker: OrderCreated then OrderApproved")]`,
       code: `// RELAY SIDE — ordering: the same order's two events must reach the broker in commit order
-// PARTIES: RLY = relay · DB = MySQL outbox table · BRK = message broker
+// PARTIES: RLY = relay · DB = MySQL 8 @ orders-db-1 (outbox table) · BRK = message broker
 // DEF: outbox — the table of stored events = [ (20, "OrderCreated", sent=false), (21, "OrderApproved", sent=false) ]
 // STATE (before):
 //    outbox : [ (20, "OrderCreated", sent=false), (21, "OrderApproved", sent=false) ]
@@ -167,7 +167,7 @@ registerChapter({
   NOSQL[("NoSQL doc store")] -->|no unsent-row query| NONE["Relay finds 0 rows"]
   NONE --> TLT["Use transaction log tailing instead"]`,
       code: `// RELAY SIDE — polling needs a queryable outbox: any SQL database has it, some NoSQL stores do not
-// PARTIES: RLY = relay · SQLDB = MySQL database · NOSQL = NoSQL document store · BRK = message broker
+// PARTIES: RLY = relay · SQLDB = MySQL 8 @ orders-db-1 · NOSQL = MongoDB 7 @ orders-nosql-1 · BRK = message broker
 // DEF: outbox_sql — the queryable table = [ (30, "OrderCreated", sent=false) ]
 // DEF: outbox_nosql — a per-record property with no global sent index = { "rec-9" : { "event" : "OrderCreated", "sent" : false } }
 // STATE (before):
@@ -204,7 +204,7 @@ registerChapter({
   P2["Poll 2"] -->|SELECT sent=false| DB
   P2 -->|0 rows match| BRK`,
       code: `// RELAY SIDE — two consecutive polls: after a row is marked sent, the next poll skips it
-// PARTIES: RLY = relay · DB = MySQL outbox table · BRK = message broker
+// PARTIES: RLY = relay · DB = MySQL 8 @ orders-db-1 (outbox table) · BRK = message broker
 // DEF: outbox — the table of stored events = [ (40, "OrderCreated", sent=false) ]
 // STATE (before):
 //    outbox : [ (40, "OrderCreated", sent=false) ]

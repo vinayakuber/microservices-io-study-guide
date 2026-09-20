@@ -64,7 +64,7 @@ registerChapter({
         { num: 3, title: 'Relay publishes later', detail: 'A separate process publishes the outbox rows to the broker after the commit.' }
       ],
       program: `// ORDER SERVICE SIDE — publishing reliably: the event is written to the outbox in the SAME transaction as the data change
-// PARTIES: SVC = Order Service · DB = its database · BRK = the message broker
+// PARTIES: SVC = Order Service · DB = PostgreSQL 16 @ orders-db-1 · BRK = the message broker
 // STATE (before):
 //    order : { id:"PO-2001", state:"NEW" }
 //    outbox : []
@@ -160,7 +160,7 @@ registerChapter({
   DB -->|COMMIT both| OK["Event durable with data"]
   OK -->|relay| BRK[("Broker")]`,
       code: `// ORDER SERVICE SIDE — publishing reliably: the event is written to the outbox in the SAME transaction as the data change
-// PARTIES: SVC = Order Service · DB = its database · BRK = the message broker
+// PARTIES: SVC = Order Service · DB = PostgreSQL 16 @ orders-db-1 · BRK = the message broker
 // STATE (before):
 //    order : { id:"PO-77", state:"NEW" }
 //    outbox : []

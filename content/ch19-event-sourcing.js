@@ -16,7 +16,7 @@ registerChapter({
         { num: 3, title: 'Rely on the single-write atomicity', detail: 'Saving one event is one operation, so it is inherently atomic — no 2PC with the broker.' }
       ],
       program: `// EVENT SOURCING SIDE — the store holds events, not current state; each change is one atomic append
-// PARTIES: SVC = Order Service · ES = Event Store · CS = CustomerService (subscriber)
+// PARTIES: SVC = Order Service · ES = EventStoreDB 24 @ orders-events-1 · CS = CustomerService (subscriber)
 // STATE (before):
 //    events : []                        // the Order's event list — its full history, empty before creation
 //    state : { orderState:null, customerId:null }
@@ -44,7 +44,7 @@ registerChapter({
         { num: 3, title: 'Stop at the last event', detail: 'The final folded value is the current state, with no separate current-state table.' }
       ],
       program: `// EVENT SOURCING SIDE — current state is never stored; it is re-derived by folding every event in order
-// PARTIES: SVC = Order Service · ES = Event Store
+// PARTIES: SVC = Order Service · ES = EventStoreDB 24 @ orders-events-1
 // STATE (before):
 //    events : [E1:OrderCreated("C-100",125.00), E2:OrderApproved("C-100")]
 //    state : { orderState:null, customerId:null }      // empty before replay
@@ -66,7 +66,7 @@ registerChapter({
         { num: 3, title: 'Replay only the later events', detail: 'Fold the events since the snapshot, so there are fewer events to replay.' }
       ],
       program: `// EVENT SOURCING SIDE — a snapshot shortens replay: load the newest snapshot, then fold only the events after it
-// PARTIES: SVC = Customer Service · ES = Event Store
+// PARTIES: SVC = Customer Service · ES = EventStoreDB 24 @ orders-events-1
 // STATE (before):
 //    snapshot : { balance:100.00, seq:3 }      // Customer's state saved at event 3
 //    events : [E1:Created, E2:Credit+50.00, E3:Credit+50.00, E4:Debit-25.00]
@@ -87,7 +87,7 @@ registerChapter({
         { num: 3, title: 'Update the subscriber state', detail: 'The handler reads the event payload and updates its own aggregate, reserving credit for the order.' }
       ],
       program: `// EVENT SOURCING SIDE — the event store doubles as a broker, so a subscriber reacts to another service's events
-// PARTIES: SVC = CustomerService (subscriber) · ES = Event Store (delivers like a broker)
+// PARTIES: SVC = CustomerService (subscriber) · ES = EventStoreDB 24 @ orders-events-1 (delivers like a broker)
 // STATE (before):
 //    reserved : {}                       // credit the Customer has reserved per order, empty
 //    balance : 200.00
@@ -115,7 +115,7 @@ registerChapter({
   EVT -->|E1| A["OrderCreated PO-77 125.00"]
   EVT -->|E2| B["OrderApproved PO-77"]`,
       code: `// ORDER SERVICE SIDE — persist state as a sequence of events instead of the current row
-// PARTIES: SVC = Order Service · STORE = the event store
+// PARTIES: SVC = Order Service · STORE = EventStoreDB 24 @ orders-events-1
 // STATE (before):
 //    events : []
 //    current_state : {}   // nothing stored as a row
@@ -144,7 +144,7 @@ registerChapter({
   STORE -->|E2 OrderApproved| AGG
   AGG -->|apply E1 then E2| NOW["state APPROVED"]`,
       code: `// ORDER SERVICE SIDE — rebuild current state by replaying the aggregate's events in order
-// PARTIES: SVC = Order Service · STORE = the event store · AGG = the Order aggregate being rebuilt
+// PARTIES: SVC = Order Service · STORE = EventStoreDB 24 @ orders-events-1 · AGG = the Order aggregate being rebuilt
 // STATE (before):
 //    events : [{ seq:1, order_id:"C-55", type:"OrderCreated", total:125.00 }, { seq:2, order_id:"C-55", type:"OrderApproved" }]
 //    order : { state:"none" }
@@ -172,7 +172,7 @@ registerChapter({
   SNAP["Snapshot balance 100.00 seq 3"] -->|replay E4| BAL["balance 75.00"]
   E4["E4 Debit -25.00"] -->|apply| BAL`,
       code: `// ACCOUNT SERVICE SIDE — shorten replay with a snapshot: load the snapshot, replay only the events after it
-// PARTIES: SVC = Account Service · STORE = the event store · ACC = the Account aggregate
+// PARTIES: SVC = Account Service · STORE = EventStoreDB 24 @ orders-events-1 · ACC = the Account aggregate
 // STATE (before):
 //    snapshot : { seq:3, balance:100.00 }
 //    events_after : [{ seq:4, type:"Debit", amount:25.00 }]
@@ -201,7 +201,7 @@ registerChapter({
   STORE[("Event store")] -->|publish OrderPlaced| SUB["Subscriber"]
   SUB -->|reserveCredit 125.00| RES[("reserved map")]`,
       code: `// ACCOUNT SERVICE SIDE — the event store delivers new events to subscribers, who build their own state
-// PARTIES: STORE = the event store · SUB = the subscriber in Account Service · BAL = the account balance
+// PARTIES: STORE = EventStoreDB 24 @ orders-events-1 · SUB = the subscriber in Account Service · BAL = the account balance
 // STATE (before):
 //    balance : 200.00
 //    reserved : {}

@@ -16,7 +16,7 @@ registerChapter({
         { num: 3, title: 'Commit both or neither', detail: 'Commit makes the business row and the outbox row durable together; rollback drops both.' }
       ],
       program: `// ORDER SERVICE SIDE — commit a business write and its event together, without 2PC
-// PARTIES: SVC = Order Service · DB = its relational database · BRK = message broker
+// PARTIES: SVC = Order Service · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox tables live in this ONE instance, so a single COMMIT covers both) · BRK = message broker
 // STATE (before):
 //    orders : { }
 //    outbox : [ ]
@@ -40,7 +40,7 @@ registerChapter({
         { num: 3, title: 'Mark the row sent', detail: 'The relay updates the row so a later poll will not re-publish it.' }
       ],
       program: `// RELAY SIDE — publish unsent outbox rows to the broker in the order they were inserted
-// PARTIES: RLY = message relay · DB = its relational database · BRK = message broker
+// PARTIES: RLY = message relay · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox tables live in this ONE instance, so a single COMMIT covers both) · BRK = message broker
 // STATE (before):
 //    outbox : [ (1, "E1", sent=false), (2, "E2", sent=false) ]
 //    published : [ ]
@@ -63,7 +63,7 @@ registerChapter({
         { num: 3, title: 'Consumer dedupes', detail: 'The consumer records each processed message id and skips any it has already handled.' }
       ],
       program: `// RELAY + CONSUMER SIDE — a crash between publish and mark re-sends the row, so the consumer dedupes
-// PARTIES: RLY = message relay · DB = its relational database · BRK = message broker · CNS = consumer service
+// PARTIES: RLY = message relay · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox tables live in this ONE instance, so a single COMMIT covers both) · BRK = message broker · CNS = consumer service
 // STATE (before):
 //    outbox : [ (1, "E1", sent=false) ]
 //    published : [ ]
@@ -90,7 +90,7 @@ registerChapter({
         { num: 3, title: 'Preserve T1 before T2', detail: 'Because T1 committed before T2, event E1 is published before E2.' }
       ],
       program: `// TWO SERVICE INSTANCES SIDE — one aggregate, two commits, and the broker still sees them in order
-// PARTIES: SVC1 = Order Service instance A · SVC2 = Order Service instance B · DB = shared database · BRK = message broker
+// PARTIES: SVC1 = Order Service instance A · SVC2 = Order Service instance B · DB = PostgreSQL 16 @ orders-db-1 (the ONE instance both order-service instances commit to) · BRK = message broker
 // STATE (before):
 //    aggregate : { "PO-2001" : "PENDING" }
 //    outbox : [ ]
@@ -123,7 +123,7 @@ registerChapter({
   DB -->|COMMIT both or neither| DONE["Both durable"]
   DB -.->|rollback| UNDO["Both dropped"]`,
       code: `// ORDER SERVICE SIDE — commit a business write and its event together, without 2PC
-// PARTIES: SVC = Order Service · DB = its relational database · BRK = message broker
+// PARTIES: SVC = Order Service · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox tables live in this ONE instance, so a single COMMIT covers both) · BRK = message broker
 // STATE (before):
 //    orders : { }
 //    outbox : [ ]
@@ -156,7 +156,7 @@ registerChapter({
   RLY -->|publish id 102 second| BRK
   RLY -->|mark sent| DB`,
       code: `// RELAY SIDE — publish unsent outbox rows to the broker in the order they were inserted
-// PARTIES: RLY = message relay · DB = its relational database · BRK = message broker
+// PARTIES: RLY = message relay · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox tables live in this ONE instance, so a single COMMIT covers both) · BRK = message broker
 // STATE (before):
 //    outbox : [ (101, "OrderPlaced", sent=false), (102, "PaymentAuthorized", sent=false) ]
 //    published : [ ]
@@ -189,7 +189,7 @@ registerChapter({
   RLY2 --> BRK
   BRK -->|OrderPlaced x2| CNS["Consumer dedupes"]`,
       code: `// RELAY + CONSUMER SIDE — a crash between publish and mark re-sends the row, so the consumer dedupes
-// PARTIES: RLY = message relay · DB = its relational database · BRK = message broker · CNS = consumer service
+// PARTIES: RLY = message relay · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox tables live in this ONE instance, so a single COMMIT covers both) · BRK = message broker · CNS = consumer service
 // STATE (before):
 //    outbox : [ (101, "OrderPlaced", sent=false) ]
 //    published : [ ]
@@ -225,7 +225,7 @@ registerChapter({
   DB -->|ORDER BY id| RLY["Relay"]
   RLY -->|Approved then Shipped| BRK[("Broker")]`,
       code: `// TWO SERVICE INSTANCES SIDE — one aggregate, two commits, and the broker still sees them in order
-// PARTIES: SVC1 = Order Service instance A · SVC2 = Order Service instance B · DB = shared database · BRK = message broker
+// PARTIES: SVC1 = Order Service instance A · SVC2 = Order Service instance B · DB = PostgreSQL 16 @ orders-db-1 (the ONE instance both order-service instances commit to) · BRK = message broker
 // STATE (before):
 //    aggregate : { "PO-77" : "PENDING" }
 //    outbox : [ ]

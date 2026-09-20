@@ -38,7 +38,7 @@ registerChapter({
         { num: 3, title: 'Isolate under the covers', detail: 'Lambda runs enough instances for the load, using containers on EC2 instances to isolate each one — hidden from you.' }
       ],
       program: `// INVOKE SIDE — an event fires and the infrastructure runs enough isolated instances of your function
-// PARTIES: S3 = object store · LAMBDA = the deployment infrastructure · FUNC = the function instance
+// PARTIES: S3 = Amazon S3 @ orders-assets-bucket · LAMBDA = the deployment infrastructure · FUNC = the function instance
 // STATE (before):
 //    instances : {}                     // idle function instances, none yet
 //    handler_runs : 0                   // how many times the handler has executed
@@ -134,7 +134,7 @@ registerChapter({
   I -->|"invoke"| H["index.handler"]
   H -->|"isolated by"| C["container on EC2"]`,
       code: `// INVOKE SIDE — an event fires and the infrastructure runs enough isolated instances of your function
-// PARTIES: S3 = object store · LAMBDA = the deployment infrastructure · FUNC = the function instance
+// PARTIES: S3 = Amazon S3 @ orders-assets-bucket · LAMBDA = the deployment infrastructure · FUNC = the function instance
 // STATE (before):
 //    instances : {}                     // idle function instances, none yet
 //    handler_runs : 0                   // how many times the handler has executed

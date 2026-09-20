@@ -79,7 +79,7 @@ flowchart TD
 
 ```java
 // OUTBOUND SIDE — the sidecar mediates every call leaving the service, attaching a trace id
-// PARTIES: SVC = Order Service · SIDE = its sidecar · DB = the database SVC calls
+// PARTIES: SVC = Order Service · SIDE = its sidecar · DB = PostgreSQL 16 @ orders-db-1
 // STATE (before):
 //    request : {}                       // the outbound call before interception
 //    trace_id : null                    // no id assigned yet
@@ -247,7 +247,7 @@ flowchart LR
 
 ```java
 // OUTBOUND SIDE — the sidecar mediates every call leaving the service, attaching a trace id
-// PARTIES: SVC = Order Service · SIDE = its sidecar · DB = the database SVC calls
+// PARTIES: SVC = Order Service · SIDE = its sidecar · DB = PostgreSQL 16 @ orders-db-1
 // STATE (before):
 //    request : {}                       // the outbound call before interception
 //    trace_id : null                    // no id assigned yet

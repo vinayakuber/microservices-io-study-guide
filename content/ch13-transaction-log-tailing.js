@@ -16,7 +16,7 @@ registerChapter({
         { num: 3, title: 'Publish each entry', detail: 'The relay publishes the message embedded in each outbox insert to the broker.' }
       ],
       program: `// TAILER SIDE — the relay reads the database transaction log and publishes each committed outbox insert
-// PARTIES: SVC = Order Service · DB = PostgreSQL database · LOG = its write-ahead log (WAL) · TLR = log tailer · BRK = message broker
+// PARTIES: SVC = Order Service · DB = PostgreSQL 16 @ orders-db-1 · LOG = its write-ahead log (WAL) · TLR = log tailer · BRK = message broker
 // STATE (before):
 //    outbox : [ ]
 //    log : [ ]
@@ -44,7 +44,7 @@ registerChapter({
         { num: 3, title: 'No broker enlistment', detail: 'The broker is never part of the database transaction, so no 2PC is needed.' }
       ],
       program: `// TAILER SIDE — the log carries only committed writes, so a rolled-back event is never published
-// PARTIES: SVC = Order Service · DB = MySQL database · LOG = its binlog · TLR = log tailer · BRK = message broker
+// PARTIES: SVC = Order Service · DB = MySQL 8 @ orders-db-1 · LOG = its binlog · TLR = log tailer · BRK = message broker
 // STATE (before):
 //    outbox : [ ]
 //    binlog : [ ]
@@ -71,7 +71,7 @@ registerChapter({
         { num: 3, title: 'Dedupe on the consumer', detail: 'A crash between publish and position-write re-reads an entry, so consumers must be idempotent.' }
       ],
       program: `// TAILER SIDE — a crash between publish and position-save re-reads an entry, so consumers dedupe
-// PARTIES: TLR = log tailer · DB = MySQL database · BRK = message broker · CNS = consumer service
+// PARTIES: TLR = log tailer · DB = MySQL 8 @ orders-db-1 · BRK = message broker · CNS = consumer service
 // STATE (before):
 //    binlog : [ { "seq":10, "row":(1,"E1") } ]
 //    position : 9
@@ -107,7 +107,7 @@ registerChapter({
   WAL -->|read at position| TLR["Log tailer"]
   TLR -->|publish OrderCreated| BRK[("Message broker")]`,
       code: `// TAILER SIDE — the relay reads the WAL and publishes each committed outbox insert
-// PARTIES: SVC = Order Service · DB = PostgreSQL database · WAL = write-ahead log · TLR = log tailer · BRK = message broker
+// PARTIES: SVC = Order Service · DB = PostgreSQL 16 @ orders-db-1 · WAL = write-ahead log · TLR = log tailer · BRK = message broker
 // STATE (before):
 //    outbox : [ ]
 //    wal : [ ]
@@ -144,7 +144,7 @@ registerChapter({
   LOG -->|only committed rows| TLR["Publishes OrderCreated only"]
   TLR --> BRK[("Broker, never enlisted")]`,
       code: `// TAILER SIDE — the log carries only committed writes, so a rolled-back event is never published
-// PARTIES: SVC = Order Service · DB = MySQL database · LOG = binlog · TLR = log tailer · BRK = message broker
+// PARTIES: SVC = Order Service · DB = MySQL 8 @ orders-db-1 · LOG = binlog · TLR = log tailer · BRK = message broker
 // STATE (before):
 //    outbox : [ ]
 //    binlog : [ ]
@@ -181,7 +181,7 @@ registerChapter({
   TLR2 --> BRK
   BRK -->|OrderCreated x2| CNS["Consumer dedupes to once"]`,
       code: `// TAILER SIDE — a crash between publish and position-save re-reads an entry, so consumers dedupe
-// PARTIES: TLR = log tailer · DB = MySQL database · BRK = message broker · CNS = consumer service
+// PARTIES: TLR = log tailer · DB = MySQL 8 @ orders-db-1 · BRK = message broker · CNS = consumer service
 // STATE (before):
 //    binlog : [ { "seq":70, "row":(70,"OrderCreated") } ]
 //    position : 69

@@ -40,7 +40,7 @@ flowchart TD
 
 ```java
 // ORDER SERVICE SIDE — commit a business write and its event together, without 2PC
-// PARTIES: SVC = Order Service · DB = its relational database · BRK = message broker
+// PARTIES: SVC = Order Service · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox tables live in this ONE instance, so a single COMMIT covers both) · BRK = message broker
 // STATE (before):
 //    orders : { }
 //    outbox : [ ]
@@ -92,7 +92,7 @@ flowchart TD
 
 ```java
 // RELAY SIDE — publish unsent outbox rows to the broker in the order they were inserted
-// PARTIES: RLY = message relay · DB = its relational database · BRK = message broker
+// PARTIES: RLY = message relay · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox tables live in this ONE instance, so a single COMMIT covers both) · BRK = message broker
 // STATE (before):
 //    outbox : [ (1, "E1", sent=false), (2, "E2", sent=false) ]
 //    published : [ ]
@@ -143,7 +143,7 @@ flowchart TD
 
 ```java
 // RELAY + CONSUMER SIDE — a crash between publish and mark re-sends the row, so the consumer dedupes
-// PARTIES: RLY = message relay · DB = its relational database · BRK = message broker · CNS = consumer service
+// PARTIES: RLY = message relay · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox tables live in this ONE instance, so a single COMMIT covers both) · BRK = message broker · CNS = consumer service
 // STATE (before):
 //    outbox : [ (1, "E1", sent=false) ]
 //    published : [ ]
@@ -195,7 +195,7 @@ flowchart TD
 
 ```java
 // TWO SERVICE INSTANCES SIDE — one aggregate, two commits, and the broker still sees them in order
-// PARTIES: SVC1 = Order Service instance A · SVC2 = Order Service instance B · DB = shared database · BRK = message broker
+// PARTIES: SVC1 = Order Service instance A · SVC2 = Order Service instance B · DB = PostgreSQL 16 @ orders-db-1 (the ONE instance both order-service instances commit to) · BRK = message broker
 // STATE (before):
 //    aggregate : { "PO-2001" : "PENDING" }
 //    outbox : [ ]
@@ -238,7 +238,7 @@ flowchart LR
 
 ```java
 // ORDER SERVICE SIDE — commit a business write and its event together, without 2PC
-// PARTIES: SVC = Order Service · DB = its relational database · BRK = message broker
+// PARTIES: SVC = Order Service · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox tables live in this ONE instance, so a single COMMIT covers both) · BRK = message broker
 // STATE (before):
 //    orders : { }
 //    outbox : [ ]
@@ -283,7 +283,7 @@ flowchart LR
 
 ```java
 // RELAY SIDE — publish unsent outbox rows to the broker in the order they were inserted
-// PARTIES: RLY = message relay · DB = its relational database · BRK = message broker
+// PARTIES: RLY = message relay · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox tables live in this ONE instance, so a single COMMIT covers both) · BRK = message broker
 // STATE (before):
 //    outbox : [ (101, "OrderPlaced", sent=false), (102, "PaymentAuthorized", sent=false) ]
 //    published : [ ]
@@ -328,7 +328,7 @@ flowchart LR
 
 ```java
 // RELAY + CONSUMER SIDE — a crash between publish and mark re-sends the row, so the consumer dedupes
-// PARTIES: RLY = message relay · DB = its relational database · BRK = message broker · CNS = consumer service
+// PARTIES: RLY = message relay · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox tables live in this ONE instance, so a single COMMIT covers both) · BRK = message broker · CNS = consumer service
 // STATE (before):
 //    outbox : [ (101, "OrderPlaced", sent=false) ]
 //    published : [ ]
@@ -376,7 +376,7 @@ flowchart LR
 
 ```java
 // TWO SERVICE INSTANCES SIDE — one aggregate, two commits, and the broker still sees them in order
-// PARTIES: SVC1 = Order Service instance A · SVC2 = Order Service instance B · DB = shared database · BRK = message broker
+// PARTIES: SVC1 = Order Service instance A · SVC2 = Order Service instance B · DB = PostgreSQL 16 @ orders-db-1 (the ONE instance both order-service instances commit to) · BRK = message broker
 // STATE (before):
 //    aggregate : { "PO-77" : "PENDING" }
 //    outbox : [ ]

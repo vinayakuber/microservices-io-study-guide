@@ -16,7 +16,8 @@ registerChapter({
         { num: 3, title: 'Queries no longer match the write model', detail: 'The write side is shaped for commands, which is a poor shape for reads.' }
       ],
       program: `// QUERY SIDE — why current state is hard to read when only events are stored
-// PARTIES: QR = a query reader · EVS = Event Store
+// PARTIES: QR = a query reader · EVS = EventStoreDB 24 @ orders-events-1
+// DEF: event — an immutable fact appended to the log; here {type:"order_created", order_id:"O-101", total:120.00}
 // STATE (before):
 //    event_log : [ {type:"order_created", order_id:"O-101", total:120.00},
 //                  {type:"order_updated", order_id:"O-101", total:95.00} ]   // append-only, no current-state row
@@ -40,7 +41,8 @@ registerChapter({
         { num: 3, title: 'Keep it read-only', detail: 'The view is a replica; it is updated only by the subscription path, never by clients.' }
       ],
       program: `// READ SIDE — the view database is a read-only replica optimized for its query
-// PARTIES: VDB = View Database · QR = query reader
+// PARTIES: VDB = MongoDB 7 @ orders-view-1 · QR = query reader
+// DEF: view — a precomputed, denormalized read model for ONE query; here {"order_history":{customer_id:"C-77", orders:[{order_id:"O-101", total:120.00}, {order_id:"O-102", total:80.00}]}}
 // DEF: db — a database holding records = a keyed store; here view_db = {"order_history":{customer_id:"C-77", orders:[{order_id:"O-101", total:120.00}, {order_id:"O-102", total:80.00}]}}
 // STATE (before):
 //    view_db : {}                             // the replica, empty and read-only by design
@@ -151,7 +153,7 @@ registerChapter({
   QRY["Query"] -->|single lookup| VDB[("View DB (document)")]
   VDB -->|returns| DOC["Doc C-42: order + customer + lines"]`,
       code: `// ORDER SERVICE SIDE — the view database serves queries from a denormalized document, one lookup per read
-// PARTIES: QRY = the query · VDB = the view database (a document store)
+// PARTIES: QRY = the query · VDB = MongoDB 7 @ orders-view-1 (document store)
 // STATE (before):
 //    docs : {}
 // DEF: build_view_document · CALLED BY: VDB when the view is materialized
@@ -179,7 +181,7 @@ registerChapter({
   EVT -->|handler updates doc| VDB[("View DB")]
   VDB -->|doc total 95.00| DOC["Doc C-42"]`,
       code: `// ORDER SERVICE SIDE — the view stays up to date by consuming the write model's domain events
-// PARTIES: WM = the write model · EVT = a domain event · VDB = the view database
+// PARTIES: WM = the write model · EVT = a domain event · VDB = MongoDB 7 @ orders-view-1
 // STATE (before):
 //    write_db : { id:"C-42", total:120.00 }
 //    view_db : { id:"C-42", total:120.00 }
@@ -208,7 +210,7 @@ registerChapter({
   EVT -->|delayed| VDB[("View DB still 120.00")]
   VDB -->|reader| READER["sees 120.00 until caught up"]`,
       code: `// ORDER SERVICE SIDE — the view is eventually consistent, so a reader can see the old total during the lag window
-// PARTIES: WM = the write model · VDB = the view database · READER = a client querying the view
+// PARTIES: WM = the write model · VDB = MongoDB 7 @ orders-view-1 · READER = a client querying the view
 // STATE (before):
 //    view_db : { id:"C-42", total:120.00 }
 //    write_db : { id:"C-42", total:95.00 }

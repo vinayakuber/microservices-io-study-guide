@@ -138,7 +138,7 @@ flowchart TD
 
 ```java
 // ORDER SERVICE SIDE — publishing reliably: the event is written to the outbox in the SAME transaction as the data change
-// PARTIES: SVC = Order Service · DB = its database · BRK = the message broker
+// PARTIES: SVC = Order Service · DB = PostgreSQL 16 @ orders-db-1 · BRK = the message broker
 // STATE (before):
 //    order : { id:"PO-2001", state:"NEW" }
 //    outbox : []
@@ -268,7 +268,7 @@ flowchart LR
 
 ```java
 // ORDER SERVICE SIDE — publishing reliably: the event is written to the outbox in the SAME transaction as the data change
-// PARTIES: SVC = Order Service · DB = its database · BRK = the message broker
+// PARTIES: SVC = Order Service · DB = PostgreSQL 16 @ orders-db-1 · BRK = the message broker
 // STATE (before):
 //    order : { id:"PO-77", state:"NEW" }
 //    outbox : []

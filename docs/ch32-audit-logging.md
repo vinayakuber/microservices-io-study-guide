@@ -39,7 +39,7 @@ n0["<b>1. User acts</b><br/>alice performs view_order on PO-2001"]:::start
 
 ```java
 // ORDER SERVICE SIDE — every user action becomes one audit row in the database
-// PARTIES: U1 = user alice · SVC = Order Service · DB = audit database
+// PARTIES: U1 = user alice · SVC = Order Service · DB = PostgreSQL 16 @ audit-db-1
 // DEF: audit — a durable row recording who did what to which target and when; here (1,"alice","view_order","PO-2001",now)
 // STATE (before):
 //    audit_log : []                                 // rows: (id, user, action, target, at)
@@ -91,7 +91,7 @@ n0["<b>1. One audit log, three questions</b><br/>SUP wants to know what alice re
 
 ```java
 // SUPPORT SIDE — reading the audit log reconstructs what one user did, for support/compliance/security
-// PARTIES: SUP = support agent · DB = audit database
+// PARTIES: SUP = support agent · DB = PostgreSQL 16 @ audit-db-1
 // DEF: audit — a durable row recording who did what to which target and when, read back to reconstruct a user's actions; here (1,"alice","view_order","PO-2001",t1)
 // STATE (before):
 //    audit_log : [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2),(3,"alice","pay_order","PO-2001",t3)]
@@ -141,7 +141,7 @@ n0["<b>1. Request arrives</b><br/>create_order for PO-2001"]:::start
 
 ```java
 // ORDER SERVICE SIDE — audit code interleaves with business logic; event sourcing makes auditing implicit
-// PARTIES: SVC = Order Service · ES = event store
+// PARTIES: SVC = Order Service · ES = EventStoreDB 24 @ orders-events-1
 // DEF: audit — a hand-written row recording what happened, appended by an explicit audit() call; here (1,"create_order","PO-2001")
 // DEF: event — a domain fact appended to the event store that doubles as the audit record; here (1,"OrderCreated")
 // DEF: inline — audit code that sits between business statements inside one method; here the 2 audit() calls inside create_order
@@ -183,7 +183,7 @@ flowchart LR
 
 ```java
 // ORDER SERVICE SIDE — every user action becomes one audit row in the database
-// PARTIES: U1 = user alice · SVC = Order Service · DB = audit database
+// PARTIES: U1 = user alice · SVC = Order Service · DB = PostgreSQL 16 @ audit-db-1
 // DEF: audit — a durable row recording who did what to which target and when; here (1,"alice","view_order","PO-2001",now)
 // STATE (before):
 //    audit_log : []                                  // rows: (id, user, action, target, at)
@@ -227,7 +227,7 @@ flowchart LR
 
 ```java
 // SUPPORT SIDE — reading the audit log reconstructs what one user did, for support/compliance/security
-// PARTIES: SUP = support agent · DB = audit database
+// PARTIES: SUP = support agent · DB = PostgreSQL 16 @ audit-db-1
 // STATE (before):
 //    audit_log : [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2),(3,"alice","pay_order","PO-2001",t3)]
 //    answer : []                                   // the reconstruction SUP builds
@@ -310,7 +310,7 @@ flowchart LR
 
 ```java
 // ORDER SERVICE SIDE — event sourcing makes auditing implicit: the event log itself is the audit trail
-// PARTIES: SVC = Order Service · ES = event store
+// PARTIES: SVC = Order Service · ES = EventStoreDB 24 @ orders-events-1
 // DEF: event — a domain fact appended to the event store that doubles as the audit record; here (1,"OrderCreated")
 // STATE (before):
 //    event_log : []                    // event-sourced alternative: events ARE the audit record

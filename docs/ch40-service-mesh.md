@@ -36,7 +36,7 @@ flowchart TD
 
 ```java
 // MESH SIDE — a proxy intercepts every call out of a service, mediating all communication
-// PARTIES: SVC = Order Service · PROXY = its sidecar proxy · DB = the database SVC calls
+// PARTIES: SVC = Order Service · PROXY = its sidecar proxy · DB = PostgreSQL 16 @ orders-db-1
 // STATE (before):
 //    request : {}                       // the outbound call, not yet intercepted
 //    trace_id : null                    // no distributed-tracing id yet
@@ -205,7 +205,7 @@ flowchart LR
 
 ```java
 // MESH SIDE — a proxy intercepts every call out of a service, mediating all communication
-// PARTIES: SVC = Order Service · PROXY = its sidecar proxy · DB = the database SVC calls
+// PARTIES: SVC = Order Service · PROXY = its sidecar proxy · DB = PostgreSQL 16 @ orders-db-1
 // STATE (before):
 //    request : {}                       // the outbound call, not yet intercepted
 //    trace_id : null                    // no distributed-tracing id yet

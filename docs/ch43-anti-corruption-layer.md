@@ -37,7 +37,7 @@ flowchart TD
 
 ```java
 // NEW SERVICE SIDE — a new Customer service reads a record straight from the legacy monolith, with no boundary
-// PARTIES: NEW = new Customer service · LEG = legacy monolith customer table
+// PARTIES: NEW = new Customer service · LEG = PostgreSQL 14 @ legacy-db-1 (customer table)
 // STATE (before):
 //    leg_customer : { "cust_id": "C-1042", "cust_dob": "1987-04-03", "status_cd": "A" }
 //    new_customer : {}
@@ -84,7 +84,7 @@ flowchart TD
 
 ```java
 // ACL SIDE — the anti-corruption layer translates a legacy record into the new service's own model
-// PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = legacy monolith
+// PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = PostgreSQL 14 @ legacy-db-1 (legacy monolith customer table)
 // STATE (before):
 //    legacy : { "cust_id": "C-1042", "cust_dob": "1987-04-03", "status_cd": "A" }
 //    domain : {}                              // the new service's model, empty before translation
@@ -125,7 +125,7 @@ flowchart TD
 
 ```java
 // ACL SIDE — the legacy monolith renames its active-status code; the change stops inside the ACL
-// PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = legacy monolith
+// PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = PostgreSQL 14 @ legacy-db-1 (legacy monolith customer table)
 // STATE (before):
 //    mapping : { "status_cd": "A" }           // the ACL's translation table: legacy code -> word
 //    domain  : { "id": "C-1042", "status": "ACTIVE" }
@@ -164,7 +164,7 @@ flowchart LR
 
 ```java
 // NEW SERVICE SIDE — a new Customer service reads a record straight from the legacy monolith, with no boundary
-// PARTIES: NEW = new Customer service · LEG = legacy monolith customer table
+// PARTIES: NEW = new Customer service · LEG = PostgreSQL 14 @ legacy-db-1 (customer table)
 // STATE (before):
 //    leg_customer : { "cust_id": "C-3157", "cust_dob": "1999-06-14", "status_cd": "A" }
 //    new_customer : {}
@@ -205,7 +205,7 @@ flowchart LR
 
 ```java
 // ACL SIDE — the anti-corruption layer translates a legacy record into the new service's own model
-// PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = legacy monolith
+// PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = PostgreSQL 14 @ legacy-db-1 (legacy monolith customer table)
 // STATE (before):
 //    legacy : { "cust_id": "C-3157", "cust_dob": "1999-06-14", "status_cd": "A" }
 //    domain : {}                              // the new service's model, empty before translation
@@ -246,7 +246,7 @@ flowchart LR
 
 ```java
 // ACL SIDE — the legacy monolith renames its status field and changes its code; the change stops inside the ACL
-// PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = legacy monolith
+// PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = PostgreSQL 14 @ legacy-db-1 (legacy monolith customer table)
 // STATE (before):
 //    mapping : { "status_cd": "A" }           // the ACL's translation table: legacy field -> code
 //    domain  : { "id": "C-3157", "status": "ACTIVE" }
@@ -288,7 +288,7 @@ flowchart LR
 
 ```java
 // BOUNDARY SIDE — one direct read that skips the layer reintroduces the exact pollution the layer stops
-// PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = legacy monolith
+// PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = PostgreSQL 14 @ legacy-db-1 (legacy monolith customer table)
 // STATE (before):
 //    domain : { "id": "C-3157", "dateOfBirth": "1999-06-14", "status": "ACTIVE" }
 //    bypass_count : 0                      // how many reads skipped the layer

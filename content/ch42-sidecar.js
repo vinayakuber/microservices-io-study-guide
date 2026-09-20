@@ -38,7 +38,7 @@ registerChapter({
         { num: 3, title: 'Apply the concern', detail: 'The sidecar stamps the request with a trace id and forwards it.' }
       ],
       program: `// OUTBOUND SIDE — the sidecar mediates every call leaving the service, attaching a trace id
-// PARTIES: SVC = Order Service · SIDE = its sidecar · DB = the database SVC calls
+// PARTIES: SVC = Order Service · SIDE = its sidecar · DB = PostgreSQL 16 @ orders-db-1
 // STATE (before):
 //    request : {}                       // the outbound call before interception
 //    trace_id : null                    // no id assigned yet
@@ -132,7 +132,7 @@ registerChapter({
   SIDE -->|"stamps trc-77c1"| DB["db:5432"]
   SIDE -->|"attaches"| ID["trace id"]`,
       code: `// OUTBOUND SIDE — the sidecar mediates every call leaving the service, attaching a trace id
-// PARTIES: SVC = Order Service · SIDE = its sidecar · DB = the database SVC calls
+// PARTIES: SVC = Order Service · SIDE = its sidecar · DB = PostgreSQL 16 @ orders-db-1
 // STATE (before):
 //    request : {}                       // the outbound call before interception
 //    trace_id : null                    // no id assigned yet
