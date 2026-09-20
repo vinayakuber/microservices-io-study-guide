@@ -42,6 +42,8 @@ registerChapter({
       ],
       program: `// DEPLOY SIDE — two services ship independently through their own pipelines
 // PARTIES: TO = Team Orders · TI = Team Inventory · P1 = order pipeline · P2 = inventory pipeline
+// DEF: built — the services compiled in this release by their own pipeline; here built = ["order"]
+// DEF: service — an independently deployable, loosely coupled component with its own repository and pipeline; here service "order" = "v1.0"
 // STATE (before):
 //    repos : { "order": {pipeline:"P1", tests:12}, "inventory": {pipeline:"P2", tests:8} }
 //    deployed : { "order": "v1.0", "inventory": "v1.0" }
@@ -68,6 +70,8 @@ registerChapter({
       ],
       program: `// ORDER SIDE — a distributed command spans three services as a saga of local transactions
 // PARTIES: API = API gateway · OSV = order service · ISV = inventory service · CSV = credit service
+// DEF: local — a transaction confined to one service and its own database, with no cross-service commit; here local txn "T1" = {service:"order", state:"NEW"}
+// DEF: txn — a transaction, the atomic unit of work each service runs against its own database; here txn = "T1"
 // STATE (before):
 //    local_txns : { "T1": {service:"order", state:"NEW"}, "T2": {service:"inventory", state:"NEW"}, "T3": {service:"credit", state:"NEW"} }
 // DEF: placeOrder · CALLED BY: API routing a client request to the order service

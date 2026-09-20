@@ -35,6 +35,9 @@ flowchart TD
 ```java
 // ORDER SIDE — one operation runs entirely inside ONE component (no network hops)
 // PARTIES: CLI = customer client · APP = the monolith · DB = its single database
+// DEF: entity — a business entity (a DDD aggregate) that implements business rules and holds state; here order entity "PO-2001" = {status:"DRAFT"}
+// DEF: inventory — the Inventory subdomain's stock, keyed by SKU; here inventory entity "SKU-77" = {qty:5}
+// DEF: order — the Order subdomain's data, keyed by purchase-order id; here order "PO-2001" = {status:"DRAFT"}
 // STATE (before):
 //    order_entities : { "PO-2001": {status:"DRAFT"} }
 //    inventory_entities : { "SKU-77": {qty:5} }
@@ -126,6 +129,9 @@ flowchart TD
 ```java
 // DATABASE SIDE — one operation spanning two subdomains stays ACID in ONE database
 // PARTIES: APP = the monolith · DB = its single database
+// DEF: credit — the Credit subdomain's ledger, keyed by customer id; here credit entity "CUST-9" = {used:100}
+// DEF: entity — a business entity (a DDD aggregate) that implements business rules and holds state; here order entity "PO-2001" = {status:"DRAFT", total:0}
+// DEF: order — the Order subdomain's rows, keyed by purchase-order id; here order "PO-2001" = {status:"DRAFT", total:0}
 // STATE (before):
 //    order_entities : { "PO-2001": {status:"DRAFT", total:0} }
 //    credit_entities : { "CUST-9": {used:100} }
@@ -169,6 +175,7 @@ flowchart TD
 ```java
 // BUILD SIDE — a modular monolith localizes a change to one vertical slice
 // PARTIES: DEV = a developer in Team Orders · CI = build tool with incremental builds
+// DEF: rebuilt — the modules recompiled in this build because only their files changed; here rebuilt = ["orders"]
 // STATE (before):
 //    modules : { "orders": {changed:false}, "billing": {changed:false} }
 //    rebuilt_modules : []

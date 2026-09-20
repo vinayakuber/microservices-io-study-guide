@@ -109,6 +109,8 @@ flowchart TD
 ```java
 // RELAY SIDE — polling needs a queryable outbox: any SQL database has it, some NoSQL stores do not
 // PARTIES: RLY = relay · SQLDB = MySQL database · NOSQL = NoSQL document store · BRK = message broker
+// DEF: outbox — the table of stored events awaiting publication to the broker = row (1, "E1", sent=false)
+// DEF: sql — the queryable relational access an SQL database gives the outbox = "SELECT * FROM outbox WHERE sent=false" returns 1 unsent row
 // STATE (before):
 //    outbox_sql : [ (1, "E1", sent=false) ]
 //    outbox_nosql : { "rec-9" : { "event" : "E1", "sent" : false } }

@@ -18,6 +18,7 @@ registerChapter({
       ],
       program: `// SERVICE SIDE — the instance registers its own host and IP on startup and unregisters on shutdown
 // PARTIES: SVC = order-service instance · REG = service registry
+// DEF: self — the instance's own registration state = self_state "DOWN", flipped to "AVAILABLE" after it registers
 // STATE (before):
 //    registry : {"order-service" -> []}
 //    self_state : "DOWN"
@@ -62,6 +63,9 @@ registerChapter({
       ],
       program: `// SERVICE SIDE — self-registration knows its own state, but a broken instance often lacks the self-awareness to leave
 // PARTIES: SVC = order-service instance · REG = service registry
+// DEF: routed — the traffic the registry directs at this instance = traffic_routed "all", steered to "none" once it marks itself STARTING
+// DEF: self — the instance's own modeled state = self_state "AVAILABLE" becoming "STARTING" on degradation
+// DEF: traffic — the requests callers send to the instance = "all", steered to "none" while STARTING
 // STATE (before):
 //    registry : {"order-service" -> [{"host":"10.0.1.7","port":8080,"state":"AVAILABLE"}]}
 //    self_state : "AVAILABLE"

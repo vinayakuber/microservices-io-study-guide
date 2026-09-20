@@ -40,6 +40,7 @@ registerChapter({
       ],
       program: `// GATEWAY SIDE — a simple request is proxied straight to one service
 // PARTIES: CLI = client · GW = API Gateway · PROD = Product Info Service
+// DEF: route — a path-to-service mapping the gateway proxies on = one entry of route_table; here route_table maps "/products" -> "PROD"
 // STATE (before):
 //    route_table : {"/products" : "PROD"}      // the gateway's route map
 //    response : null

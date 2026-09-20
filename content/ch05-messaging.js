@@ -45,6 +45,8 @@ registerChapter({
       ],
       program: `// CONSUMER SERVICE SIDE — request/response: send a request, expect a prompt reply over a channel
 // PARTIES: CLIENT = Consumer · BRK = message broker · SVC = Provider service
+// DEF: channel — a named conduit through which messages flow from sender to receiver; here the reply_to channel "reply_channel" carried "REQ-77:42.50"
+// DEF: reply — the answer the provider returns to the caller over the reply channel; here "42.50" for request "REQ-77"
 // STATE (before):
 //    request_channel : []
 //    reply_channel : []
@@ -68,6 +70,7 @@ registerChapter({
       ],
       program: `// BROKER SIDE — publish/subscribe: one publisher, two subscribers (zero or more recipients)
 // PARTIES: PUB = Order Service · BRK = message broker · SUB1 = Billing · SUB2 = Kitchen
+// DEF: inbox — a per-subscriber mailbox the broker delivers one copy into; here inbox_billing and inbox_kitchen each receive "OrderCreated(PO-2001)"
 // STATE (before):
 //    topic : { "orders": [] }
 //    inbox_billing : []

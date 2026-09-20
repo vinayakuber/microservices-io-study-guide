@@ -79,6 +79,7 @@ flowchart TD
 ```java
 // REGISTRAR SIDE — a separate process registers and unregisters the instance on its behalf
 // PARTIES: SVC = order-service instance · RGR = third-party registrar (sidecar) · REG = service registry
+// DEF: proc — the service's OS process whose lifecycle the registrar watches; here svc_proc = "STOPPED" -> "STARTED" on host "10.0.1.7"
 // STATE (before):
 //    registry : {"order-service" -> []}
 //    svc_proc : "STOPPED"

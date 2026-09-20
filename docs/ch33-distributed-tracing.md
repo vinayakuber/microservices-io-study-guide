@@ -31,6 +31,10 @@ flowchart TD
 ```java
 // API GATEWAY SIDE — each external request is assigned a unique id before entering the services
 // PARTIES: GW = API gateway · SVC = first service
+// DEF: trace — the entire journey of ONE external request = every span that shares one trace_id; here trace "4bf92f3577b34da6a3ce90d0e2b88a4d" = the GW->ORD->KIT->PAY chain
+// DEF: span — ONE unit of work (a single service operation) with a span_id, a parent span_id and start/end times; here ("6f9a3c1b8e2d4001", parent="", start=100)
+// DEF: trace_id — the id shared by every span of one trace, attached to the request header; here "4bf92f3577b34da6a3ce90d0e2b88a4d"
+// DEF: root_span — the FIRST span of a trace, with parent="" (no parent); here "6f9a3c1b8e2d4001"
 // STATE (before):
 //    trace_registry : {}                  // trace_id -> spans
 //    spans : []                           // spans recorded so far for this request
@@ -68,6 +72,9 @@ flowchart TD
 ```java
 // SERVICE SIDE — one request traverses 3 services, each opening a child span of the previous hop
 // PARTIES: GW = API gateway · ORD = Order Service · KIT = Kitchen Service · PAY = Payment Service
+// DEF: span — ONE unit of work with a span_id, a parent span_id and start/end; here ("6f9a3c1b8e2d4001", parent="", svc="GW", start=100, end=104)
+// DEF: parent — a span's parent span_id (which span invoked it); here parent="6f9a3c1b8e2d4001" for a child, "" for the root_span
+// DEF: header — the key-value carrier that passes trace_id and the last span_id between hops; here {trace_id:"4bf92f3577b34da6a3ce90d0e2b88a4d", span_id:""}
 // STATE (before):
 //    spans : [("6f9a3c1b8e2d4001", parent="", svc="GW", start=100, end=104)]
 //    header : { trace_id: "4bf92f3577b34da6a3ce90d0e2b88a4d", span_id: "" }
@@ -109,6 +116,9 @@ flowchart TD
 ```java
 // TRACE STORE SIDE — the spans from all 4 hops land in one centralized trace server (Zipkin)
 // PARTIES: GW = gateway · ORD = Order Service · ZIP = Zipkin server · BRK = RabbitMQ broker
+// DEF: trace — the set of all spans sharing one trace_id; here trace "4bf92f3577b34da6a3ce90d0e2b88a4d" = 4 spans
+// DEF: span — ONE unit of work with span_id, parent, start and end; here ("6f9a3c1b8e2d4001",parent="",start=100,end=104)
+// DEF: latency — how long one span took = end - start; here 104-100 = 4 ms
 // STATE (before):
 //    trace_store : {}                        // trace_id -> spans, as ZIP holds them
 // DEF: collect_spans · CALLED BY: each service finishing its operation
@@ -148,6 +158,8 @@ flowchart TD
 ```java
 // OPERATOR SIDE — the request id links a request's scattered log lines so one search reassembles it
 // PARTIES: OP = operator · LOGS = log-aggregation index · ZIP = Zipkin trace server
+// DEF: trace_id — the id shared by every log line of one request; here "4bf92f3577b34da6a3ce90d0e2b88a4d"
+// DEF: match — one stored log line that satisfies the search; here 3 lines for one trace_id
 // STATE (before):
 //    log_index : []                       // every stored log line, tagged with its trace id
 //    matches : []                         // what a search returns

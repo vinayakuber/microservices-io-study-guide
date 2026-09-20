@@ -41,6 +41,7 @@ registerChapter({
       ],
       program: `// READ SIDE — the view database is a read-only replica optimized for its query
 // PARTIES: VDB = View Database · QR = query reader
+// DEF: db — a database holding records = a keyed store; here view_db = {"order_history":{customer_id:"C-77", orders:[{order_id:"O-101", total:120.00}, {order_id:"O-102", total:80.00}]}}
 // STATE (before):
 //    view_db : {}                             // the replica, empty and read-only by design
 //    doc     : {}
@@ -63,6 +64,9 @@ registerChapter({
       ],
       program: `// COMMAND, THEN READ SIDE — a write updates the write side, then an event updates the view
 // PARTIES: WR = Order Service (write side) · BRK = message broker · RD = Order History Service (read side)
+// DEF: db — a database holding an order row = a keyed store; here write_db = {"O-101":{total:120.00}} and view_db = {"O-101":{total:120.00}}
+// DEF: view — the read-only replica updated by subscribed domain events = a keyed store; here view_db = {"O-101":{total:120.00}} -> {"O-101":{total:95.00}}
+// DEF: write — the source-of-truth side updated by commands = a keyed store; here write_db = {"O-101":{total:120.00}} -> {"O-101":{total:95.00}}
 // STATE (before):
 //    write_db : { "O-101": {total:120.00} }        // the source of truth, in WR
 //    view_db  : { "O-101": {total:120.00} }        // the replica, about to go stale
@@ -86,6 +90,9 @@ registerChapter({
       ],
       program: `// READ SIDE — the view lags the write side, so it is only eventually consistent
 // PARTIES: WR = Order Service · RD = Order History Service · BRK = message broker
+// DEF: db — a database holding an order row = a keyed store; here write_db = {"O-101":{total:95.00}} and view_db = {"O-101":{total:120.00}}
+// DEF: view — the read-only replica that lags behind the write side = a keyed store; here view_db = {"O-101":{total:120.00}} while the write side holds 95.00
+// DEF: write — the source-of-truth side = a keyed store; here write_db = {"O-101":{total:95.00}}
 // STATE (before):
 //    write_db : { "O-101": {total:95.00} }        // just updated by WR
 //    view_db  : { "O-101": {total:120.00} }       // still shows the old total

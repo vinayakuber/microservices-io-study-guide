@@ -31,6 +31,7 @@ flowchart TD
 ```java
 // ORDER SERVICE SIDE — every user action becomes one audit row in the database
 // PARTIES: U1 = user alice · SVC = Order Service · DB = audit database
+// DEF: audit — a durable row recording who did what to which target and when; here (1,"alice","view_order","PO-2001",now)
 // STATE (before):
 //    audit_log : []                                 // rows: (id, user, action, target, at)
 // DEF: record_activity · CALLED BY: U1 performing actions
@@ -68,6 +69,7 @@ flowchart TD
 ```java
 // SUPPORT SIDE — reading the audit log reconstructs what one user did, for support/compliance/security
 // PARTIES: SUP = support agent · DB = audit database
+// DEF: audit — a durable row recording who did what to which target and when, read back to reconstruct a user's actions; here (1,"alice","view_order","PO-2001",t1)
 // STATE (before):
 //    audit_log : [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2),(3,"alice","pay_order","PO-2001",t3)]
 //    answer : []                                // the reconstruction SUP builds
@@ -105,6 +107,9 @@ flowchart TD
 ```java
 // ORDER SERVICE SIDE — audit code interleaves with business logic; event sourcing makes auditing implicit
 // PARTIES: SVC = Order Service · ES = event store
+// DEF: audit — a hand-written row recording what happened, appended by an explicit audit() call; here (1,"create_order","PO-2001")
+// DEF: event — a domain fact appended to the event store that doubles as the audit record; here (1,"OrderCreated")
+// DEF: inline — audit code that sits between business statements inside one method; here the 2 audit() calls inside create_order
 // STATE (before):
 //    inline_audit : []                 // hand-written audit rows
 //    event_log : []                    // event-sourced alternative: events ARE the audit record

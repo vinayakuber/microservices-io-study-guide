@@ -31,6 +31,7 @@ flowchart TD
 ```java
 // ORDER AGGREGATE SIDE — from DDD: a graph of objects can be treated as a unit, reached by one root
 // PARTIES: SVC = Order Service · AG = the Order aggregate (root Order entity + its line-item value objects)
+// DEF: item — a line-item object the aggregate root owns and sums into the total = { product:"BOOK-1", price:30.00 }
 // STATE (before) — two floating objects with no owning root:
 //    order : { id:"PO-2001", total:0.00 }
 //    item_a : { product:"BOOK-1", price:30.00 }

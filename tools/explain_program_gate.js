@@ -114,6 +114,51 @@ for (const ch of CHAPTERS) {
     const unacct = [...accounts].filter(a => !declaredAccts.has(a));
     if (unacct.length) probs.push(`R11 undeclared account(s): ${unacct.join(', ')} (declare its initial balance)`);
 
+    // R12: container != concept — declaring a data structure is not defining the
+    // concept it holds. `trace_registry : {}` and `spans : []` do not define
+    // `trace` or `span`; every non-generic stem and singular of each STATE-declared
+    // structure must itself be defined (a `// DEF:` / `->` / STATE / PARTIES name).
+    const GENERIC12 = new Set('registry store table list map set log index cache id ids value values name names key keys count total depth bound size entries entry record records line lines flag flags field fields pool state box boxes status address process class bus plus success analysis basis axis alias'.split(' '));
+    const declared12 = new Set();
+    const containers12 = new Set();
+    L.forEach((l) => {
+      let m;
+      if ((m = l.match(/\/\/\s*DEF:\s*([A-Za-z_][A-Za-z0-9_]*)/))) declared12.add(m[1]);
+      if ((m = l.match(/\/\/\s*->\s*([A-Za-z_][A-Za-z0-9_]*)\s*:/))) declared12.add(m[1]);
+      if ((m = l.match(/^\s*\/\/\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*[\[{"']/))) { declared12.add(m[1]); containers12.add(m[1]); }
+      const pl = l.match(/^\/\/\s*PARTIES:\s*(.*)$/);
+      if (pl) (pl[1].match(/[A-Z][A-Za-z0-9_]*/g) || []).forEach(x => declared12.add(x));
+    });
+    // R12 compares concepts case-insensitively (a `gw` container IS the `GW`
+    // party) and recognizes the true singular of a plural stem — `responses` ->
+    // `response`, `processes` -> `process`, `chassis` -> `chassis` — not the
+    // mangled `respon`/`proces`/`chassi` a naive suffix strip produces.
+    const generic12lc = new Set([...GENERIC12].map(x => x.toLowerCase()));
+    const declared12lc = new Set([...declared12].map(x => x.toLowerCase()));
+    const pluralForms = (p) => {
+      const c = new Set([p]);
+      for (const v of [p.replace(/ies$/, 'y'), p.replace(/ches$/, 'ch'), p.replace(/shes$/, 'sh'),
+        p.replace(/xes$/, 'x'), p.replace(/zes$/, 'z'), p.replace(/sses$/, 'ss'),
+        p.replace(/ses$/, 's'), p.replace(/es$/, ''), p.replace(/s$/, '')]) {
+        if (v && v.length >= 2 && v !== p) { c.add(v); c.add(v + 'e'); }
+      }
+      return [...c];
+    };
+    const un12 = new Set();
+    for (const c of containers12) {
+      for (const p of c.toLowerCase().split('_').filter(Boolean)) {
+        if (p.length < 2 || generic12lc.has(p)) continue;
+        const forms = pluralForms(p);
+        if (forms.some(f => generic12lc.has(f) || declared12lc.has(f))) continue;
+        // report the most natural singular: `ies` -> `y` (entities -> entity),
+        // else drop a bare trailing `s` (responses -> response)
+        const stem = (p.length > 4 && p.endsWith('ies')) ? p.slice(0, -3) + 'y'
+          : (p.length > 2 && p.endsWith('s')) ? p.slice(0, -1) : p;
+        if (stem.length >= 2) un12.add(stem);
+      }
+    }
+    if (un12.size) probs.push(`R12 undefined concept(s): ${[...un12].sort().join(', ')} (define each at first use with a concrete value)`);
+
 
 
     if (probs.length) failures.push({ id: ch.id, section: s.section, probs });

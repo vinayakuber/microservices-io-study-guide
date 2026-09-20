@@ -145,6 +145,7 @@ flowchart TD
 ```java
 // CLIENT SIDE — the client is the subject under test, not the provider
 // PARTIES: CLI = OrderServiceProxy (subject) · SVC = Order Service (the service it talks to)
+// DEF: behavior — the client's observable actions = what it sends ("GET /orders/ORD-4007") and reads ("orderId,state"), held in cli_behavior
 // STATE (before):
 //    cli_behavior : { sends:"", reads:"" }
 //    checks : 0

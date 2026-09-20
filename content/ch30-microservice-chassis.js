@@ -18,6 +18,9 @@ registerChapter({
       ],
       program: `// TEAM SIDE — wiring six cross-cutting concerns once per service versus once in a chassis
 // PARTIES: SVC1 = Order Service · SVC2 = Customer Service · SVC3 = Kitchen Service
+// DEF: chassis — the shared framework that wires the 6 cross-cutting concerns once, not per service; here chassis_wiring = { chassis: 0 }
+// DEF: manual — wired by hand, one service at a time; here manual_wiring = { SVC1: 0, SVC2: 0, SVC3: 0 } = 18 wirings total
+// DEF: wiring — the act of connecting a cross-cutting concern to a service; here 3 services x 6 concerns = 18 wirings
 // STATE (before):
 //    manual_wiring : { SVC1: 0, SVC2: 0, SVC3: 0 }       // concerns wired by hand, per service
 //    chassis_wiring : { chassis: 0 }                     // concerns wired once, inside the chassis

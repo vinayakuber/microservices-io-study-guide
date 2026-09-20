@@ -17,6 +17,7 @@ registerChapter({
       ],
       program: `// API GATEWAY SIDE — authenticate the requestor once and mint a token that carries their identity
 // PARTIES: CL = client app · GW = API Gateway (single entry point) · SVC = order service
+// DEF: auth — confirming WHO the requestor is, once, at the gateway; here gw_auth = {"alice":"verified"}
 // STATE (before):
 //    gw_auth : {}                         // identities GW has verified this session
 //    payload : ""                         // the identity claim GW will sign into the token
@@ -40,6 +41,8 @@ registerChapter({
       ],
       program: `// ORDER SERVICE SIDE — verify the requestor identity and authorization straight from the token
 // PARTIES: GW = API Gateway · SVC = order service · CL = client app
+// DEF: allowed — whether the requestor may perform the operation; here "alice" is allowed = verdict "authorized"
+// DEF: role — the category of actor a requestor belongs to; here role = "customer" from allowed_roles {"alice":"customer"}
 // STATE (before):
 //    allowed_roles : {"alice":"customer"}    // roles that may act on orders
 //    requestor : ""                          // identity read out of the token
@@ -63,6 +66,7 @@ registerChapter({
       ],
       program: `// PAYMENT SERVICE SIDE — a service includes the token when it calls another service
 // PARTIES: SVC = order service · PAY = payment service · CL = client app
+// DEF: verdict — the authorization decision a service reaches about a request; here pay_verdict = "pending" then "authorized"
 // STATE (before):
 //    incoming : ""                     // token SVC received on its own request
 //    forwarded : ""                    // token SVC sends onward to PAY

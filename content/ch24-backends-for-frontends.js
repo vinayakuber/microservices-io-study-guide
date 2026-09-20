@@ -87,6 +87,8 @@ registerChapter({
       ],
       program: `// GATEWAY SIDE — two stacks would duplicate common functionality unless it is shared
 // PARTIES: GW-M = Mobile gateway · GW-W = Web gateway · LIB = shared edge-function library
+// DEF: edge — the gateway edge where per-client logic such as auth runs = the "verify_access_token" function held in edge_fn
+// DEF: fn — one named unit of common code (a function) = "verify_access_token", shared by GW-M and GW-W instead of duplicated
 // STATE (before):
 //    edge_fn : {}                              // where the auth edge function lives
 // DEF: add_edge_function · CALLED BY: GW-M and GW-W both needing the same function

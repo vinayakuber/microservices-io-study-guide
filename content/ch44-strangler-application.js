@@ -63,6 +63,8 @@ registerChapter({
       ],
       program: `// STRANGLER SIDE — a brand-new feature lands in the new app, showing the business what microservices enable
 // PARTIES: NEW = new strangler application · MONO = legacy monolith · RTR = strangler router · U1 = user
+// DEF: brand — a brand-new feature with no monolith twin, added only to the new app; here "recommendations"
+// DEF: route — a mapping from a request path to the system that serves it; here "/catalog" -> "NEW"
 // STATE (before):
 //    new_features : { "catalog": true }        // re-implemented monolith features
 //    brand_new    : {}                          // features with no monolith twin

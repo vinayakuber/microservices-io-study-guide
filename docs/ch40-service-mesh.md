@@ -68,6 +68,7 @@ flowchart TD
 ```java
 // MESH SIDE — one unique id travels with the request across services so a call chain can be traced
 // PARTIES: U1 = a user request · PROXY = sidecar of Order Service · SVCB = Customer Service
+// DEF: trace — the whole chain of spans that share one trace_id for a single request; here trace_id "trc-9f2a" = the order-service -> customer-service chain
 // STATE (before):
 //    trace_id : "trc-9f2a"              // id assigned at the first proxy
 //    hops : []                          // services the request has passed through

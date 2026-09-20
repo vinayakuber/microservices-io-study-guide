@@ -61,6 +61,10 @@ registerChapter({
       ],
       program: `// SERVICE SIDE — test the service in isolation using test doubles for the services it invokes
 // PARTIES: OSVC = Order Service (under test) · DBLE = test double for Kitchen Service
+// DEF: dep — a dependency the service under test invokes = "KitchenService", stubbed by DBLE in isolation
+// DEF: real — the actual production service, NOT launched here = "KitchenService", the real_dep value
+// DEF: ticket — the Kitchen ticket id the double returns = "T-88"
+// DEF: seen — the reply value the service observed from the double = "T-88", stored in ticket_seen
 // STATE (before):
 //    real_dep : "KitchenService"        // the real dependency, not launched
 //    double : { createTicket:"" }
@@ -86,6 +90,8 @@ registerChapter({
       ],
       program: `// SERVICE SIDE — resulting context: isolation is cheap, but doubles can drift from the real service
 // PARTIES: OSVC = Order Service · DBLE = test double · PROD = production
+// DEF: test — the in-isolation component suite run = test_result "green"
+// DEF: result — the verdict of one run = "green" (passing) or "red" (failing)
 // STATE (before):
 //    test_result : ""
 //    prod_result : ""

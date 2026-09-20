@@ -87,6 +87,9 @@ registerChapter({
       ],
       program: `// IDENTIFICATION SIDE — find subdomains from the org structure and the domain model
 // PARTIES: ARC = architect
+// DEF: domain — the business problem space DDD decomposes into subdomains; here the online store, whose key domain objects are "Order" and "Product"
+// DEF: model — the high-level domain model holding the key domain objects that suggest subdomains; here { "Order":{}, "Product":{} } = 2 objects
+// DEF: org — the organization structure whose groups may correspond to subdomains; here { "Catalog Team":{}, "Fulfillment Team":{} } = 2 groups
 // STATE (before):
 //    org_groups : { "Catalog Team":{}, "Fulfillment Team":{} }
 //    domain_model : { "Order":{}, "Product":{} }

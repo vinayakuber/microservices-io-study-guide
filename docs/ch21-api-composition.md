@@ -31,6 +31,7 @@ flowchart TD
 ```java
 // QUERY SIDE — why one logical query can no longer be a single SQL JOIN
 // PARTIES: CLI = client rendering an order page · CUST = Customer Service · ORD = Order Service
+// DEF: db — a service-owned database that holds only its own service's rows = a keyed store; here cust_db = {"C-77":{name:"Ada"}} and ord_db = {"O-101":{cust_id:"C-77", total:120.00}}
 // STATE (before):
 //    cust_db : { "C-77": {name:"Ada"} }                          // rows owned by CUST only
 //    ord_db  : { "O-101": {cust_id:"C-77", total:120.00} }       // rows owned by ORD only
@@ -106,6 +107,7 @@ flowchart TD
 ```java
 // COMPOSER SIDE — the in-memory join merges fragments on the shared key
 // PARTIES: CMP = API Composer · ORD = Order Service · CUST = Customer Service
+// DEF: row — one fragment/record returned by a service, keyed by the shared id = one element of ord_rows or cust_rows; here the order row {"O-101":{total:120.00}} and the customer row {"C-77":{name:"Ada"}}
 // STATE (before):
 //    ord_rows  : [{"O-101":{total:120.00}}, {"O-102":{total:80.00}}]        // fetched from ORD
 //    cust_rows : [{"C-77":{name:"Ada"}}]                                     // fetched from CUST
@@ -145,6 +147,7 @@ flowchart TD
 ```java
 // COMPOSER SIDE — the tradeoff: joining a large dataset in memory gets inefficient
 // PARTIES: CMP = API Composer · ORD = Order Service · CUST = Customer Service
+// DEF: row — one order or customer record pulled from a service = one element of ord_rows; here ORD.fetch_all("last 30 days") returns 900000 order rows
 // STATE (before):
 //    ord_rows  : []                         // order rows pulled from ORD
 //    cust_rows : []                         // customer rows pulled from CUST

@@ -17,6 +17,7 @@ registerChapter({
       ],
       program: `// ORDER SERVICE SIDE — a local ACID transaction cannot reach the credit data that lives in another service
 // PARTIES: ORD = Order Service · ORDDB = Orders database · CS = Customer Service · CSDB = Customers database
+// DEF: credit — the customer's spending limit owned by the Customer Service = 100.00 (the order total that must not exceed it)
 // STATE (before):
 //    orders : {}
 //    customer_credit : {}          // owned by CS in CSDB, invisible to ORDDB
@@ -42,6 +43,7 @@ registerChapter({
       ],
       program: `// ORDER SERVICE SIDE — an orchestrated create-order saga across three services, with a failure and full compensation
 // PARTIES: CLIENT = the user · ORD = Order Service (runs the orchestrator) · CS = Customer Service · KIT = Kitchen Service
+// DEF: credit — the customer's available balance a saga step reserves and releases = { "CUST-7" : 500.00 }
 // STATE (before):
 //    orders : {}
 //    customer_credit : { "CUST-7" : 500.00 }     // available credit, owned by Customer Service
@@ -74,6 +76,8 @@ registerChapter({
       ],
       program: `// ORDER SERVICE SIDE — choreography: each local transaction publishes a domain event that triggers the next local transaction
 // PARTIES: ORD = Order Service · CS = Customer Service · BRK = the events travelling between them
+// DEF: credit — the customer's available balance a saga step reserves = { "CUST-7" : 500.00 }
+// DEF: event — a domain message a service publishes to trigger the next local transaction = "OrderCreated"
 // STATE (before):
 //    orders : {}
 //    customer_credit : { "CUST-7" : 500.00 }

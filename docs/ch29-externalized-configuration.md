@@ -68,6 +68,8 @@ flowchart TD
 ```java
 // DEPLOYMENT SIDE — the SAME build runs in QA and production because each environment supplies its own values
 // PARTIES: ENV-QA = QA environment · ENV-PROD = production environment · DB = database server
+// DEF: config — the key/value settings a service reads at startup; here qa_config = {"db_url":"jdbc:mysql://qa-db:3306/orders","db_password":"qa-secret"}
+// DEF: connection — the open link to a dependency, established from config; here connection = "qa-db"
 // STATE (before):
 //    artifact : "orders-service.jar"      // the identical, unmodified build
 //    qa_config : {}                        // what the QA deployment resolves at startup
@@ -108,6 +110,10 @@ flowchart TD
 ```java
 // WEB SERVICE SIDE — config names the dependency logically; client-side discovery resolves the real location
 // PARTIES: WEB = web service (RegistrationServiceProxy) · REG = registration service · DISC = client-side discovery
+// DEF: call — the invocation the proxy makes to the dependency; here call_target = "http://10.0.0.7:8080/user"
+// DEF: resolved — turned from a logical name into a real network address; here resolved_url = "http://10.0.0.7:8080/user"
+// DEF: target — the specific address the proxy will call; here target = "http://10.0.0.7:8080/user"
+// DEF: url — the network location string held in config; here url = "http://REGISTRATION-SERVICE/user" resolving to "http://10.0.0.7:8080/user"
 // STATE (before):
 //    config : {}                           // WEB holds no registration URL yet
 //    resolved_url : ""                     // real network location, not yet found

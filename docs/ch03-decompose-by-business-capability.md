@@ -35,6 +35,7 @@ flowchart TD
 ```java
 // CHANGE SIDE — one business rule change must touch one service (CCP), not many
 // PARTIES: DEV = developer · SVC_O = order service · SVC_I = inventory service · SVC_D = delivery service
+// DEF: impact — the footprint of a change, i.e. which services it touches; here impact = { "SVC_O":0, "SVC_I":0, "SVC_D":0 }
 // STATE (before):
 //    change_impact : { "SVC_O":0, "SVC_I":0, "SVC_D":0 }
 //    teams_to_coordinate : 0
@@ -118,6 +119,8 @@ flowchart TD
 ```java
 // SIZING SIDE — a service must fit a two-pizza team (6-10 people) and hide its implementation behind an API
 // PARTIES: ORG = engineering org
+// DEF: api — the interface a service exposes so clients call it without seeing its implementation; here api = { exposed: 0 }
+// DEF: service — a cohesive, loosely coupled unit small enough for a 6-10 person team and testable; here service = a 7-member team
 // STATE (before):
 //    team : { members: 2 }
 //    service_api : { exposed: 0 }
@@ -159,6 +162,9 @@ flowchart TD
 ```java
 // IDENTIFICATION SIDE — find capabilities from the org structure and the domain model
 // PARTIES: ARC = architect analyzing the organization
+// DEF: domain — the high-level domain model, a map of the business's key objects; here domain = { "Product":{}, "Order":{} }
+// DEF: object — a domain object, a business thing a capability manages; here object = "Product"
+// DEF: org — the organization structure, its groups and areas of expertise; here org = { "Merchandising":{}, "Warehouse":{}, "Customer Service":{} }
 // STATE (before):
 //    org_groups : { "Merchandising":{}, "Warehouse":{}, "Customer Service":{} }
 //    domain_objects : { "Product":{}, "Order":{} }

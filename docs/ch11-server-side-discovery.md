@@ -35,6 +35,8 @@ flowchart TD
 ```java
 // ROUTER SIDE — the client calls a well-known router, which consults the registry and forwards to an instance
 // PARTIES: CLI = client · RTR = router (load balancer) · REG = service registry · SVC = order-service instance
+// DEF: router — the load balancer the client calls at a well-known address = RTR, which forwards to router_target "10.0.1.7:8080"
+// DEF: target — the instance location the router forwards to = "10.0.1.7:8080"
 // STATE (before):
 //    registry : {"order-service" -> [{"host":"10.0.1.7","port":8080},{"host":"10.0.1.8","port":8080}]}
 //    lookup : []
@@ -77,6 +79,7 @@ flowchart TD
 ```java
 // ELB SIDE — the load balancer is also the registry; instances register explicitly or via an autoscaling group
 // PARTIES: CLI = client · ELB = Elastic Load Balancer (router + registry) · EC2 = service instances
+// DEF: target — one EC2 instance the ELB load-balances across = elb_targets hosts "10.0.3.1" and "10.0.3.2"
 // STATE (before):
 //    elb_targets : {"order-service" -> [{"id":"i-abc","host":"10.0.3.1"},{"id":"i-def","host":"10.0.3.2"}]}
 // DEF: an autoscaling group adds an instance · CALLED BY: the ASG scaling out
@@ -112,6 +115,9 @@ flowchart TD
 ```java
 // CLUSTER SIDE — each host runs a proxy; the client connects to the local proxy's port and it forwards into the cluster
 // PARTIES: CLI = client on a host · PRX = per-host proxy (server-side router) · SVC = service instance in the cluster
+// DEF: cluster — the set of hosts whose services the proxy reaches = cluster_map mapping order-service to "port 8080"
+// DEF: proxy — the per-host router the client dials at a local port = PRX, which forwards to proxy_target "10.0.4.9:8080"
+// DEF: target — the instance location the proxy forwards to = "10.0.4.9:8080"
 // STATE (before):
 //    cluster_map : {"order-service" -> "port 8080"}
 //    proxy_target : "unset"

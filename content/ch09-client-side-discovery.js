@@ -18,6 +18,9 @@ registerChapter({
       ],
       program: `// CLIENT SIDE — a hardcoded host:port goes stale the moment instances move, motivating a lookup mechanism
 // PARTIES: CLI = order-service client · SVC = order-service instances
+// DEF: call — one request the client sends to the order-service = call_status "ok", which becomes "connection refused" once the endpoint goes stale
+// DEF: instance — one running copy of the order-service = the VM at instance_ip "10.0.1.7"
+// DEF: ip — the network address of an instance = "10.0.1.7", replaced by "10.0.1.9" when the autoscaler scales out
 // STATE (before):
 //    endpoint : "http://10.0.1.7:8080"
 //    instance_ip : "10.0.1.7"
@@ -66,6 +69,8 @@ registerChapter({
       ],
       program: `// CLIENT SIDE — the chassis (Spring Cloud) resolves a logical name via Eureka + Ribbon under the hood
 // PARTIES: CLI = RegistrationServiceProxy · RBN = Ribbon (HTTP client) · EUK = Eureka (registry) · SVC = registration-service instance
+// DEF: resttemplate — the Spring HTTP client whose URL host is resolved by Ribbon = restTemplate_target "unresolved", rewritten to "10.0.2.4:8080"
+// DEF: target — the network location a request is routed to = "10.0.2.4:8080"
 // STATE (before):
 //    eureka_registry : {"registration-service" -> [{"host":"10.0.2.4","port":8080}]}
 //    restTemplate_target : "unresolved"
