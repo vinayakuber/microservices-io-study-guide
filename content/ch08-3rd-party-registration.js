@@ -193,6 +193,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design service registration without the service knowing. Premise: a third-party registrar watches service instances and registers them in the service registry, so the service itself stays unchanged.',
     pipeline: 'service instance → third-party registrar → service registry',
     decomposition: [
       {

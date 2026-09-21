@@ -224,6 +224,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design publishing database changes without CDC. Premise: a polling publisher relay reads new rows from an outbox table and publishes them to a broker, so subscribers get messages without tailing the log.',
     pipeline: 'source database → polling publisher (relay) → message broker → subscriber',
     decomposition: [
       {

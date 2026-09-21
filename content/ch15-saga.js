@@ -261,6 +261,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design a transaction that spans services. Premise: an orchestrator drives each participant service through the broker, and every step that fails is compensated, so the business flow is eventually consistent.',
     pipeline: 'orchestrator → participant services → event/message broker',
     decomposition: [
       {

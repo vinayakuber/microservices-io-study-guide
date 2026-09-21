@@ -173,6 +173,8 @@ flowchart TD
 
 ## System Design Interview
 
+> **The question:** Design the unit of consistency for domain objects. Premise: a client loads an aggregate root, mutates its domain objects under one transaction, and the repository persists the whole aggregate atomically.
+
 **The pipeline:** client → aggregate root (domain objects) → repository → database
 
 ### client — calls the aggregate

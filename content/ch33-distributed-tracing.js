@@ -168,6 +168,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design request tracing across services. Premise: each service\'s Tracer emits spans through a Reporter and Sender over RabbitMQ to a Zipkin collector, so one request\'s path across services is reassembled.',
     pipeline: 'writer → transport → collector → aggregator/store → reader',
     decomposition: [
       {

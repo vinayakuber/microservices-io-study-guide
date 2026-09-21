@@ -221,6 +221,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design a service boundary. Premise: each business capability becomes one service (catalog) owned by one autonomous team, so the service owns its data and its lifecycle end to end.',
     pipeline: 'business capability → service → autonomous team',
     decomposition: [
       {

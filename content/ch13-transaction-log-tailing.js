@@ -241,6 +241,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design publishing database changes with CDC. Premise: a log tailer or miner reads the database transaction log and publishes changes to a broker, so subscribers see committed changes with low latency.',
     pipeline: 'database transaction log → log tailer/miner → message broker → subscriber',
     decomposition: [
       {

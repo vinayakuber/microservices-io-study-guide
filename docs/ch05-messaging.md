@@ -223,6 +223,8 @@ flowchart TD
 
 ## System Design Interview
 
+> **The question:** Design asynchronous communication between services. Premise: a sender builds a message and sends it through a RabbitMQ channel, and a receiver consumes it, so the two services never block on each other.
+
 **The pipeline:** sender/producer → message channel (broker) → receiver/consumer
 
 ### the sender — e.g. Order Service

@@ -175,6 +175,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design integration with a legacy system. Premise: a new subsystem talks to the legacy monolith only through an ACL adapter and translator, so the legacy model cannot leak into the new one.',
     pipeline: 'subsystem → ACL (adapter + translator) → legacy monolith',
     decomposition: [
       {

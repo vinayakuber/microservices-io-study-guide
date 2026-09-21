@@ -232,6 +232,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design the deployment for a small application. Premise: the monolith is one process with presentation, business logic, and data access tiers all hitting one database, so changes deploy as one unit and scale as one unit.',
     pipeline: 'client → monolithic application (presentation → business logic → data access) → single relational database',
     decomposition: [
       {

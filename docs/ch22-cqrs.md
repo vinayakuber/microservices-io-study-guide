@@ -210,6 +210,8 @@ flowchart TD
 
 ## System Design Interview
 
+> **The question:** Design separate read and write models. Premise: the command side appends to an event store, projections build query-side views, and the query side serves them, so read and write can scale and model independently.
+
 **The pipeline:** command side → event store → projections → query side
 
 ### Order Service — command side

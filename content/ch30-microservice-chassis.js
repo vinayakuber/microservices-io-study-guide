@@ -151,6 +151,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design shared cross-cutting concerns. Premise: each service uses a chassis framework of shared libraries for security, logging, and metrics, so teams do not rebuild the same plumbing per service.',
     pipeline: 'service → chassis framework (libraries) → cross-cutting concerns',
     decomposition: [
       {

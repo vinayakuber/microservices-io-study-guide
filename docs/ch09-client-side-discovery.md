@@ -223,6 +223,8 @@ flowchart TD
 
 ## System Design Interview
 
+> **The question:** Design service discovery where the client picks the instance. Premise: the client queries the service registry and load-balances across service instances itself, so no server-side hop is needed.
+
 **The pipeline:** client → service registry → service instances (client load-balances)
 
 ### order-service client — the client

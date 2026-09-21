@@ -200,6 +200,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design error visibility for services. Premise: a service reports exceptions to a tracker that collects, dedups, and aggregates them, and a developer reads the grouped stack traces.',
     pipeline: 'service → exception tracker (collect/dedup/aggregate) → developer reader',
     decomposition: [
       {

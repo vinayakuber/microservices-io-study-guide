@@ -126,6 +126,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design authentication between a client and services. Premise: a client obtains an access token from the identity provider; the API gateway validates it, and each service verifies it before acting.',
     pipeline: 'client → identity provider (token issuance) → API gateway (validation) → service',
     decomposition: [
       {

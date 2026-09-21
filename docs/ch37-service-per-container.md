@@ -197,6 +197,8 @@ n0["<b>1. Deploy test times the service</b><br/>same service 1.4.2, two packagin
 
 ## System Design Interview
 
+> **The question:** Design the deployment unit for a service. Premise: a build pipeline produces an image, the registry stores it, and the cluster runs each service in its own container, so deploys are immutable and portable.
+
 **The pipeline:** build pipeline → registry → cluster → container
 
 ### Build pipeline — the builder

@@ -182,6 +182,8 @@ flowchart TD
 
 ## System Design Interview
 
+> **The question:** Design deployment without managing servers. Premise: a client request goes through an API gateway into a function runtime that runs the function on demand, so capacity is provisioned per request.
+
 **The pipeline:** client request → API gateway → function runtime → function
 
 ### client — the HTTP caller that sends the request

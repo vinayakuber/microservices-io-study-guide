@@ -213,6 +213,8 @@ flowchart TD
 
 ## System Design Interview
 
+> **The question:** Design shared cross-cutting concerns. Premise: each service uses a chassis framework of shared libraries for security, logging, and metrics, so teams do not rebuild the same plumbing per service.
+
 **The pipeline:** service → chassis framework (libraries) → cross-cutting concerns
 
 ### Order Service — the new service

@@ -223,6 +223,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design the unit of consistency for domain objects. Premise: a client loads an aggregate root, mutates its domain objects under one transaction, and the repository persists the whole aggregate atomically.',
     pipeline: 'client → aggregate root (domain objects) → repository → database',
     decomposition: [
       {

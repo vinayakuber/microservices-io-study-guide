@@ -185,6 +185,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design service registration from the service itself. Premise: each service instance registers itself at startup and renews a heartbeat lease with the registry, so the registry reflects live instances.',
     pipeline: 'service instance → self-registrar → service registry',
     decomposition: [
       {

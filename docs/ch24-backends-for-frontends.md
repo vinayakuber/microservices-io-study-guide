@@ -197,6 +197,8 @@ flowchart TD
 
 ## System Design Interview
 
+> **The question:** Design a gateway per client type. Premise: each client (mobile or web) gets its own gateway that fetches and shapes one product from upstream services, so each client gets exactly the fields it needs.
+
 **The pipeline:** client → per-client gateway → upstream services
 
 ### Clients — two device shapes

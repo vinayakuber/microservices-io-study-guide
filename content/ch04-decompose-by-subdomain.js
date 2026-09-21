@@ -218,6 +218,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design boundaries from the domain model. Premise: the domain (food delivery) splits into core, supporting, and generic subdomains, and each subdomain becomes a service that owns its subdomain data.',
     pipeline: 'domain → subdomain (core/supporting/generic) → service',
     decomposition: [
       {

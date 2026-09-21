@@ -205,6 +205,8 @@ n0["<b>1. Issue crosses threshold</b><br/>FP-77A3 count 2, state OPEN, threshold
 
 ## System Design Interview
 
+> **The question:** Design error visibility for services. Premise: a service reports exceptions to a tracker that collects, dedups, and aggregates them, and a developer reads the grouped stack traces.
+
 **The pipeline:** service → exception tracker (collect/dedup/aggregate) → developer reader
 
 ### Order Service — the thrower

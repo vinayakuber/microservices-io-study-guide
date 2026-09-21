@@ -125,6 +125,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design an audit trail for business operations. Premise: the Order Service writes the business change and the audit record to the same database, and an aggregator reads them, so who-did-what is durable and queryable.',
     pipeline: 'service → audit log (store) → log aggregator → reader',
     decomposition: [
       {

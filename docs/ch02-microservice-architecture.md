@@ -226,6 +226,8 @@ flowchart TD
 
 ## System Design Interview
 
+> **The question:** Design a service decomposition. Premise: the application is split into microservices, each with its own business logic and its own database behind an API gateway, so teams deploy independently but distributed operations replace local ones.
+
 **The pipeline:** client → API gateway → microservices → service databases
 
 ### the client

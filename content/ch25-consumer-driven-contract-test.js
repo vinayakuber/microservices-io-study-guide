@@ -151,6 +151,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design contract testing driven by the consumer. Premise: the consumer (API Gateway) records its expectation in a Pact broker, and the provider verifies against it, so the two sides stay compatible without shared code.',
     pipeline: 'consumer → contract/expectation → provider verification → provider',
     decomposition: [
       {

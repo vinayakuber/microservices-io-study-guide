@@ -193,6 +193,8 @@ n0["<b>1. Health check reports failure</b><br/>SVC2 DOWN"]:::start
 
 ## System Design Interview
 
+> **The question:** Design liveness for service instances. Premise: each instance exposes a /health endpoint; a health-check client polls it and drives routing and alerting, so traffic stops reaching unhealthy instances.
+
 **The pipeline:** service instance → /health endpoint → health-check client → routing/alert
 
 ### Order Service — the instance under check

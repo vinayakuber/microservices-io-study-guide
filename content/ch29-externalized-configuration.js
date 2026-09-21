@@ -129,6 +129,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design configuration without redeploys. Premise: a service pulls its configuration from a config server backed by git, so changing a setting never requires rebuilding the service.',
     pipeline: 'service → config server → config repository (git/VCS)',
     decomposition: [
       {

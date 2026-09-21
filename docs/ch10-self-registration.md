@@ -166,6 +166,8 @@ flowchart TD
 
 ## System Design Interview
 
+> **The question:** Design service registration from the service itself. Premise: each service instance registers itself at startup and renews a heartbeat lease with the registry, so the registry reflects live instances.
+
 **The pipeline:** service instance → self-registrar → service registry
 
 ### order-service instance — the service instance

@@ -190,6 +190,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design simple business logic for a small module. Premise: the presentation tier calls a transaction script (OrderService), which runs the business procedure through a DAO (OrderDao) to the database, one operation at a time.',
     pipeline: 'presentation tier → transaction script (OrderService) → DAO (OrderDao) → database',
     decomposition: [
       {

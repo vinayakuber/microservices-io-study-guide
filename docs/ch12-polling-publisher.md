@@ -164,6 +164,8 @@ flowchart TD
 
 ## System Design Interview
 
+> **The question:** Design publishing database changes without CDC. Premise: a polling publisher relay reads new rows from an outbox table and publishes them to a broker, so subscribers get messages without tailing the log.
+
 **The pipeline:** source database → polling publisher (relay) → message broker → subscriber
 
 ### source database (outbox table) — the source database

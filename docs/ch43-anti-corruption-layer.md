@@ -141,6 +141,8 @@ flowchart TD
 
 ## System Design Interview
 
+> **The question:** Design integration with a legacy system. Premise: a new subsystem talks to the legacy monolith only through an ACL adapter and translator, so the legacy model cannot leak into the new one.
+
 **The pipeline:** subsystem → ACL (adapter + translator) → legacy monolith
 
 ### new Customer service — the subsystem that keeps its own clean model

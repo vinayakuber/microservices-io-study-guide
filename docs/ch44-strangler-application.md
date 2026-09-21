@@ -148,6 +148,8 @@ flowchart TD
 
 ## System Design Interview
 
+> **The question:** Design a monolith-to-microservices migration. Premise: a strangler facade/router sits in front of the legacy monolith and moves traffic one feature at a time to new microservices, so the monolith shrinks until it is gone.
+
 **The pipeline:** legacy monolith → strangler façade/router → new microservices
 
 ### legacy monolith — the running system that still serves unmigrated paths

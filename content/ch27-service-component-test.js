@@ -153,6 +153,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design in-process integration testing for a service. Premise: a test harness runs the Order Service in-process with its real wiring but stubbed dependencies (Kitchen Service), so behavior is tested without deploying.',
     pipeline: 'test harness → service under test (in-process) → stubbed dependencies',
     decomposition: [
       {

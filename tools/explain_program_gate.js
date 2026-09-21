@@ -21,6 +21,10 @@
 //       each major component into its internals, and draws the wiring as a
 //       mermaid diagram + an annotated program. Naming a component is not
 //       defining it; defining it is not wiring it.
+//   R17 (chapter-level) every chapter with a systemDesign section must OPEN it
+//       with the interview question being solved — the problem, the use case,
+//       and the premise. A pipeline without a question is a solution looking
+//       for a problem.
 //   R14 (chapter-level) every chapter with a program must cover BOTH a write
 //       path (data created/stored) AND a read path (data queried/served back).
 //       A write-only chapter hides how its store is consumed; a read-only
@@ -271,6 +275,14 @@ for (const ch of CHAPTERS) {
       if (!sd.program || !String(sd.program).trim()) r16.push('R16 systemDesign.program missing (annotate the wiring)');
     }
     if (r16.length) failures.push({ id: ch.id, section: '(system design)', probs: r16 });
+  }
+
+  // R17: the System Design Interview section must OPEN with the question being
+  // solved (the problem, the use case, and the premise). A pipeline that jumps
+  // straight to the boxes never says what we are trying to solve.
+  if (ch.systemDesign) {
+    const q = String(ch.systemDesign.question || '').trim();
+    if (q.length < 40) failures.push({ id: ch.id, section: '(system design)', probs: ['R17 systemDesign.question missing or too short (state the problem, use case, and premise being solved)'] });
   }
 }
 

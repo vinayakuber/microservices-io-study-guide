@@ -202,6 +202,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design network behavior outside the services. Premise: each service has a sidecar proxy in the data plane, and a control plane configures them, so retries, timeouts, and TLS happen without changing the service.',
     pipeline: 'service → sidecar proxy (data plane) → control plane',
     decomposition: [
       {

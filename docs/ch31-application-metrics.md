@@ -154,6 +154,8 @@ flowchart TD
 
 ## System Design Interview
 
+> **The question:** Design a metrics pipeline for services. Premise: an instrumented Order Service pushes or pulls metrics, Prometheus collects them, and a dashboard reads them, so operators watch each service's behavior live.
+
 **The pipeline:** writer (instrumented service) → transport (push/pull) → collector (metrics service) → aggregator (store/registry) → reader (dashboard)
 
 ### Order Service — the writer

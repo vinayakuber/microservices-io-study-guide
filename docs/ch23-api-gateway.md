@@ -198,6 +198,8 @@ flowchart TD
 
 ## System Design Interview
 
+> **The question:** Design one entry point for many services. Premise: a client sends one product request to the gateway, which composes calls to upstream services and returns one response, so clients never talk to services directly.
+
 **The pipeline:** client → gateway → upstream services
 
 ### Clients — the callers

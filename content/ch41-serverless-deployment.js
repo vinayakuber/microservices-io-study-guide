@@ -204,6 +204,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design deployment without managing servers. Premise: a client request goes through an API gateway into a function runtime that runs the function on demand, so capacity is provisioned per request.',
     pipeline: 'client request → API gateway → function runtime → function',
     decomposition: [
       {

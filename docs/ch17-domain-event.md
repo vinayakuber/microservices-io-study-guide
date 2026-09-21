@@ -155,6 +155,8 @@ flowchart TD
 
 ## System Design Interview
 
+> **The question:** Design change notification from aggregates. Premise: an aggregate publishes a domain event to a broker, and subscribers react to it, so services stay consistent without synchronous coupling.
+
 **The pipeline:** aggregate (publisher) → event broker (transport) → subscriber/consumer
 
 ### Order aggregate (in Order Service) — the publisher

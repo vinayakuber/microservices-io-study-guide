@@ -192,6 +192,8 @@ n0["<b>1. New line indexed</b><br/>ERROR order-service REQ-3001 customer lookup 
 
 ## System Design Interview
 
+> **The question:** Design centralized logs for services. Premise: each service writes logs, a transport ships them, a collector aggregates them into a store, and a reader queries them, so one query spans all services.
+
 **The pipeline:** writer → transport → collector → aggregator/store → reader
 
 ### Three services — the writers

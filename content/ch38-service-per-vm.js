@@ -207,6 +207,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design VM-based service deployment. Premise: a build pipeline produces an AMI, and IaaS runs each service in its own VM, so each service gets isolated resources and its own OS.',
     pipeline: 'build pipeline → image (AMI) → IaaS → VM instances',
     decomposition: [
       {

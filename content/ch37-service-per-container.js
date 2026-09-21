@@ -201,6 +201,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design the deployment unit for a service. Premise: a build pipeline produces an image, the registry stores it, and the cluster runs each service in its own container, so deploys are immutable and portable.',
     pipeline: 'build pipeline → registry → cluster → container',
     decomposition: [
       {

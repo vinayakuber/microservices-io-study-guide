@@ -214,6 +214,8 @@ flowchart TD
 
 ## System Design Interview
 
+> **The question:** Design reliable message publication. Premise: the application writes the business row and the outbox row in one database transaction, and a relay publishes the outbox, so a message is never lost or sent without its state change.
+
 **The pipeline:** application tx → outbox table → relay publisher → broker
 
 ### order service (application) — the application

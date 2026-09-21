@@ -222,6 +222,8 @@ flowchart TD
 
 ## System Design Interview
 
+> **The question:** Design a service boundary. Premise: each business capability becomes one service (catalog) owned by one autonomous team, so the service owns its data and its lifecycle end to end.
+
 **The pipeline:** business capability → service → autonomous team
 
 ### a business capability — e.g. product catalog

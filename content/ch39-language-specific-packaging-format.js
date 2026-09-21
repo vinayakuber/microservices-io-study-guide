@@ -203,6 +203,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design packaging for a JVM service. Premise: the build pipeline produces a language-specific package, and the machine runs it in a JVM process, so the runtime and the package match the language.',
     pipeline: 'build pipeline → package → machine (runtime) → JVM process',
     decomposition: [
       {

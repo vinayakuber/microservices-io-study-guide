@@ -218,6 +218,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design a system where the event log is the source of truth. Premise: a command appends an event to the event store; a projector folds events into a read model that queries answer, so state is always reconstructable.',
     pipeline: 'command → event store (append) → projector/event handler → read model → query',
     decomposition: [
       {

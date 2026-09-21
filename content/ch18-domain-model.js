@@ -221,6 +221,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design business logic around domain objects. Premise: a client calls a domain service, which mutates entities and value objects (Order plus DeliveryInformation) and persists them through a repository, so rules live with the data.',
     pipeline: 'client → domain service → entities/value objects → repository → database',
     decomposition: [
       {

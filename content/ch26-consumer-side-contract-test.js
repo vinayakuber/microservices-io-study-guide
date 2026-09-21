@@ -148,6 +148,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design provider testing from the consumer\'s contract. Premise: the consumer tests against a mock provider built from its contract stub, and the real provider is verified against the same contract.',
     pipeline: 'consumer → mock provider (contract) → provider service',
     decomposition: [
       {

@@ -168,6 +168,8 @@ flowchart TD
 
 ## System Design Interview
 
+> **The question:** Design service registration without the service knowing. Premise: a third-party registrar watches service instances and registers them in the service registry, so the service itself stays unchanged.
+
 **The pipeline:** service instance → third-party registrar → service registry
 
 ### the service instance

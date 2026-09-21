@@ -196,6 +196,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design liveness for service instances. Premise: each instance exposes a /health endpoint; a health-check client polls it and drives routing and alerting, so traffic stops reaching unhealthy instances.',
     pipeline: 'service instance → /health endpoint → health-check client → routing/alert',
     decomposition: [
       {

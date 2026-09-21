@@ -181,6 +181,8 @@ flowchart TD
 
 ## System Design Interview
 
+> **The question:** Design a per-instance helper container. Premise: an application container and a sidecar container share resources in one pod, so the helper handles concerns the application should not.
+
 **The pipeline:** application container → sidecar container → shared resources
 
 ### application container — the Order Service that owns the business logic

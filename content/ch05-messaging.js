@@ -239,6 +239,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design asynchronous communication between services. Premise: a sender builds a message and sends it through a RabbitMQ channel, and a receiver consumes it, so the two services never block on each other.',
     pipeline: 'sender/producer → message channel (broker) → receiver/consumer',
     decomposition: [
       {

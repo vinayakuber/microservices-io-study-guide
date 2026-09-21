@@ -218,6 +218,8 @@ flowchart TD
 
 ## System Design Interview
 
+> **The question:** Design service discovery behind a router. Premise: the client calls a router or load balancer, which queries the service registry and forwards to a live instance, so the client stays simple.
+
 **The pipeline:** client → router / load balancer → service registry → service instances
 
 ### client — calls only the router

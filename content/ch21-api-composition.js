@@ -228,6 +228,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design a query that spans services. Premise: an API composer calls several provider services and their databases and joins the results, so a client gets one response without a shared database.',
     pipeline: 'client → API composer → provider services → their databases',
     decomposition: [
       {

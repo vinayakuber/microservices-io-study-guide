@@ -216,6 +216,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design failure isolation for a downstream dependency. Premise: a breaker proxy sits between the caller and a downstream service; on consecutive failures it trips open and fails fast, so a down service cannot stall its caller.',
     pipeline: 'caller → breaker proxy → downstream service',
     decomposition: [
       {

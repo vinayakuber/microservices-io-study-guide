@@ -201,6 +201,8 @@ flowchart TD
 
 ## System Design Interview
 
+> **The question:** Design a system where the event log is the source of truth. Premise: a command appends an event to the event store; a projector folds events into a read model that queries answer, so state is always reconstructable.
+
 **The pipeline:** command → event store (append) → projector/event handler → read model → query
 
 ### Order Service command side — appends events

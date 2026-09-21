@@ -225,6 +225,7 @@ registerChapter({
     }
   ],
   systemDesign: {
+    question: 'Design synchronous service-to-service calls. Premise: a caller goes through a client stub/proxy, HTTP transport, and a server skeleton into business logic and back, so the caller blocks for a reply.',
     pipeline: 'caller → client stub/proxy → transport (HTTP) → server skeleton → business logic → reply',
     decomposition: [
       {

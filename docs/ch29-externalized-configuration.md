@@ -152,6 +152,8 @@ flowchart TD
 
 ## System Design Interview
 
+> **The question:** Design configuration without redeploys. Premise: a service pulls its configuration from a config server backed by git, so changing a setting never requires rebuilding the service.
+
 **The pipeline:** service → config server → config repository (git/VCS)
 
 ### Order Service — the consumer of config
