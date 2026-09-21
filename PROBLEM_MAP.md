@@ -1,7 +1,7 @@
-# The 28 problems → three knowledge bases (mapped + ranked)
+# The 28 problems → four knowledge bases (mapped + ranked)
 
 Each of the 28 system-design problems (in `system-design-deep-dives`) is mapped
-against **all three** books, and the best pattern/solution is **handpicked** per
+against **all four** books, and the best pattern/solution is **handpicked** per
 problem. Ranked candidates are listed strongest-first; the **PICK** is the one
 that belongs in the solution.
 
@@ -9,6 +9,7 @@ Books:
 - **DDIA** — Designing Data-Intensive Applications (14 chapters).
 - **PDS** — Patterns of Distributed Systems (30 patterns).
 - **MSP** — Microservice Patterns / microservices.io (44 patterns).
+- **SS** — Streaming Systems (10 chapters).
 
 Legend: ⭐ = the handpicked best for this problem · 🥈 = strong secondary · 🥉 = supporting.
 
@@ -33,8 +34,8 @@ Legend: ⭐ = the handpicked best for this problem · 🥈 = strong secondary ·
 | 17 | Nearby friends | PDS ch27 State watch + ch28 Gossip dissemination | DDIA ch12 Stream processing | MSP ch05 Messaging |
 | 18 | Google Maps | DDIA ch04 Spatial index | DDIA ch07 Sharding | MSP ch03 Decompose by business capability |
 | 19 | Distributed message queue | DDIA ch12 Stream processing (log-based broker) | PDS ch04 Segmented log + ch06 Leader-followers + ch12 Replicated log | MSP ch05 Messaging |
-| 20 | Metrics monitoring | MSP ch31 Application metrics + ch36 Log aggregation | DDIA ch12 Stream aggregation | MSP ch33 Distributed tracing |
-| 21 | Ad-click aggregation | DDIA ch12 Stream processing (windowing, exactly-once) | DDIA ch11 Batch processing | — |
+| 20 | Metrics monitoring | MSP ch31 Application metrics + ch36 Log aggregation | SS ch03 Watermarks + ch04 Advanced windowing + ch07 Persistent state | DDIA ch12 Stream aggregation · MSP ch33 Distributed tracing |
+| 21 | Ad-click aggregation | SS ch03 Watermarks + ch04 Advanced windowing + ch05 Exactly-once | DDIA ch12 Stream processing · DDIA ch11 Batch | SS ch07 Persistent state · ch10 Evolution |
 | 22 | Hotel reservation | MSP ch15 Saga | DDIA ch08 Transactions | PDS ch21 Two-phase commit · ch15 Idempotent receiver |
 | 23 | Distributed email | MSP ch14 Transactional outbox + ch05 Messaging | DDIA ch12 Stream processing | PDS ch03 WAL · ch04 Segmented log |
 | 24 | S3 object storage | DDIA ch04 Storage engines | DDIA ch06 Replication + ch07 Sharding | PDS ch17 Versioned value |
