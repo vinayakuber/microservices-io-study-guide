@@ -225,8 +225,8 @@ _Role: application_
 ```mermaid
 flowchart TD
   R["order service (application) — the application"]
-  R --> P0["Writes the order row"]
-  R --> P1["Writes the outbox event row in the same tx"]
+  R -->|"comprises"| P0["Writes the order row"]
+  R -->|"comprises"| P1["Writes the outbox event row in the same tx"]
 ```
 
 ### orders + outbox table (PostgreSQL 16 @ orders-db-1) — the database
@@ -236,8 +236,8 @@ _Role: database_
 ```mermaid
 flowchart TD
   R["orders + outbox table (PostgreSQL 16 @ orders-db-1) — the database"]
-  R --> P0["Keeps business rows and outbox rows in one instance"]
-  R --> P1["Commits both writes atomically"]
+  R -->|"comprises"| P0["Keeps business rows and outbox rows in one instance"]
+  R -->|"comprises"| P1["Commits both writes atomically"]
 ```
 
 ### relay publisher — the relay
@@ -247,9 +247,9 @@ _Role: relay_
 ```mermaid
 flowchart TD
   R["relay publisher — the relay"]
-  R --> P0["Reads outbox rows not yet relayed"]
-  R --> P1["Publishes them to the broker"]
-  R --> P2["Marks each row relayed"]
+  R -->|"comprises"| P0["Reads outbox rows not yet relayed"]
+  R -->|"comprises"| P1["Publishes them to the broker"]
+  R -->|"comprises"| P2["Marks each row relayed"]
 ```
 
 ### message broker (RabbitMQ) — the broker
@@ -259,8 +259,8 @@ _Role: broker_
 ```mermaid
 flowchart TD
   R["message broker (RabbitMQ) — the broker"]
-  R --> P0["Holds published events"]
-  R --> P1["Delivers them to subscribers"]
+  R -->|"comprises"| P0["Holds published events"]
+  R -->|"comprises"| P1["Delivers them to subscribers"]
 ```
 
 ```mermaid
@@ -403,7 +403,7 @@ flowchart LR
   RLY["Relay"] -->|publish OrderPlaced| BRK[("Broker")]
   RLY -->|crash before mark| DB[("Outbox row still sent=false")]
   DB -->|re-select on restart| RLY2["Relay re-publishes"]
-  RLY2 --> BRK
+  RLY2 -->|"publishes to"| BRK
   BRK -->|OrderPlaced x2| CNS["Consumer dedupes"]
 ```
 

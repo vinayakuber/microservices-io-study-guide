@@ -118,7 +118,7 @@ registerChapter({
       diagram: `flowchart LR
   C["Registration Service"] -->|"POST /register"| SVC["User Registration service"]
   SVC -->|"200 OK"| C
-  C --> R["Right(user-14)"]`,
+  C -->|"yields"| R["Right(user-14)"]`,
       code: `// CLIENT SIDE — RPI: the client POSTs a request and waits for a reply, with no broker in between
 // PARTIES: CLIENT = Registration Service · SVC = User Registration service (remote)
 // STATE (before):
@@ -146,7 +146,7 @@ registerChapter({
       diagram: `flowchart LR
   C["Registration Service"] -->|"POST /register"| SVC["User Registration service"]
   SVC -->|"409 CONFLICT"| C
-  C --> L["Left(DuplicateRegistrationError)"]`,
+  C -->|"yields"| L["Left(DuplicateRegistrationError)"]`,
       code: `// CLIENT SIDE — RPI error path: a duplicate sign-up maps a 409 CONFLICT to a typed error
 // PARTIES: CLIENT = Registration Service · SVC = User Registration service (remote)
 // STATE (before):
@@ -174,7 +174,7 @@ registerChapter({
       components: ["Both sides available", "Blocked caller thread", "Timeout expiry", "No broker to buffer"],
       diagram: `flowchart LR
   C["Registration Service"] -->|"POST /register"| SVC["User Registration (down)"]
-  C --> T["thread WAITING -> timeout"]`,
+  C -->|"blocks in"| T["thread WAITING -> timeout"]`,
       code: `// CLIENT SIDE — RPI availability: client and service must both be available for the whole call
 // PARTIES: CLIENT = Registration Service · SVC = User Registration service (unresponsive)
 // STATE (before):
@@ -200,7 +200,7 @@ registerChapter({
       solution: "The client discovers the instance's location via client-side or server-side discovery, resolves its URL from externalized configuration, and invokes behind a circuit breaker.",
       components: ["Service discovery", "Externalized config URL", "Circuit breaker wrapper"],
       diagram: `flowchart LR
-  C["Registration Service"] --> DISC["service registry"]
+  C["Registration Service"] -->|"queries"| DISC["service registry"]
   DISC -->|"10.0.2.9:8080"| C
   C -->|"behind breaker"| SVC["User Registration instance"]`,
       code: `// CLIENT SIDE — RPI wiring: discover an instance, resolve its URL, then invoke behind a breaker

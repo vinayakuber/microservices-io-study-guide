@@ -142,7 +142,7 @@ registerChapter({
   TX1["Commit OrderCreated"] -->|binlog write| LOG[("Binlog")]
   TX2["Rollback OrderShipped"] -->|no committed write| LOG
   LOG -->|only committed rows| TLR["Publishes OrderCreated only"]
-  TLR --> BRK[("Broker, never enlisted")]`,
+  TLR -->|"publishes to"| BRK[("Broker, never enlisted")]`,
       code: `// TAILER SIDE — the log carries only committed writes, so a rolled-back event is never published
 // PARTIES: SVC = Order Service · DB = MySQL 8 @ orders-db-1 · LOG = binlog · TLR = log tailer · BRK = message broker
 // STATE (before):
@@ -178,7 +178,7 @@ registerChapter({
   TLR["Tailer reads seq 70"] -->|publish OrderCreated| BRK[("Broker")]
   TLR -->|crash before save| P["position stays 69"]
   P -->|restart, re-read seq 70| TLR2["Tailer re-publishes"]
-  TLR2 --> BRK
+  TLR2 -->|"publishes to"| BRK
   BRK -->|OrderCreated x2| CNS["Consumer dedupes to once"]`,
       code: `// TAILER SIDE — a crash between publish and position-save re-reads an entry, so consumers dedupe
 // PARTIES: TLR = log tailer · DB = MySQL 8 @ orders-db-1 · BRK = message broker · CNS = consumer service
@@ -216,7 +216,7 @@ registerChapter({
   MY[("MySQL binlog")] -->|reader A| TLR["Tailer"]
   PG[("Postgres WAL")] -->|reader B| TLR
   DD[("DynamoDB streams")] -->|reader C| TLR
-  TLR --> BRK[("Broker")]`,
+  TLR -->|"publishes to"| BRK[("Broker")]`,
       code: `// TAILER SIDE — each database logs commits in its own format, so the tailer needs a database-specific reader
 // PARTIES: TLR = log tailer · BRK = message broker
 // DEF: mysql_binlog — MySQL's log entry = { "seq":80, "op":"write", "table":"outbox", "row":(80,"OrderCreated") }

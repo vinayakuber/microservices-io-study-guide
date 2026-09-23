@@ -170,8 +170,8 @@ registerChapter({
         "Domain model — the refactor target"
       ],
       diagram: `flowchart LR
-  A["createOrder + discount"] --> B["+ approval rule"]
-  B --> C["+ split shipment rule"]
+  A["createOrder + discount"] -->|"adds"| B["+ approval rule"]
+  B -->|"adds"| C["+ split shipment rule"]
   C -->|too many branches| FIX["refactor to domain model"]`,
       code: `// ORDER SERVICE SIDE — the pattern sprawls as rules multiply: a script that grows a branch per new business rule
 // PARTIES: TS = the transaction script · DAO = the data access object

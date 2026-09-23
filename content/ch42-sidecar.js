@@ -156,7 +156,7 @@ registerChapter({
   MON["Monitoring service"] -->|"GET /health"| SIDE["Sidecar"]
   SIDE -->|"status UP"| MON
   SIDE -->|"metric 1"| MON
-  SVC["Order Service"] --- SIDE`,
+  SVC["Order Service"] ---|"runs beside"| SIDE`,
       code: `// INBOUND SIDE — a monitor pings the sidecar, which answers for the service without touching its code
 // PARTIES: MON = monitoring service · SIDE = the sidecar · SVC = Order Service
 // STATE (before):
@@ -182,7 +182,7 @@ registerChapter({
   SIDEA["Sidecar A"] -->|"forward"| SIDEB["Sidecar B"]
   SIDEB -->|"hands off"| SVCB["Customer Service"]
   SIDEA -->|"together"| MESH["service mesh"]
-  SIDEB --> MESH`,
+  SIDEB -->|"together"| MESH`,
       code: `// MESH SIDE — when every instance has a sidecar, the set of sidecars mediates all traffic: a service mesh
 // PARTIES: SIDEA = sidecar of Order Service · SIDEB = sidecar of Customer Service · SVCB = Customer Service
 // STATE (before):

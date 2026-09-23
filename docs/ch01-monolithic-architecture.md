@@ -277,9 +277,9 @@ _Role: application (all three tiers in one process)_
 ```mermaid
 flowchart TD
   R["the monolith — one deployable process holding every subdomain"]
-  R --> P0["presentation tier — receives client requests, returns responses"]
-  R --> P1["business logic — implements business rules, mutates entities"]
-  R --> P2["data-access layer — reads and writes the single database"]
+  R -->|"comprises"| P0["presentation tier — receives client requests, returns responses"]
+  R -->|"comprises"| P1["business logic — implements business rules, mutates entities"]
+  R -->|"comprises"| P2["data-access layer — reads and writes the single database"]
 ```
 
 ### the single relational database
@@ -289,9 +289,9 @@ _Role: store_
 ```mermaid
 flowchart TD
   R["the single relational database"]
-  R --> P0["PostgreSQL 16 @ monolith-db-1 — the one engine and instance"]
-  R --> P1["holds the rows of every subdomain in one schema"]
-  R --> P2["one ACID transaction spans the Orders and Credit subdomains"]
+  R -->|"comprises"| P0["PostgreSQL 16 @ monolith-db-1 — the one engine and instance"]
+  R -->|"comprises"| P1["holds the rows of every subdomain in one schema"]
+  R -->|"comprises"| P2["one ACID transaction spans the Orders and Credit subdomains"]
 ```
 
 ### the client
@@ -301,15 +301,15 @@ _Role: client_
 ```mermaid
 flowchart TD
   R["the client"]
-  R --> P0["sends a synchronous request to the monolith"]
-  R --> P1["reads the response — no network hops inside the app"]
+  R -->|"comprises"| P0["sends a synchronous request to the monolith"]
+  R -->|"comprises"| P1["reads the response — no network hops inside the app"]
 ```
 
 ```mermaid
 flowchart LR
   CLI["Client"] -->|"POST /orders/PO-2001"| APP["Monolith (one process)"]
-  APP --> BL["business logic tier"]
-  BL --> DA["data-access layer"]
+  APP -->|"routes to"| BL["business logic tier"]
+  BL -->|"calls"| DA["data-access layer"]
   DA -->|"INSERT / query"| DB[("PostgreSQL 16 @ monolith-db-1")]
   DB -->|"row back"| DA
   APP -->|"response"| CLI
@@ -350,11 +350,11 @@ You run an online store as a single Rails app backed by one Postgres database. A
 
 ```mermaid
 flowchart LR
-  P["placeOrder(PO-5002)"] --> T1["BEGIN T1"]
-  T1 --> O["write order row"]
-  T1 --> C["reserve credit"]
-  O --> CM["COMMIT T1"]
-  C --> CM
+  P["placeOrder(PO-5002)"] -->|"starts"| T1["BEGIN T1"]
+  T1 -->|"writes"| O["write order row"]
+  T1 -->|"reserves"| C["reserve credit"]
+  O -->|"commits"| CM["COMMIT T1"]
+  C -->|"commits"| CM
 ```
 
 ```java
@@ -398,10 +398,10 @@ Your monolith now has five subdomains and six teams. Team Orders commits a one-l
 
 ```mermaid
 flowchart LR
-  C["tax fix in Orders"] --> B["rebuild whole WAR"]
-  B --> T["rerun 200 tests"]
-  T --> D["redeploy 4 instances"]
-  D --> X["Billing change ships too"]
+  C["tax fix in Orders"] -->|"forces"| B["rebuild whole WAR"]
+  B -->|"triggers"| T["rerun 200 tests"]
+  T -->|"gates"| D["redeploy 4 instances"]
+  D -->|"ships"| X["Billing change ships too"]
 ```
 
 ```java
@@ -443,9 +443,9 @@ An architect weighs splitting the monolith into services. A skeptical reviewer a
 
 ```mermaid
 flowchart LR
-  OP["placeOrder + reserveCredit"] --> L["local, 0 hops"]
-  OP --> A["one ACID txn"]
-  OP --> NC["no cross-service coupling"]
+  OP["placeOrder + reserveCredit"] -->|"stays"| L["local, 0 hops"]
+  OP -->|"runs in"| A["one ACID txn"]
+  OP -->|"avoids"| NC["no cross-service coupling"]
 ```
 
 ```java
@@ -488,7 +488,7 @@ The monolith is getting painful to build, but the team is not ready to rewrite i
 
 ```mermaid
 flowchart LR
-  E["edit orders/persistence"] --> S["orders slice"]
+  E["edit orders/persistence"] -->|"touches"| S["orders slice"]
   S -->|rebuild| IB["incremental build"]
   BL["billing slice"] -.skip.-> IB
 ```
@@ -529,11 +529,11 @@ Structure the application as a single deployable/executable component that uses 
 
 ```mermaid
 flowchart LR
-  P["placeOrder(PO-5002)"] --> T1["BEGIN T1"]
-  T1 --> O["write order row"]
-  T1 --> C["reserve credit"]
-  O --> CM["COMMIT T1"]
-  C --> CM
+  P["placeOrder(PO-5002)"] -->|"starts"| T1["BEGIN T1"]
+  T1 -->|"writes"| O["write order row"]
+  T1 -->|"reserves"| C["reserve credit"]
+  O -->|"commits"| CM["COMMIT T1"]
+  C -->|"commits"| CM
 ```
 
 

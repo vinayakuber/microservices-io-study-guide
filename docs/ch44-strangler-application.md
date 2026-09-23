@@ -159,8 +159,8 @@ _Role: legacy monolith_
 ```mermaid
 flowchart TD
   R["legacy monolith — the running system that still serves unmigrated paths"]
-  R --> P0["checkout + accounts — features not yet moved"]
-  R --> P1["Serves — any path the route table still points at it"]
+  R -->|"comprises"| P0["checkout + accounts — features not yet moved"]
+  R -->|"comprises"| P1["Serves — any path the route table still points at it"]
 ```
 
 ### strangler façade / router — fronts both systems and decides per request
@@ -170,8 +170,8 @@ _Role: router_
 ```mermaid
 flowchart TD
   R["strangler façade / router — fronts both systems and decides per request"]
-  R --> P0["Route by path — looks up each path in the route table"]
-  R --> P1["Incrementally replace — moves one feature at a time"]
+  R -->|"comprises"| P0["Route by path — looks up each path in the route table"]
+  R -->|"comprises"| P1["Incrementally replace — moves one feature at a time"]
 ```
 
 ### new microservices — the growing strangler application
@@ -181,8 +181,8 @@ _Role: new microservices_
 ```mermaid
 flowchart TD
   R["new microservices — the growing strangler application"]
-  R --> P0["Migrated features — catalog, search re-implemented"]
-  R --> P1["New features — recommendations, wishlist with no monolith twin"]
+  R -->|"comprises"| P0["Migrated features — catalog, search re-implemented"]
+  R -->|"comprises"| P1["New features — recommendations, wishlist with no monolith twin"]
 ```
 
 ```mermaid
@@ -361,7 +361,7 @@ flowchart LR
   RELEASE["Release"] -->|"deploy"| MONO["Monolith"]
   RELEASE -->|"deploy"| NEW["Strangler"]
   MONO -->|"until retired"| COST["two systems to run"]
-  NEW --> COST
+  NEW -->|"until retired"| COST
 ```
 
 ```java

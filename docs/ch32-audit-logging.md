@@ -171,8 +171,8 @@ _Role: service (business op + audit record)_
 ```mermaid
 flowchart TD
   R["Order Service — the writer"]
-  R --> P0["performs the business op (view/create/pay order)"]
-  R --> P1["writes one audit row per action"]
+  R -->|"comprises"| P0["performs the business op (view/create/pay order)"]
+  R -->|"comprises"| P1["writes one audit row per action"]
 ```
 
 ### audit log store
@@ -182,8 +182,8 @@ _Role: audit log (store)_
 ```mermaid
 flowchart TD
   R["audit log store"]
-  R --> P0["PostgreSQL 16 @ audit-db-1"]
-  R --> P1["holds rows (id, user, action, target, at)"]
+  R -->|"comprises"| P0["PostgreSQL 16 @ audit-db-1"]
+  R -->|"comprises"| P1["holds rows (id, user, action, target, at)"]
 ```
 
 ### log aggregator
@@ -193,8 +193,8 @@ _Role: log aggregator_
 ```mermaid
 flowchart TD
   R["log aggregator"]
-  R --> P0["collects audit rows across services"]
-  R --> P1["indexes them for query"]
+  R -->|"comprises"| P0["collects audit rows across services"]
+  R -->|"comprises"| P1["indexes them for query"]
 ```
 
 ### reader (auditor queries)
@@ -204,8 +204,8 @@ _Role: reader_
 ```mermaid
 flowchart TD
   R["reader (auditor queries)"]
-  R --> P0["support/compliance/security query the log"]
-  R --> P1["reconstructs what a user did"]
+  R -->|"comprises"| P0["support/compliance/security query the log"]
+  R -->|"comprises"| P1["reconstructs what a user did"]
 ```
 
 ```mermaid

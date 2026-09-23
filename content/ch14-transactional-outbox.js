@@ -186,7 +186,7 @@ registerChapter({
   RLY["Relay"] -->|publish OrderPlaced| BRK[("Broker")]
   RLY -->|crash before mark| DB[("Outbox row still sent=false")]
   DB -->|re-select on restart| RLY2["Relay re-publishes"]
-  RLY2 --> BRK
+  RLY2 -->|"publishes to"| BRK
   BRK -->|OrderPlaced x2| CNS["Consumer dedupes"]`,
       code: `// RELAY + CONSUMER SIDE — a crash between publish and mark re-sends the row, so the consumer dedupes
 // PARTIES: RLY = message relay · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox tables live in this ONE instance, so a single COMMIT covers both) · BRK = message broker · CNS = consumer service

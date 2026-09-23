@@ -204,8 +204,8 @@ _Role: service instance_
 ```mermaid
 flowchart TD
   R["Order Service — the instance under check"]
-  R --> P0["exposes GET /health"]
-  R --> P1["probes its db, disk, and app dependencies"]
+  R -->|"comprises"| P0["exposes GET /health"]
+  R -->|"comprises"| P1["probes its db, disk, and app dependencies"]
 ```
 
 ### Monitoring service — the health-check client
@@ -215,8 +215,8 @@ _Role: health-check client_
 ```mermaid
 flowchart TD
   R["Monitoring service — the health-check client"]
-  R --> P0["polls /health every 30s"]
-  R --> P1["marks the instance UP or DOWN"]
+  R -->|"comprises"| P0["polls /health every 30s"]
+  R -->|"comprises"| P1["marks the instance UP or DOWN"]
 ```
 
 ### Load balancer + registry — routing/alert
@@ -226,8 +226,8 @@ _Role: routing/alert_
 ```mermaid
 flowchart TD
   R["Load balancer + registry — routing/alert"]
-  R --> P0["LB stops routing to a DOWN instance"]
-  R --> P1["REG de-registers the unhealthy instance"]
+  R -->|"comprises"| P0["LB stops routing to a DOWN instance"]
+  R -->|"comprises"| P1["REG de-registers the unhealthy instance"]
 ```
 
 ```mermaid

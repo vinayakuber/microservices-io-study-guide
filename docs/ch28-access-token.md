@@ -159,8 +159,8 @@ _Role: identity provider (token issuance)_
 ```mermaid
 flowchart TD
   R["identity provider — the token issuer"]
-  R --> P0["authenticates the requestor (alice)"]
-  R --> P1["mints the JWT #quot;eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig#quot;"]
+  R -->|"comprises"| P0["authenticates the requestor (alice)"]
+  R -->|"comprises"| P1["mints the JWT #quot;eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig#quot;"]
 ```
 
 ### API gateway — the single entry point
@@ -170,8 +170,8 @@ _Role: API gateway (validation)_
 ```mermaid
 flowchart TD
   R["API gateway — the single entry point"]
-  R --> P0["validates the token signature"]
-  R --> P1["routes the request to the service with the token attached"]
+  R -->|"comprises"| P0["validates the token signature"]
+  R -->|"comprises"| P1["routes the request to the service with the token attached"]
 ```
 
 ### Order Service — the verifier
@@ -181,8 +181,8 @@ _Role: service_
 ```mermaid
 flowchart TD
   R["Order Service — the verifier"]
-  R --> P0["verifies the signature locally"]
-  R --> P1["checks role customer against operation place_order"]
+  R -->|"comprises"| P0["verifies the signature locally"]
+  R -->|"comprises"| P1["checks role customer against operation place_order"]
 ```
 
 ```mermaid

@@ -152,8 +152,8 @@ _Role: subsystem_
 ```mermaid
 flowchart TD
   R["new Customer service — the subsystem that keeps its own clean model"]
-  R --> P0["Domain model — id, dateOfBirth, status"]
-  R --> P1["Consumer — reads only what the ACL hands it"]
+  R -->|"comprises"| P0["Domain model — id, dateOfBirth, status"]
+  R -->|"comprises"| P1["Consumer — reads only what the ACL hands it"]
 ```
 
 ### anti-corruption layer — the translation boundary
@@ -163,8 +163,8 @@ _Role: ACL (adapter + translator)_
 ```mermaid
 flowchart TD
   R["anti-corruption layer — the translation boundary"]
-  R --> P0["Adapter — calls the legacy API / table"]
-  R --> P1["Translator — maps legacy names and codes to the modern model"]
+  R -->|"comprises"| P0["Adapter — calls the legacy API / table"]
+  R -->|"comprises"| P1["Translator — maps legacy names and codes to the modern model"]
 ```
 
 ### legacy monolith — the old system being shielded
@@ -174,8 +174,8 @@ _Role: legacy monolith_
 ```mermaid
 flowchart TD
   R["legacy monolith — the old system being shielded"]
-  R --> P0["customer table — cust_id, cust_dob, status_cd on PostgreSQL 14 @ legacy-db-1"]
-  R --> P1["Legacy codes — status_cd #quot;A#quot; for active"]
+  R -->|"comprises"| P0["customer table — cust_id, cust_dob, status_cd on PostgreSQL 14 @ legacy-db-1"]
+  R -->|"comprises"| P1["Legacy codes — status_cd #quot;A#quot; for active"]
 ```
 
 ```mermaid

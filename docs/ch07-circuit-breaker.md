@@ -223,8 +223,8 @@ _Role: caller_
 ```mermaid
 flowchart TD
   R["the caller"]
-  R --> P0["makes remote calls through the breaker"]
-  R --> P1["gets a fail-fast verdict while the breaker is OPEN"]
+  R -->|"comprises"| P0["makes remote calls through the breaker"]
+  R -->|"comprises"| P1["gets a fail-fast verdict while the breaker is OPEN"]
 ```
 
 ### the breaker proxy
@@ -234,9 +234,9 @@ _Role: breaker_
 ```mermaid
 flowchart TD
   R["the breaker proxy"]
-  R --> P0["failure counter (trips at threshold 4)"]
-  R --> P1["timeout timer (250 ms)"]
-  R --> P2["state machine CLOSED / OPEN / HALF-OPEN"]
+  R -->|"comprises"| P0["failure counter (trips at threshold 4)"]
+  R -->|"comprises"| P1["timeout timer (250 ms)"]
+  R -->|"comprises"| P2["state machine CLOSED / OPEN / HALF-OPEN"]
 ```
 
 ### the downstream service
@@ -246,8 +246,8 @@ _Role: server_
 ```mermaid
 flowchart TD
   R["the downstream service"]
-  R --> P0["answers calls while healthy"]
-  R --> P1["times out when degraded"]
+  R -->|"comprises"| P0["answers calls while healthy"]
+  R -->|"comprises"| P1["times out when degraded"]
 ```
 
 ```mermaid
@@ -294,9 +294,9 @@ A checkout service calls a payments service that has died. Calls keep arriving, 
 
 ```mermaid
 flowchart LR
-  C["Checkout"] --> P["breaker proxy"]
+  C["Checkout"] -->|"calls"| P["breaker proxy"]
   P -->|"fails"| SVC["Payments (down)"]
-  P --> O["OPEN when failures >= threshold"]
+  P -->|"trips"| O["OPEN when failures >= threshold"]
 ```
 
 ```java
@@ -337,7 +337,7 @@ The payments service is down and the breaker has tripped. New checkout requests 
 
 ```mermaid
 flowchart LR
-  C["Checkout"] --> P["breaker (OPEN)"]
+  C["Checkout"] -->|"calls"| P["breaker (OPEN)"]
   P -. "fail fast" .-> C
   P -. "never calls" .- SVC["Payments (down)"]
 ```
@@ -424,8 +424,8 @@ The team sets a 250 ms timeout, but the payments service reliably answers in abo
 
 ```mermaid
 flowchart LR
-  T["timeout 250ms"] --> FP["false positive (healthy 600ms marked down)"]
-  T2["timeout 5000ms"] --> EL["excessive latency (real outage hidden)"]
+  T["timeout 250ms"] -->|"causes"| FP["false positive (healthy 600ms marked down)"]
+  T2["timeout 5000ms"] -->|"causes"| EL["excessive latency (real outage hidden)"]
 ```
 
 ```java
@@ -466,9 +466,9 @@ The client invokes a remote service through a proxy that trips after a threshold
 
 ```mermaid
 flowchart LR
-  C["Checkout"] --> P["breaker proxy"]
+  C["Checkout"] -->|"calls"| P["breaker proxy"]
   P -->|"fails"| SVC["Payments (down)"]
-  P --> O["OPEN when failures >= threshold"]
+  P -->|"trips"| O["OPEN when failures >= threshold"]
 ```
 
 

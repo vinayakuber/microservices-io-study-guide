@@ -163,7 +163,7 @@ registerChapter({
   RELEASE["Release"] -->|"deploy"| MONO["Monolith"]
   RELEASE -->|"deploy"| NEW["Strangler"]
   MONO -->|"until retired"| COST["two systems to run"]
-  NEW --> COST`,
+  NEW -->|"until retired"| COST`,
       code: `// OPS SIDE — one release must deploy both systems, so the migration cost is two systems side by side
 // PARTIES: MONO = legacy monolith · NEW = new strangler application · OPS = operations team
 // STATE (before):

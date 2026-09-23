@@ -192,8 +192,8 @@ _Role: application container_
 ```mermaid
 flowchart TD
   R["application container — the Order Service that owns the business logic"]
-  R --> P0["Order Service — runs the business code"]
-  R --> P1["Sends calls — outbound traffic passes through the sidecar"]
+  R -->|"comprises"| P0["Order Service — runs the business code"]
+  R -->|"comprises"| P1["Sends calls — outbound traffic passes through the sidecar"]
 ```
 
 ### sidecar container — the concern-carrying twin
@@ -203,10 +203,10 @@ _Role: sidecar container_
 ```mermaid
 flowchart TD
   R["sidecar container — the concern-carrying twin"]
-  R --> P0["Proxy — intercepts outbound traffic and stamps a trace id"]
-  R --> P1["Log-shipper — forwards the logs from the shared volume"]
-  R --> P2["Config-reloader — watches and reloads config"]
-  R --> P3["Shares the pod — mounts the same volume and network namespace"]
+  R -->|"comprises"| P0["Proxy — intercepts outbound traffic and stamps a trace id"]
+  R -->|"comprises"| P1["Log-shipper — forwards the logs from the shared volume"]
+  R -->|"comprises"| P2["Config-reloader — watches and reloads config"]
+  R -->|"comprises"| P3["Shares the pod — mounts the same volume and network namespace"]
 ```
 
 ### shared resources — what both containers share
@@ -216,8 +216,8 @@ _Role: shared resources_
 ```mermaid
 flowchart TD
   R["shared resources — what both containers share"]
-  R --> P0["Network namespace — one IP for app and sidecar"]
-  R --> P1["Volume — shared-logs mounted by both"]
+  R -->|"comprises"| P0["Network namespace — one IP for app and sidecar"]
+  R -->|"comprises"| P1["Volume — shared-logs mounted by both"]
 ```
 
 ```mermaid
@@ -357,7 +357,7 @@ flowchart LR
   MON["Monitoring service"] -->|"GET /health"| SIDE["Sidecar"]
   SIDE -->|"status UP"| MON
   SIDE -->|"metric 1"| MON
-  SVC["Order Service"] --- SIDE
+  SVC["Order Service"] ---|"runs beside"| SIDE
 ```
 
 ```java
@@ -400,7 +400,7 @@ flowchart LR
   SIDEA["Sidecar A"] -->|"forward"| SIDEB["Sidecar B"]
   SIDEB -->|"hands off"| SVCB["Customer Service"]
   SIDEA -->|"together"| MESH["service mesh"]
-  SIDEB --> MESH
+  SIDEB -->|"together"| MESH
 ```
 
 ```java

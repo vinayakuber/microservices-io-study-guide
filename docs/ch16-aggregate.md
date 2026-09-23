@@ -184,8 +184,8 @@ _Role: client_
 ```mermaid
 flowchart TD
   R["client — calls the aggregate"]
-  R --> P0["Sends a command to the aggregate"]
-  R --> P1["Treats the aggregate as one unit"]
+  R -->|"comprises"| P0["Sends a command to the aggregate"]
+  R -->|"comprises"| P1["Treats the aggregate as one unit"]
 ```
 
 ### order aggregate root (order + line items) — the aggregate
@@ -195,8 +195,8 @@ _Role: aggregate root_
 ```mermaid
 flowchart TD
   R["order aggregate root (order + line items) — the aggregate"]
-  R --> P0["Enforces invariants on the order"]
-  R --> P1["Adds the line item and recomputes the total"]
+  R -->|"comprises"| P0["Enforces invariants on the order"]
+  R -->|"comprises"| P1["Adds the line item and recomputes the total"]
 ```
 
 ### repository — the repository
@@ -206,8 +206,8 @@ _Role: repository_
 ```mermaid
 flowchart TD
   R["repository — the repository"]
-  R --> P0["Loads the aggregate"]
-  R --> P1["Persists the aggregate after the command"]
+  R -->|"comprises"| P0["Loads the aggregate"]
+  R -->|"comprises"| P1["Persists the aggregate after the command"]
 ```
 
 ### PostgreSQL 16 @ orders-db-1 — the database
@@ -217,7 +217,7 @@ _Role: database_
 ```mermaid
 flowchart TD
   R["PostgreSQL 16 @ orders-db-1 — the database"]
-  R --> P0["Stores the aggregate as one consistency boundary"]
+  R -->|"comprises"| P0["Stores the aggregate as one consistency boundary"]
 ```
 
 ```mermaid
@@ -266,7 +266,7 @@ Your Order and its line items live as separate objects, and every time a line ch
 
 ```mermaid
 flowchart LR
-  SVC["Order Service"] --> ROOT["Order root"]
+  SVC["Order Service"] -->|"aggregates via"| ROOT["Order root"]
   ROOT -->|owns| A["Line item BOOK-1"]
   ROOT -->|owns| B["Line item BOOK-2"]
   ROOT -->|recomputes| TOT["total 35.00"]
@@ -442,7 +442,7 @@ Model the cluster as an aggregate — a graph of objects that can be treated as 
 
 ```mermaid
 flowchart LR
-  SVC["Order Service"] --> ROOT["Order root"]
+  SVC["Order Service"] -->|"aggregates via"| ROOT["Order root"]
   ROOT -->|owns| A["Line item BOOK-1"]
   ROOT -->|owns| B["Line item BOOK-2"]
   ROOT -->|recomputes| TOT["total 35.00"]

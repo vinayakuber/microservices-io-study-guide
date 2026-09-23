@@ -224,8 +224,8 @@ _Role: service_
 ```mermaid
 flowchart TD
   R["Order Service — the new service"]
-  R --> P0["adopts the chassis via a Gradle plugin"]
-  R --> P1["inherits the cross-cutting wiring"]
+  R -->|"comprises"| P0["adopts the chassis via a Gradle plugin"]
+  R -->|"comprises"| P1["inherits the cross-cutting wiring"]
 ```
 
 ### chassis framework 2.4.0 — the shared libraries
@@ -235,8 +235,8 @@ _Role: chassis framework (libraries)_
 ```mermaid
 flowchart TD
   R["chassis framework 2.4.0 — the shared libraries"]
-  R --> P0["externalized configuration + health-check URL"]
-  R --> P1["logging, metrics (counter: orders_created), and tracing"]
+  R -->|"comprises"| P0["externalized configuration + health-check URL"]
+  R -->|"comprises"| P1["logging, metrics (counter: orders_created), and tracing"]
 ```
 
 ### the cross-cutting concerns
@@ -246,8 +246,8 @@ _Role: cross-cutting concerns_
 ```mermaid
 flowchart TD
   R["the cross-cutting concerns"]
-  R --> P0["security via an Access Token"]
-  R --> P1["service registration/discovery + circuit breakers"]
+  R -->|"comprises"| P0["security via an Access Token"]
+  R -->|"comprises"| P1["service registration/discovery + circuit breakers"]
 ```
 
 ```mermaid
@@ -297,9 +297,9 @@ The team is standing up three new services, and each one needs the same six cros
 ```mermaid
 flowchart LR
   C["Chassis"] -->|"wires 6 concerns once"| W["concern wiring"]
-  W --> O["Order Service"]
-  W --> U["Customer Service"]
-  W --> K["Kitchen Service"]
+  W -->|"wires"| O["Order Service"]
+  W -->|"wires"| U["Customer Service"]
+  W -->|"wires"| K["Kitchen Service"]
   M["Manual: 3 x 6 = 18 wirings"] -.->|"vs"| W
 ```
 
@@ -472,9 +472,9 @@ A microservice chassis provides reusable build logic and mechanisms for cross-cu
 ```mermaid
 flowchart LR
   C["Chassis"] -->|"wires 6 concerns once"| W["concern wiring"]
-  W --> O["Order Service"]
-  W --> U["Customer Service"]
-  W --> K["Kitchen Service"]
+  W -->|"wires"| O["Order Service"]
+  W -->|"wires"| U["Customer Service"]
+  W -->|"wires"| K["Kitchen Service"]
   M["Manual: 3 x 6 = 18 wirings"] -.->|"vs"| W
 ```
 

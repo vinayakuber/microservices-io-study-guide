@@ -157,7 +157,7 @@ registerChapter({
   MON["Monitoring service"] -->|"GET /health every 10 s"| PROXY["Sidecar proxy"]
   PROXY -->|"status UP"| MON
   PROXY -->|"metric 1"| MON
-  SVC["Order Service"] --- PROXY`,
+  SVC["Order Service"] ---|"proxied by"| PROXY`,
       code: `// MESH SIDE — a health URL and per-request metrics, both handled at the proxy without touching service code
 // PARTIES: MON = monitoring service · PROXY = the sidecar proxy · SVC = Order Service
 // STATE (before):

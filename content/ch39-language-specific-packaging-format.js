@@ -157,8 +157,8 @@ registerChapter({
   MACH -->|"launch"| J2["jvm-2 :8082"]
   MACH -->|"launch"| J3["jvm-3 :8083"]
   J1 -->|"own port"| P["ports 3"]
-  J2 --> P
-  J3 --> P`,
+  J2 -->|"own port"| P
+  J3 -->|"own port"| P`,
       code: `// RUNTIME SIDE — run three service instances on one machine, one JVM per instance, each on its own port
 // PARTIES: MACH = the production machine · SVC = Restaurant Service
 // STATE (before):

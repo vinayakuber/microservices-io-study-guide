@@ -165,8 +165,8 @@ _Role: writer (instrumented service)_
 ```mermaid
 flowchart TD
   R["Order Service — the writer"]
-  R --> P0["counter increments on create_order completion"]
-  R --> P1["histogram observes each request duration"]
+  R -->|"comprises"| P0["counter increments on create_order completion"]
+  R -->|"comprises"| P1["histogram observes each request duration"]
 ```
 
 ### push/pull transport
@@ -176,8 +176,8 @@ _Role: transport (push/pull)_
 ```mermaid
 flowchart TD
   R["push/pull transport"]
-  R --> P0["push: the service POSTs metrics"]
-  R --> P1["pull: the metrics service GETs /metrics"]
+  R -->|"comprises"| P0["push: the service POSTs metrics"]
+  R -->|"comprises"| P1["pull: the metrics service GETs /metrics"]
 ```
 
 ### Prometheus — the collector
@@ -187,8 +187,8 @@ _Role: collector (metrics service)_
 ```mermaid
 flowchart TD
   R["Prometheus — the collector"]
-  R --> P0["scrapes or receives the metrics"]
-  R --> P1["provides reporting and alerting"]
+  R -->|"comprises"| P0["scrapes or receives the metrics"]
+  R -->|"comprises"| P1["provides reporting and alerting"]
 ```
 
 ### time-series registry — the aggregator
@@ -198,8 +198,8 @@ _Role: aggregator/store (registry)_
 ```mermaid
 flowchart TD
   R["time-series registry — the aggregator"]
-  R --> P0["holds each series keyed by metric name"]
-  R --> P1["stores orders_created and request_ms"]
+  R -->|"comprises"| P0["holds each series keyed by metric name"]
+  R -->|"comprises"| P1["stores orders_created and request_ms"]
 ```
 
 ### dashboard — the reader
@@ -209,8 +209,8 @@ _Role: reader (dashboard)_
 ```mermaid
 flowchart TD
   R["dashboard — the reader"]
-  R --> P0["queries the stored series"]
-  R --> P1["renders the counts and latencies"]
+  R -->|"comprises"| P0["queries the stored series"]
+  R -->|"comprises"| P1["renders the counts and latencies"]
 ```
 
 ```mermaid

@@ -237,8 +237,8 @@ _Role: client_
 ```mermaid
 flowchart TD
   R["the client"]
-  R --> P0["sends a request to the API gateway"]
-  R --> P1["reads the composed response"]
+  R -->|"comprises"| P0["sends a request to the API gateway"]
+  R -->|"comprises"| P1["reads the composed response"]
 ```
 
 ### the API gateway
@@ -248,8 +248,8 @@ _Role: gateway (the entry point)_
 ```mermaid
 flowchart TD
   R["the API gateway"]
-  R --> P0["routes the request to one or more services"]
-  R --> P1["composes the responses into one page"]
+  R -->|"comprises"| P0["routes the request to one or more services"]
+  R -->|"comprises"| P1["composes the responses into one page"]
 ```
 
 ### each microservice — e.g. the order service
@@ -259,9 +259,9 @@ _Role: service_
 ```mermaid
 flowchart TD
   R["each microservice — e.g. the order service"]
-  R --> P0["own business logic — implements one or more subdomains"]
-  R --> P1["own database — PostgreSQL 16 @ order-db-1"]
-  R --> P2["communicates over HTTP or messaging"]
+  R -->|"comprises"| P0["own business logic — implements one or more subdomains"]
+  R -->|"comprises"| P1["own database — PostgreSQL 16 @ order-db-1"]
+  R -->|"comprises"| P2["communicates over HTTP or messaging"]
 ```
 
 ### the service database
@@ -271,8 +271,8 @@ _Role: store_
 ```mermaid
 flowchart TD
   R["the service database"]
-  R --> P0["PostgreSQL 16 @ order-db-1 — one engine and instance per service"]
-  R --> P1["no single ACID commit spans two services"]
+  R -->|"comprises"| P0["PostgreSQL 16 @ order-db-1 — one engine and instance per service"]
+  R -->|"comprises"| P1["no single ACID commit spans two services"]
 ```
 
 ```mermaid
@@ -320,7 +320,7 @@ An architect is turning a monolith's subdomains into services and must decide wh
 
 ```mermaid
 flowchart LR
-  SUB["ProductCatalog, Inventory, Order"] --> SV["one service each"]
+  SUB["ProductCatalog, Inventory, Order"] -->|"becomes"| SV["one service each"]
   LIB["CommonLib"] -->|shared| SV
   LIB -->|shared| SV2["other services"]
 ```
@@ -362,8 +362,8 @@ Team Orders wants to ship a fix while Team Payment is mid-refactor. Under the mo
 
 ```mermaid
 flowchart LR
-  TO["Team Orders fix"] --> P1["order pipeline"]
-  P1 --> D1["deploy order v2.3"]
+  TO["Team Orders fix"] -->|"touches"| P1["order pipeline"]
+  P1 -->|"deploys"| D1["deploy order v2.3"]
   TP["Team Payment refactor"] -.own pipeline.-> P2["payment pipeline"]
   P2 -.untouched.-> D2["payment still v2.2"]
 ```
@@ -408,9 +408,9 @@ A 'checkout' command must now touch order, payment, and shipping services, each 
 
 ```mermaid
 flowchart LR
-  API["API gateway"] --> OSV["order: T1"]
-  API --> PSV["payment: T2"]
-  API --> SSV["shipping: T3"]
+  API["API gateway"] -->|"routes to"| OSV["order: T1"]
+  API -->|"routes to"| PSV["payment: T2"]
+  API -->|"routes to"| SSV["shipping: T3"]
   OSV -->|"each commits its own DB"| SAGA["eventually consistent saga"]
 ```
 
@@ -452,10 +452,10 @@ A client requests its home feed, which needs data from six services. The team as
 
 ```mermaid
 flowchart LR
-  Q["getHomeFeed"] --> API["API composition"]
-  API --> S1["catalog"]
-  API --> S2["watchlist"]
-  API --> S3["profile"]
+  Q["getHomeFeed"] -->|"calls"| API["API composition"]
+  API -->|"queries"| S1["catalog"]
+  API -->|"queries"| S2["watchlist"]
+  API -->|"queries"| S3["profile"]
   API -->|"6 local queries -> 1 page"| P["composed page"]
 ```
 
@@ -496,7 +496,7 @@ Structure the application as a set of two or more independently deployable, loos
 
 ```mermaid
 flowchart LR
-  SUB["ProductCatalog, Inventory, Order"] --> SV["one service each"]
+  SUB["ProductCatalog, Inventory, Order"] -->|"becomes"| SV["one service each"]
   LIB["CommonLib"] -->|shared| SV
   LIB -->|shared| SV2["other services"]
 ```

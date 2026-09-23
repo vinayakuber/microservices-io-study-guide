@@ -163,8 +163,8 @@ _Role: service_
 ```mermaid
 flowchart TD
   R["Order Service — the consumer of config"]
-  R --> P0["pulls config at startup (DB_URL, DB_PASSWORD)"]
-  R --> P1["refreshes when the config changes"]
+  R -->|"comprises"| P0["pulls config at startup (DB_URL, DB_PASSWORD)"]
+  R -->|"comprises"| P1["refreshes when the config changes"]
 ```
 
 ### Spring Cloud Config server
@@ -174,8 +174,8 @@ _Role: config server_
 ```mermaid
 flowchart TD
   R["Spring Cloud Config server"]
-  R --> P0["serves configuration over HTTP"]
-  R --> P1["versions each property change"]
+  R -->|"comprises"| P0["serves configuration over HTTP"]
+  R -->|"comprises"| P1["versions each property change"]
 ```
 
 ### git repository — the config source
@@ -185,8 +185,8 @@ _Role: config repository (git/VCS)_
 ```mermaid
 flowchart TD
   R["git repository — the config source"]
-  R --> P0["stores the property files per environment"]
-  R --> P1["is the versioned source of truth"]
+  R -->|"comprises"| P0["stores the property files per environment"]
+  R -->|"comprises"| P1["is the versioned source of truth"]
 ```
 
 ```mermaid
@@ -368,7 +368,7 @@ flowchart LR
   E["Environment"] -->|"supplies config"| S["Service"]
   E -->|"missing DB_PASSWORD"| M["mismatch"]
   S -->|"startup"| C["connection failed"]
-  M --> C
+  M -->|"causes"| C
 ```
 
 ```java

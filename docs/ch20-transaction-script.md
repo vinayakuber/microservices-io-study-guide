@@ -158,8 +158,8 @@ _Role: presentation tier_
 ```mermaid
 flowchart TD
   R["presentation tier"]
-  R --> P0["receives the HTTP request POST /orders"]
-  R --> P1["maps it to OrderService.createOrder()"]
+  R -->|"comprises"| P0["receives the HTTP request POST /orders"]
+  R -->|"comprises"| P1["maps it to OrderService.createOrder()"]
 ```
 
 ### OrderService — the transaction script
@@ -169,9 +169,9 @@ _Role: transaction script (service class)_
 ```mermaid
 flowchart TD
   R["OrderService — the transaction script"]
-  R --> P0["createOrder() — one procedural method per request type"]
-  R --> P1["reviseOrder()/cancelOrder() — each runs its whole transaction"]
-  R --> P2["mutates a pure-data Order object step by step"]
+  R -->|"comprises"| P0["createOrder() — one procedural method per request type"]
+  R -->|"comprises"| P1["reviseOrder()/cancelOrder() — each runs its whole transaction"]
+  R -->|"comprises"| P2["mutates a pure-data Order object step by step"]
 ```
 
 ### OrderDao — the DAO
@@ -181,8 +181,8 @@ _Role: DAO_
 ```mermaid
 flowchart TD
   R["OrderDao — the DAO"]
-  R --> P0["save(Order) — writes the row"]
-  R --> P1["findOrderById() — reads the row back"]
+  R -->|"comprises"| P0["save(Order) — writes the row"]
+  R -->|"comprises"| P1["findOrderById() — reads the row back"]
 ```
 
 ### PostgreSQL 16 @ orders-db-1 — the database
@@ -192,8 +192,8 @@ _Role: database_
 ```mermaid
 flowchart TD
   R["PostgreSQL 16 @ orders-db-1 — the database"]
-  R --> P0["holds the Order rows"]
-  R --> P1["written by save(Order), read by findOrderById()"]
+  R -->|"comprises"| P0["holds the Order rows"]
+  R -->|"comprises"| P1["written by save(Order), read by findOrderById()"]
 ```
 
 ```mermaid
@@ -363,8 +363,8 @@ The business keeps adding rules — discounts, then approvals, then split shipme
 
 ```mermaid
 flowchart LR
-  A["createOrder + discount"] --> B["+ approval rule"]
-  B --> C["+ split shipment rule"]
+  A["createOrder + discount"] -->|"adds"| B["+ approval rule"]
+  B -->|"adds"| C["+ split shipment rule"]
   C -->|too many branches| FIX["refactor to domain model"]
 ```
 

@@ -186,8 +186,8 @@ _Role: source database_
 ```mermaid
 flowchart TD
   R["source database (transaction log) — the source database"]
-  R --> P0["Appends every committed change to the log"]
-  R --> P1["Exposes the log to the tailer"]
+  R -->|"comprises"| P0["Appends every committed change to the log"]
+  R -->|"comprises"| P1["Exposes the log to the tailer"]
 ```
 
 ### log tailer / miner — the tailer
@@ -197,9 +197,9 @@ _Role: log tailer_
 ```mermaid
 flowchart TD
   R["log tailer / miner — the tailer"]
-  R --> P0["Tails the transaction log"]
-  R --> P1["Converts log records into domain events"]
-  R --> P2["Publishes each event to the broker"]
+  R -->|"comprises"| P0["Tails the transaction log"]
+  R -->|"comprises"| P1["Converts log records into domain events"]
+  R -->|"comprises"| P2["Publishes each event to the broker"]
 ```
 
 ### message broker (RabbitMQ) — the broker
@@ -209,8 +209,8 @@ _Role: broker_
 ```mermaid
 flowchart TD
   R["message broker (RabbitMQ) — the broker"]
-  R --> P0["Receives the events in commit order"]
-  R --> P1["Holds them for subscribers"]
+  R -->|"comprises"| P0["Receives the events in commit order"]
+  R -->|"comprises"| P1["Holds them for subscribers"]
 ```
 
 ### subscriber — the consumer
@@ -220,7 +220,7 @@ _Role: subscriber_
 ```mermaid
 flowchart TD
   R["subscriber — the consumer"]
-  R --> P0["Consumes each event off the broker"]
+  R -->|"comprises"| P0["Consumes each event off the broker"]
 ```
 
 ```mermaid
@@ -321,7 +321,7 @@ flowchart LR
   TX1["Commit OrderCreated"] -->|binlog write| LOG[("Binlog")]
   TX2["Rollback OrderShipped"] -->|no committed write| LOG
   LOG -->|only committed rows| TLR["Publishes OrderCreated only"]
-  TLR --> BRK[("Broker, never enlisted")]
+  TLR -->|"publishes to"| BRK[("Broker, never enlisted")]
 ```
 
 ```java
@@ -369,7 +369,7 @@ flowchart LR
   TLR["Tailer reads seq 70"] -->|publish OrderCreated| BRK[("Broker")]
   TLR -->|crash before save| P["position stays 69"]
   P -->|restart, re-read seq 70| TLR2["Tailer re-publishes"]
-  TLR2 --> BRK
+  TLR2 -->|"publishes to"| BRK
   BRK -->|OrderCreated x2| CNS["Consumer dedupes to once"]
 ```
 
@@ -419,7 +419,7 @@ flowchart LR
   MY[("MySQL binlog")] -->|reader A| TLR["Tailer"]
   PG[("Postgres WAL")] -->|reader B| TLR
   DD[("DynamoDB streams")] -->|reader C| TLR
-  TLR --> BRK[("Broker")]
+  TLR -->|"publishes to"| BRK[("Broker")]
 ```
 
 ```java

@@ -216,9 +216,9 @@ _Role: domain service_
 ```mermaid
 flowchart TD
   R["OrderService — the domain service"]
-  R --> P0["createOrder() — delegates to the Order.create() factory"]
-  R --> P1["reviseOrder()/cancelOrder() — routes commands to the aggregate"]
-  R --> P2["holds no business state (behavior only)"]
+  R -->|"comprises"| P0["createOrder() — delegates to the Order.create() factory"]
+  R -->|"comprises"| P1["reviseOrder()/cancelOrder() — routes commands to the aggregate"]
+  R -->|"comprises"| P2["holds no business state (behavior only)"]
 ```
 
 ### Order aggregate + DeliveryInformation — entities/value objects
@@ -228,9 +228,9 @@ _Role: entities/value objects_
 ```mermaid
 flowchart TD
   R["Order aggregate + DeliveryInformation — entities/value objects"]
-  R --> P0["Order — entity with state (orderId, lineItems) and behavior create()/revise()/cancel()"]
-  R --> P1["DeliveryInformation — state-only value object (deliveryTime, deliveryAddress)"]
-  R --> P2["business rules — guard the CREATED -&gt; CANCELLED transition and recompute the total"]
+  R -->|"comprises"| P0["Order — entity with state (orderId, lineItems) and behavior create()/revise()/cancel()"]
+  R -->|"comprises"| P1["DeliveryInformation — state-only value object (deliveryTime, deliveryAddress)"]
+  R -->|"comprises"| P2["business rules — guard the CREATED -&gt; CANCELLED transition and recompute the total"]
 ```
 
 ### OrderRepository — the repository
@@ -240,8 +240,8 @@ _Role: repository_
 ```mermaid
 flowchart TD
   R["OrderRepository — the repository"]
-  R --> P0["findOrderById() — loads the aggregate"]
-  R --> P1["save() — persists the aggregate back"]
+  R -->|"comprises"| P0["findOrderById() — loads the aggregate"]
+  R -->|"comprises"| P1["save() — persists the aggregate back"]
 ```
 
 ### PostgreSQL 16 @ orders-db-1 — the database
@@ -251,8 +251,8 @@ _Role: database_
 ```mermaid
 flowchart TD
   R["PostgreSQL 16 @ orders-db-1 — the database"]
-  R --> P0["stores the aggregate rows"]
-  R --> P1["single source of truth for orders"]
+  R -->|"comprises"| P0["stores the aggregate rows"]
+  R -->|"comprises"| P1["single source of truth for orders"]
 ```
 
 ```mermaid

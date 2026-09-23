@@ -225,8 +225,8 @@ _Role: test harness_
 ```mermaid
 flowchart TD
   R["test harness"]
-  R --> P0["drives the service in-process (no network)"]
-  R --> P1["asserts the response against the double's canned reply"]
+  R -->|"comprises"| P0["drives the service in-process (no network)"]
+  R -->|"comprises"| P1["asserts the response against the double's canned reply"]
 ```
 
 ### Order Service — the service under test
@@ -236,8 +236,8 @@ _Role: service under test (in-process)_
 ```mermaid
 flowchart TD
   R["Order Service — the service under test"]
-  R --> P0["real wiring: its controller and outbound call run for real"]
-  R --> P1["in-memory database instead of the production store"]
+  R -->|"comprises"| P0["real wiring: its controller and outbound call run for real"]
+  R -->|"comprises"| P1["in-memory database instead of the production store"]
 ```
 
 ### Kitchen Service double
@@ -247,8 +247,8 @@ _Role: stubbed dependency_
 ```mermaid
 flowchart TD
   R["Kitchen Service double"]
-  R --> P0["returns the canned ticket #quot;T-88#quot;"]
-  R --> P1["stands in for the real Kitchen Service"]
+  R -->|"comprises"| P0["returns the canned ticket #quot;T-88#quot;"]
+  R -->|"comprises"| P1["stands in for the real Kitchen Service"]
 ```
 
 ```mermaid

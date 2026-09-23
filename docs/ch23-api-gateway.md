@@ -209,9 +209,9 @@ _Role: client_
 ```mermaid
 flowchart TD
   R["Clients — the callers"]
-  R --> P0["CLI — a command-line client"]
-  R --> P1["MOB — the mobile client"]
-  R --> P2["WEB — the web client"]
+  R -->|"comprises"| P0["CLI — a command-line client"]
+  R -->|"comprises"| P1["MOB — the mobile client"]
+  R -->|"comprises"| P2["WEB — the web client"]
 ```
 
 ### API Gateway — the single entry point
@@ -221,8 +221,8 @@ _Role: gateway_
 ```mermaid
 flowchart TD
   R["API Gateway — the single entry point"]
-  R --> P0["request routing — looks up the route table"]
-  R --> P1["API composition — assembles product + price + reviews"]
+  R -->|"comprises"| P0["request routing — looks up the route table"]
+  R -->|"comprises"| P1["API composition — assembles product + price + reviews"]
 ```
 
 ### Upstream services — the backends
@@ -232,16 +232,16 @@ _Role: upstream services_
 ```mermaid
 flowchart TD
   R["Upstream services — the backends"]
-  R --> P0["PROD — product service"]
-  R --> P1["PRI — pricing service"]
-  R --> P2["REV — reviews service"]
+  R -->|"comprises"| P0["PROD — product service"]
+  R -->|"comprises"| P1["PRI — pricing service"]
+  R -->|"comprises"| P2["REV — reviews service"]
 ```
 
 ```mermaid
 flowchart LR
-  CLI["CLI client"] --> GW["API Gateway"]
-  MOB["MOB client"] --> GW
-  WEB["WEB client"] --> GW
+  CLI["CLI client"] -->|"calls"| GW["API Gateway"]
+  MOB["MOB client"] -->|"calls"| GW
+  WEB["WEB client"] -->|"calls"| GW
   GW -->|"route /products"| PROD["Product service"]
   GW -->|"compose"| RES["product + price + reviews"]
 ```
@@ -331,9 +331,9 @@ flowchart LR
   G -->|"fan out"| A["Product Info"]
   G -->|"fan out"| B["Pricing"]
   G -->|"fan out"| D["Review"]
-  A --> G
-  B --> G
-  D --> G
+  A -->|"returns to"| G
+  B -->|"returns to"| G
+  D -->|"returns to"| G
   G -->|"one composed response"| C
 ```
 

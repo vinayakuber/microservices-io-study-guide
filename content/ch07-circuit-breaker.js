@@ -111,9 +111,9 @@ registerChapter({
       solution: "The proxy counts consecutive failures; when the count crosses a threshold it trips, and for the timeout period all attempts fail immediately.",
       components: ["Failure counter", "Threshold", "Tripped (OPEN) state", "Immediate rejection"],
       diagram: `flowchart LR
-  C["Checkout"] --> P["breaker proxy"]
+  C["Checkout"] -->|"calls"| P["breaker proxy"]
   P -->|"fails"| SVC["Payments (down)"]
-  P --> O["OPEN when failures >= threshold"]`,
+  P -->|"trips"| O["OPEN when failures >= threshold"]`,
       code: `// PROXY SIDE — CLOSED state: a breaker trips when consecutive failures cross the threshold
 // PARTIES: CLIENT = caller thread · PROXY = circuit breaker · SVC = remote service (down)
 // STATE (before):
@@ -138,7 +138,7 @@ registerChapter({
       solution: "Attempts fail immediately without calling the service, so threads are not consumed waiting, and the failure of one service no longer drains its callers.",
       components: ["Open breaker", "Fail-fast rejection", "Protected caller threads"],
       diagram: `flowchart LR
-  C["Checkout"] --> P["breaker (OPEN)"]
+  C["Checkout"] -->|"calls"| P["breaker (OPEN)"]
   P -. "fail fast" .-> C
   P -. "never calls" .- SVC["Payments (down)"]`,
       code: `// PROXY SIDE — OPEN state: while open, every attempt fails immediately, so SVC is never touched
@@ -192,8 +192,8 @@ registerChapter({
       solution: "Choosing timeout values is the challenge: too short creates false positives on a healthy but slow service, and too long hides real outages behind latency.",
       components: ["Timeout threshold", "False positives", "Excessive latency"],
       diagram: `flowchart LR
-  T["timeout 250ms"] --> FP["false positive (healthy 600ms marked down)"]
-  T2["timeout 5000ms"] --> EL["excessive latency (real outage hidden)"]`,
+  T["timeout 250ms"] -->|"causes"| FP["false positive (healthy 600ms marked down)"]
+  T2["timeout 5000ms"] -->|"causes"| EL["excessive latency (real outage hidden)"]`,
       code: `// PROXY SIDE — tuning: a too-short timeout marks a healthy but slow service as failed
 // PARTIES: CLIENT = caller thread · PROXY = circuit breaker · SVC = remote service (slow but alive)
 // STATE (before):

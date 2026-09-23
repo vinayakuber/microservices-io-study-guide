@@ -206,8 +206,8 @@ _Role: consumer (test)_
 ```mermaid
 flowchart TD
   R["OrderServiceProxy — the consumer under test"]
-  R --> P0["builds the request: GET /orders/ORD-4007 + Accept header"]
-  R --> P1["parses the reply into orderId and state"]
+  R -->|"comprises"| P0["builds the request: GET /orders/ORD-4007 + Accept header"]
+  R -->|"comprises"| P1["parses the reply into orderId and state"]
 ```
 
 ### mock provider stub
@@ -217,8 +217,8 @@ _Role: mock provider (contract)_
 ```mermaid
 flowchart TD
   R["mock provider stub"]
-  R --> P0["returns the canned reply: status 200 + JSON body"]
-  R --> P1["stands in for the real Order Service during the test"]
+  R -->|"comprises"| P0["returns the canned reply: status 200 + JSON body"]
+  R -->|"comprises"| P1["stands in for the real Order Service during the test"]
 ```
 
 ### Order Service — the real provider
@@ -228,8 +228,8 @@ _Role: provider service_
 ```mermaid
 flowchart TD
   R["Order Service — the real provider"]
-  R --> P0["owns the real contract: GET /orders/{orderId}"]
-  R --> P1["answers the well-formed request in production"]
+  R -->|"comprises"| P0["owns the real contract: GET /orders/{orderId}"]
+  R -->|"comprises"| P1["answers the well-formed request in production"]
 ```
 
 ```mermaid

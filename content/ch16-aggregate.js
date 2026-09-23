@@ -101,7 +101,7 @@ registerChapter({
         "Root — the single entry point"
       ],
       diagram: `flowchart LR
-  SVC["Order Service"] --> ROOT["Order root"]
+  SVC["Order Service"] -->|"aggregates via"| ROOT["Order root"]
   ROOT -->|owns| A["Line item BOOK-1"]
   ROOT -->|owns| B["Line item BOOK-2"]
   ROOT -->|recomputes| TOT["total 35.00"]`,

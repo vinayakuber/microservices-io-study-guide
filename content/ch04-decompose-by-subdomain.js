@@ -111,10 +111,10 @@ registerChapter({
       solution: "The domain is the problem space — the business itself; a domain consists of multiple subdomains, each a different part of the business, and each subdomain becomes one service.",
       components: ["Domain — the problem space", "Subdomain — a distinct part of the business", "One service per subdomain"],
       diagram: `flowchart LR
-  D["food delivery domain"] --> S1["catalog subdomain"]
-  D --> S2["orders subdomain"]
-  S1 --> V1["catalog service"]
-  S2 --> V2["orders service"]`,
+  D["food delivery domain"] -->|"decomposes into"| S1["catalog subdomain"]
+  D -->|"decomposes into"| S2["orders subdomain"]
+  S1 -->|"maps to"| V1["catalog service"]
+  S2 -->|"maps to"| V2["orders service"]`,
       code: `// DECOMPOSITION SIDE — the DDD domain (the business) splits into subdomains, each becoming a service
 // PARTIES: ARC = architect · DOM = the domain (the application's problem space)
 // STATE (before):
@@ -139,9 +139,9 @@ registerChapter({
       solution: "Core subdomains are the key differentiator and most valuable; supporting relate to the business but are not differentiators; generic are not business-specific and are ideally bought off the shelf.",
       components: ["Core — key differentiator", "Supporting — related but not differentiating", "Generic — off-the-shelf software"],
       diagram: `flowchart LR
-  R["search ranking"] --> CORE["core · invest in-house"]
-  S["customer support"] --> SUP["supporting · in-house or outsource"]
-  E["email delivery"] --> GEN["generic · buy off the shelf"]`,
+  R["search ranking"] -->|"classified as"| CORE["core · invest in-house"]
+  S["customer support"] -->|"classified as"| SUP["supporting · in-house or outsource"]
+  E["email delivery"] -->|"classified as"| GEN["generic · buy off the shelf"]`,
       code: `// CLASSIFICATION SIDE — each subdomain is core, supporting, or generic, deciding the investment
 // PARTIES: ARC = architect · BIZ = the business
 // STATE (before):
@@ -165,10 +165,10 @@ registerChapter({
       solution: "Each subdomain becomes one service; services stay cohesive and loosely coupled behind an API, and teams are cross-functional and organized around delivering business value.",
       components: ["One service per subdomain", "Cohesive services", "Loosely coupled services behind an API", "Cross-functional teams around business value"],
       diagram: `flowchart LR
-  SUB["subdomains"] --> SVC["one service per subdomain"]
-  SVC --> COH["cohesive"]
-  SVC --> LC["loosely coupled behind an API"]
-  SVC --> TM["cross-functional team"]`,
+  SUB["subdomains"] -->|"maps to"| SVC["one service per subdomain"]
+  SVC -->|"kept"| COH["cohesive"]
+  SVC -->|"kept"| LC["loosely coupled behind an API"]
+  SVC -->|"owned by"| TM["cross-functional team"]`,
       code: `// MAPPING SIDE — each subdomain of the food-delivery business becomes one cohesive, loosely coupled service
 // PARTIES: ARC = architect
 // STATE (before):
@@ -193,10 +193,10 @@ registerChapter({
       solution: "Start from the organization structure and the high-level domain model — subdomains often have a key domain object — then refine the boundaries iteratively.",
       components: ["Organization structure", "High-level domain model", "Areas of expertise", "Iterative refinement"],
       diagram: `flowchart LR
-  ORG["org groups"] --> SUB1["subdomain"]
-  DM["domain model"] --> SUB2["subdomain"]
-  SUB1 --> IT["iterate"]
-  SUB2 --> IT`,
+  ORG["org groups"] -->|"informs"| SUB1["subdomain"]
+  DM["domain model"] -->|"informs"| SUB2["subdomain"]
+  SUB1 -->|"refined by"| IT["iterate"]
+  SUB2 -->|"refined by"| IT`,
       code: `// IDENTIFICATION SIDE — find subdomains from the org structure and the domain model
 // PARTIES: ARC = architect analyzing the business
 // DEF: domain — the business problem space DDD decomposes into subdomains; here food delivery, whose key domain objects are "Menu" and "Delivery"
@@ -247,7 +247,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  DOM[\"domain: food delivery\"] --> SUB[\"subdomain: order management (core)\"]\n  SUB --> SVC[\"order service\"]\n  SVC --> DB[(\"PostgreSQL 16 @ order-db-1\")]\n  DB -->|\"query result\"| SVC",
+    wiring: "flowchart LR\n  DOM[\"domain: food delivery\"] -->|\"decomposes into\"| SUB[\"subdomain: order management (core)\"]\n  SUB -->|\"maps to\"| SVC[\"order service\"]\n  SVC -->|\"owns\"| DB[(\"PostgreSQL 16 @ order-db-1\")]\n  DB -->|\"query result\"| SVC",
     program: `// SYSTEM DESIGN — decompose by subdomain: domain (food delivery) -> subdomain (core/supporting/generic) -> service (owns its subdomain data)
 // PARTIES: DOM = the domain (the business problem space: food delivery) · SUB = subdomain (a distinct part of the business, classified core/supporting/generic) · SVC = order service (owns the order-management subdomain) · DB = PostgreSQL 16 @ order-db-1 (the order service's own database)
 // DEF: domain — the business problem space DDD splits into subdomains; here "food delivery"

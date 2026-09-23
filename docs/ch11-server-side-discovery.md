@@ -229,8 +229,8 @@ _Role: client_
 ```mermaid
 flowchart TD
   R["client — calls only the router"]
-  R --> P0["Dials the router at a well-known address"]
-  R --> P1["Never performs discovery itself"]
+  R -->|"comprises"| P0["Dials the router at a well-known address"]
+  R -->|"comprises"| P1["Never performs discovery itself"]
 ```
 
 ### router / load balancer — the router
@@ -240,9 +240,9 @@ _Role: router / load balancer_
 ```mermaid
 flowchart TD
   R["router / load balancer — the router"]
-  R --> P0["Queries the registry for available instances"]
-  R --> P1["Picks one instance"]
-  R --> P2["Forwards the request to it"]
+  R -->|"comprises"| P0["Queries the registry for available instances"]
+  R -->|"comprises"| P1["Picks one instance"]
+  R -->|"comprises"| P2["Forwards the request to it"]
 ```
 
 ### service registry (Eureka) — the registry
@@ -252,8 +252,8 @@ _Role: registry_
 ```mermaid
 flowchart TD
   R["service registry (Eureka) — the registry"]
-  R --> P0["Holds the name -&gt; instances map"]
-  R --> P1["Returns instance locations on query"]
+  R -->|"comprises"| P0["Holds the name -&gt; instances map"]
+  R -->|"comprises"| P1["Returns instance locations on query"]
 ```
 
 ### order-service instances — the instances
@@ -263,8 +263,8 @@ _Role: service instances_
 ```mermaid
 flowchart TD
   R["order-service instances — the instances"]
-  R --> P0["Self-register on startup"]
-  R --> P1["Serve the forwarded request"]
+  R -->|"comprises"| P0["Self-register on startup"]
+  R -->|"comprises"| P1["Serve the forwarded request"]
 ```
 
 ```mermaid
@@ -314,7 +314,7 @@ A client must call order-service but has no discovery logic. The application tea
 ```mermaid
 flowchart LR
   C["client"] -->|"well-known address"| R["router"]
-  R --> REG["registry"]
+  R -->|"queries"| REG["registry"]
   REG -->|"instances"| R
   R -->|"forward"| SVC["order-service instance"]
 ```
@@ -359,9 +359,9 @@ The team runs on AWS and wants a single managed component to act as both the loa
 
 ```mermaid
 flowchart LR
-  C["client"] --> ELB["ELB (router + registry)"]
-  ELB --> I1["i-abc"]
-  ELB --> I2["i-def"]
+  C["client"] -->|"calls"| ELB["ELB (router + registry)"]
+  ELB -->|"routes to"| I1["i-abc"]
+  ELB -->|"routes to"| I2["i-def"]
   ASG["autoscaling group"] -->|"register i-ghi"| ELB
 ```
 
@@ -449,7 +449,7 @@ flowchart LR
   C["client"] -->|"hop 1"| R["router"]
   R -->|"hop 2"| REG["registry"]
   R -->|"hop 3"| SVC["instance"]
-  R --> REP["replicas + protocols"]
+  R -->|"requires"| REP["replicas + protocols"]
 ```
 
 ```java
@@ -488,7 +488,7 @@ The client calls a router (load balancer) at a well-known location; the router q
 ```mermaid
 flowchart LR
   C["client"] -->|"well-known address"| R["router"]
-  R --> REG["registry"]
+  R -->|"queries"| REG["registry"]
   REG -->|"instances"| R
   R -->|"forward"| SVC["order-service instance"]
 ```

@@ -208,8 +208,8 @@ _Role: client_
 ```mermaid
 flowchart TD
   R["Clients — two device shapes"]
-  R --> P0["WEB — desktop client needing 5 fields"]
-  R --> P1["MOB — mobile client needing 2 fields"]
+  R -->|"comprises"| P0["WEB — desktop client needing 5 fields"]
+  R -->|"comprises"| P1["MOB — mobile client needing 2 fields"]
 ```
 
 ### Per-client gateways — the BFFs
@@ -219,8 +219,8 @@ _Role: per-client gateway_
 ```mermaid
 flowchart TD
   R["Per-client gateways — the BFFs"]
-  R --> P0["GW-W — web gateway, owned by the public API team"]
-  R --> P1["GW-M — mobile gateway, owned by the mobile team"]
+  R -->|"comprises"| P0["GW-W — web gateway, owned by the public API team"]
+  R -->|"comprises"| P1["GW-M — mobile gateway, owned by the mobile team"]
 ```
 
 ### Upstream services + shared library
@@ -230,18 +230,18 @@ _Role: upstream services_
 ```mermaid
 flowchart TD
   R["Upstream services + shared library"]
-  R --> P0["PROD — product service"]
-  R --> P1["LIB — shared library with verify_access_token"]
+  R -->|"comprises"| P0["PROD — product service"]
+  R -->|"comprises"| P1["LIB — shared library with verify_access_token"]
 ```
 
 ```mermaid
 flowchart LR
-  WEB["WEB desktop client"] --> GWW["GW-W web gateway"]
-  MOB["MOB mobile client"] --> GWM["GW-M mobile gateway"]
-  GWW --> PROD["Product service"]
-  GWM --> PROD
-  GWW --> LIB["Shared library verify_access_token"]
-  GWM --> LIB
+  WEB["WEB desktop client"] -->|"calls"| GWW["GW-W web gateway"]
+  MOB["MOB mobile client"] -->|"calls"| GWM["GW-M mobile gateway"]
+  GWW -->|"calls"| PROD["Product service"]
+  GWM -->|"calls"| PROD
+  GWW -->|"uses"| LIB["Shared library verify_access_token"]
+  GWM -->|"uses"| LIB
 ```
 
 ```java
@@ -410,8 +410,8 @@ flowchart LR
   GM["GW-M"] -->|needs| F["verify_access_token"]
   GW["GW-W"] -->|needs| F
   F -->|moved into| LIB["shared library"]
-  LIB --> GM
-  LIB --> GW
+  LIB -->|"used by"| GM
+  LIB -->|"used by"| GW
 ```
 
 ```java

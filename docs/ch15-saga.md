@@ -256,9 +256,9 @@ _Role: orchestrator_
 ```mermaid
 flowchart TD
   R["saga orchestrator — the orchestrator"]
-  R --> P0["Orders each participant to act"]
-  R --> P1["Tracks the saga state"]
-  R --> P2["Triggers compensations on failure"]
+  R -->|"comprises"| P0["Orders each participant to act"]
+  R -->|"comprises"| P1["Tracks the saga state"]
+  R -->|"comprises"| P2["Triggers compensations on failure"]
 ```
 
 ### order service — the participant
@@ -268,8 +268,8 @@ _Role: participant service_
 ```mermaid
 flowchart TD
   R["order service — the participant"]
-  R --> P0["Executes its step"]
-  R --> P1["Publishes its outcome event"]
+  R -->|"comprises"| P0["Executes its step"]
+  R -->|"comprises"| P1["Publishes its outcome event"]
 ```
 
 ### customer service — the participant
@@ -279,8 +279,8 @@ _Role: participant service_
 ```mermaid
 flowchart TD
   R["customer service — the participant"]
-  R --> P0["Reserves credit for the order"]
-  R --> P1["Publishes CreditReserved"]
+  R -->|"comprises"| P0["Reserves credit for the order"]
+  R -->|"comprises"| P1["Publishes CreditReserved"]
 ```
 
 ### event / message broker (RabbitMQ) — the broker
@@ -290,7 +290,7 @@ _Role: broker_
 ```mermaid
 flowchart TD
   R["event / message broker (RabbitMQ) — the broker"]
-  R --> P0["Carries step results back to the orchestrator"]
+  R -->|"comprises"| P0["Carries step results back to the orchestrator"]
 ```
 
 ```mermaid

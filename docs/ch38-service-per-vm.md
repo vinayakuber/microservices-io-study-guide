@@ -196,8 +196,8 @@ _Role: build pipeline_
 ```mermaid
 flowchart TD
   R["Build pipeline — the baker"]
-  R --> P0["bakes JDK 17 + OS into one machine image"]
-  R --> P1["publishes the AMI catalog:2.3.0"]
+  R -->|"comprises"| P0["bakes JDK 17 + OS into one machine image"]
+  R -->|"comprises"| P1["publishes the AMI catalog:2.3.0"]
 ```
 
 ### EC2 IaaS — the provisioner
@@ -207,8 +207,8 @@ _Role: IaaS_
 ```mermaid
 flowchart TD
   R["EC2 IaaS — the provisioner"]
-  R --> P0["provisions a new EC2 instance per service instance"]
-  R --> P1["boots the AMI on each VM"]
+  R -->|"comprises"| P0["provisions a new EC2 instance per service instance"]
+  R -->|"comprises"| P1["boots the AMI on each VM"]
 ```
 
 ### Auto-scaling group + load balancer
@@ -218,8 +218,8 @@ _Role: VM instances_
 ```mermaid
 flowchart TD
   R["Auto-scaling group + load balancer"]
-  R --> P0["ASG scales between min 2 and max 6"]
-  R --> P1["ELB routes to the healthy instances i-1, i-2, i-3"]
+  R -->|"comprises"| P0["ASG scales between min 2 and max 6"]
+  R -->|"comprises"| P1["ELB routes to the healthy instances i-1, i-2, i-3"]
 ```
 
 ```mermaid
@@ -310,9 +310,9 @@ flowchart LR
   AMI["catalog:2.3.0 image"] -->|"launch"| I1["i-1"]
   AMI -->|"launch"| I2["i-2"]
   AMI -->|"launch"| I3["i-3"]
-  I1 --> ELB["Elastic Load Balancer"]
-  I2 --> ELB
-  I3 --> ELB
+  I1 -->|"register with"| ELB["Elastic Load Balancer"]
+  I2 -->|"register with"| ELB
+  I3 -->|"register with"| ELB
   ELB -->|"spread"| T["traffic"]
 ```
 

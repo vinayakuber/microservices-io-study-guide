@@ -175,8 +175,8 @@ _Role: source database_
 ```mermaid
 flowchart TD
   R["source database (outbox table) — the source database"]
-  R --> P0["Holds the outbox rows with a sent flag"]
-  R --> P1["Answers the unsent-row SELECT"]
+  R -->|"comprises"| P0["Holds the outbox rows with a sent flag"]
+  R -->|"comprises"| P1["Answers the unsent-row SELECT"]
 ```
 
 ### polling publisher relay — the relay
@@ -186,9 +186,9 @@ _Role: polling publisher_
 ```mermaid
 flowchart TD
   R["polling publisher relay — the relay"]
-  R --> P0["Polls SELECT ... WHERE sent=false ORDER BY id"]
-  R --> P1["Publishes each row to the broker"]
-  R --> P2["Marks the row sent=true"]
+  R -->|"comprises"| P0["Polls SELECT ... WHERE sent=false ORDER BY id"]
+  R -->|"comprises"| P1["Publishes each row to the broker"]
+  R -->|"comprises"| P2["Marks the row sent=true"]
 ```
 
 ### message broker (RabbitMQ) — the broker
@@ -198,8 +198,8 @@ _Role: broker_
 ```mermaid
 flowchart TD
   R["message broker (RabbitMQ) — the broker"]
-  R --> P0["Receives published events in id order"]
-  R --> P1["Holds them for subscribers"]
+  R -->|"comprises"| P0["Receives published events in id order"]
+  R -->|"comprises"| P1["Holds them for subscribers"]
 ```
 
 ### subscriber — the consumer
@@ -209,7 +209,7 @@ _Role: subscriber_
 ```mermaid
 flowchart TD
   R["subscriber — the consumer"]
-  R --> P0["Consumes each event off the broker"]
+  R -->|"comprises"| P0["Consumes each event off the broker"]
 ```
 
 ```mermaid
@@ -304,9 +304,9 @@ Your order aggregate wrote two events in one transaction — OrderCreated then O
 ```mermaid
 flowchart LR
   DB[("Outbox table")] -->|unordered query| BAD["Publishes id 21 first"]
-  BAD --> BRK[("Broker: OrderApproved then OrderCreated")]
+  BAD -->|"publishes to"| BRK[("Broker: OrderApproved then OrderCreated")]
   DB -->|ORDER BY id ASC| GOOD["Publishes id 20 first"]
-  GOOD --> BRK2[("Broker: OrderCreated then OrderApproved")]
+  GOOD -->|"publishes to"| BRK2[("Broker: OrderCreated then OrderApproved")]
 ```
 
 ```java
@@ -352,7 +352,7 @@ Your team stores domain events in a NoSQL document store where each document has
 flowchart LR
   SQL[("MySQL outbox table")] -->|SELECT sent=false| RLY["Relay publishes the row"]
   NOSQL[("NoSQL doc store")] -->|no unsent-row query| NONE["Relay finds 0 rows"]
-  NONE --> TLT["Use transaction log tailing instead"]
+  NONE -->|"forces"| TLT["Use transaction log tailing instead"]
 ```
 
 ```java

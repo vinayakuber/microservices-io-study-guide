@@ -121,8 +121,8 @@ registerChapter({
       solution: "A notification is a message that expects no reply, so the sender publishes it to a channel and returns at once; a consumer reads it later.",
       components: ["Sender service", "Message channel", "Consumer (reads later)", "No reply expected"],
       diagram: `flowchart LR
-  SVC["Order Service"] --> BRK["channel"]
-  BRK --> CON["Refund consumer"]
+  SVC["Order Service"] -->|"publishes to"| BRK["channel"]
+  BRK -->|"delivers to"| CON["Refund consumer"]
   SVC -. "returns immediately" .-> SVC`,
       code: `// ORDER SERVICE SIDE — publish an OrderCancelled event to a channel; the consumer reads it later
 // PARTIES: SVC = Order Service · BRK = message broker · CON = Refund consumer
@@ -152,10 +152,10 @@ registerChapter({
       solution: "The sender sends a request with a reply-to channel and a correlation id, and the provider replies on that channel, so the reply is matched to the request.",
       components: ["Request message", "Reply-to channel", "Correlation id", "Prompt reply"],
       diagram: `flowchart LR
-  C["Checkout"] --> RQ["request channel"]
-  RQ --> P["Inventory service"]
-  P --> RP["reply-to channel"]
-  RP --> C`,
+  C["Checkout"] -->|"requests via"| RQ["request channel"]
+  RQ -->|"routes to"| P["Inventory service"]
+  P -->|"replies via"| RP["reply-to channel"]
+  RP -->|"returns to"| C`,
       code: `// CONSUMER SERVICE SIDE — request/response: send a request, expect a prompt reply over a channel
 // PARTIES: CLIENT = Checkout · BRK = message broker · SVC = Inventory service
 // DEF: channel — a named conduit through which messages flow; here the reply_to channel "reply_channel" carried "REQ-91:yes 18.75"
@@ -181,10 +181,10 @@ registerChapter({
       solution: "A publisher writes a message to a topic and knows nothing of its recipients; the broker delivers a copy to each subscriber (zero or more).",
       components: ["Publisher", "Topic", "Broker fan-out", "Multiple subscribers"],
       diagram: `flowchart LR
-  PUB["Payment service"] --> TOP["topic: payments"]
-  TOP --> B["Billing"]
-  TOP --> S["Shipping"]
-  TOP --> L["Loyalty"]`,
+  PUB["Payment service"] -->|"publishes to"| TOP["topic: payments"]
+  TOP -->|"delivers to"| B["Billing"]
+  TOP -->|"delivers to"| S["Shipping"]
+  TOP -->|"delivers to"| L["Loyalty"]`,
       code: `// BROKER SIDE — publish/subscribe: one publisher, three subscribers (zero or more recipients)
 // PARTIES: PUB = Payment service · BRK = message broker · SUB1 = Billing · SUB2 = Shipping · SUB3 = Loyalty
 // DEF: inbox — a per-subscriber mailbox the broker delivers one copy into; here inbox_billing, inbox_shipping, and inbox_loyalty each receive "PaymentProcessed(PAY-311)"
@@ -212,9 +212,9 @@ registerChapter({
       solution: "The broker keeps messages queued until the consumer can process them, decoupling sender from consumer, at the cost of running a highly available broker.",
       components: ["Message broker buffer", "Down consumer", "Loose runtime coupling", "Broker complexity"],
       diagram: `flowchart LR
-  SVC["Order Service"] --> Q["broker queue"]
+  SVC["Order Service"] -->|"publishes to"| Q["broker queue"]
   Q -. "held while down" .-> CON["Consumer (DOWN)"]
-  Q --> R["replays on reconnect"]`,
+  Q -->|"replays to"| R["replays on reconnect"]`,
       code: `// BROKER SIDE — buffering buys availability: consumer down, broker holds the queue until it returns
 // PARTIES: BRK = message broker · SVC = Order Service (publisher) · CON = Consumer
 // STATE (before):

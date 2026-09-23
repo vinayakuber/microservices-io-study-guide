@@ -132,9 +132,9 @@ registerChapter({
   AMI["catalog:2.3.0 image"] -->|"launch"| I1["i-1"]
   AMI -->|"launch"| I2["i-2"]
   AMI -->|"launch"| I3["i-3"]
-  I1 --> ELB["Elastic Load Balancer"]
-  I2 --> ELB
-  I3 --> ELB
+  I1 -->|"register with"| ELB["Elastic Load Balancer"]
+  I2 -->|"register with"| ELB
+  I3 -->|"register with"| ELB
   ELB -->|"spread"| T["traffic"]`,
       code: `// RUNTIME SIDE — deploy one catalog instance per VM, all launched from the shared AMI
 // PARTIES: SVC = catalog-service · IaaS = the EC2 cloud

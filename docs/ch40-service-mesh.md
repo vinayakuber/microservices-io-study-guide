@@ -193,8 +193,8 @@ _Role: service_
 ```mermaid
 flowchart TD
   R["Order Service — the business service whose traffic the mesh mediates"]
-  R --> P0["Application code — sends queries and receives replies"]
-  R --> P1["Traffic — every in/out call is routed through the sidecar proxy"]
+  R -->|"comprises"| P0["Application code — sends queries and receives replies"]
+  R -->|"comprises"| P1["Traffic — every in/out call is routed through the sidecar proxy"]
 ```
 
 ### sidecar proxy — the per-service data plane
@@ -204,10 +204,10 @@ _Role: data plane_
 ```mermaid
 flowchart TD
   R["sidecar proxy — the per-service data plane"]
-  R --> P0["Interceptor — sees each call before it leaves the service"]
-  R --> P1["mTLS — encrypts service-to-service traffic with a distributed cert"]
-  R --> P2["Retry / circuit-breaker — retries and trips circuits on failures"]
-  R --> P3["Metrics — counts requests and answers health pings"]
+  R -->|"comprises"| P0["Interceptor — sees each call before it leaves the service"]
+  R -->|"comprises"| P1["mTLS — encrypts service-to-service traffic with a distributed cert"]
+  R -->|"comprises"| P2["Retry / circuit-breaker — retries and trips circuits on failures"]
+  R -->|"comprises"| P3["Metrics — counts requests and answers health pings"]
 ```
 
 ### control plane — the mesh brain that pushes policy to every proxy
@@ -217,8 +217,8 @@ _Role: control plane_
 ```mermaid
 flowchart TD
   R["control plane — the mesh brain that pushes policy to every proxy"]
-  R --> P0["Route config — distributes route rules to the proxies"]
-  R --> P1["Cert distribution — hands each proxy its mTLS identity"]
+  R -->|"comprises"| P0["Route config — distributes route rules to the proxies"]
+  R -->|"comprises"| P1["Cert distribution — hands each proxy its mTLS identity"]
 ```
 
 ```mermaid
@@ -355,7 +355,7 @@ flowchart LR
   MON["Monitoring service"] -->|"GET /health every 10 s"| PROXY["Sidecar proxy"]
   PROXY -->|"status UP"| MON
   PROXY -->|"metric 1"| MON
-  SVC["Order Service"] --- PROXY
+  SVC["Order Service"] ---|"proxied by"| PROXY
 ```
 
 ```java

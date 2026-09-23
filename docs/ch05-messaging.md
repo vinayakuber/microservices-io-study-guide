@@ -234,8 +234,8 @@ _Role: writer (producer)_
 ```mermaid
 flowchart TD
   R["the sender — e.g. Order Service"]
-  R --> P0["builds the message — OrderCreated(PO-2001)"]
-  R --> P1["sends it to the channel and returns at once"]
+  R -->|"comprises"| P0["builds the message — OrderCreated(PO-2001)"]
+  R -->|"comprises"| P1["sends it to the channel and returns at once"]
 ```
 
 ### the message channel — the broker
@@ -245,8 +245,8 @@ _Role: transport_
 ```mermaid
 flowchart TD
   R["the message channel — the broker"]
-  R --> P0["RabbitMQ broker holding the queue"]
-  R --> P1["buffers messages until the consumer is ready"]
+  R -->|"comprises"| P0["RabbitMQ broker holding the queue"]
+  R -->|"comprises"| P1["buffers messages until the consumer is ready"]
 ```
 
 ### the receiver — e.g. Kitchen consumer
@@ -256,8 +256,8 @@ _Role: reader (consumer)_
 ```mermaid
 flowchart TD
   R["the receiver — e.g. Kitchen consumer"]
-  R --> P0["subscribes to the channel"]
-  R --> P1["handles each message — starts cooking"]
+  R -->|"comprises"| P0["subscribes to the channel"]
+  R -->|"comprises"| P1["handles each message — starts cooking"]
 ```
 
 ```mermaid
@@ -302,8 +302,8 @@ A customer cancels an order. The Order Service must tell downstream services wit
 
 ```mermaid
 flowchart LR
-  SVC["Order Service"] --> BRK["channel"]
-  BRK --> CON["Refund consumer"]
+  SVC["Order Service"] -->|"publishes to"| BRK["channel"]
+  BRK -->|"delivers to"| CON["Refund consumer"]
   SVC -. "returns immediately" .-> SVC
 ```
 
@@ -350,10 +350,10 @@ A checkout flow needs the current item availability before it quotes a price, so
 
 ```mermaid
 flowchart LR
-  C["Checkout"] --> RQ["request channel"]
-  RQ --> P["Inventory service"]
-  P --> RP["reply-to channel"]
-  RP --> C
+  C["Checkout"] -->|"requests via"| RQ["request channel"]
+  RQ -->|"routes to"| P["Inventory service"]
+  P -->|"replies via"| RP["reply-to channel"]
+  RP -->|"returns to"| C
 ```
 
 ```java
@@ -396,10 +396,10 @@ A payment succeeds, and three services — billing, shipping, and loyalty — al
 
 ```mermaid
 flowchart LR
-  PUB["Payment service"] --> TOP["topic: payments"]
-  TOP --> B["Billing"]
-  TOP --> S["Shipping"]
-  TOP --> L["Loyalty"]
+  PUB["Payment service"] -->|"publishes to"| TOP["topic: payments"]
+  TOP -->|"delivers to"| B["Billing"]
+  TOP -->|"delivers to"| S["Shipping"]
+  TOP -->|"delivers to"| L["Loyalty"]
 ```
 
 ```java
@@ -444,9 +444,9 @@ The notification consumer is down for maintenance, but orders keep arriving. The
 
 ```mermaid
 flowchart LR
-  SVC["Order Service"] --> Q["broker queue"]
+  SVC["Order Service"] -->|"publishes to"| Q["broker queue"]
   Q -. "held while down" .-> CON["Consumer (DOWN)"]
-  Q --> R["replays on reconnect"]
+  Q -->|"replays to"| R["replays on reconnect"]
 ```
 
 ```java
@@ -489,8 +489,8 @@ Services communicate by exchanging messages over messaging channels, asynchronou
 
 ```mermaid
 flowchart LR
-  SVC["Order Service"] --> BRK["channel"]
-  BRK --> CON["Refund consumer"]
+  SVC["Order Service"] -->|"publishes to"| BRK["channel"]
+  BRK -->|"delivers to"| CON["Refund consumer"]
   SVC -. "returns immediately" .-> SVC
 ```
 

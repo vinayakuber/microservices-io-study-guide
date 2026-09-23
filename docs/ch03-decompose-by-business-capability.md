@@ -233,8 +233,8 @@ _Role: business capability_
 ```mermaid
 flowchart TD
   R["a business capability — e.g. product catalog"]
-  R --> P0["something the business does to generate value"]
-  R --> P1["maps to a business object — Product"]
+  R -->|"comprises"| P0["something the business does to generate value"]
+  R -->|"comprises"| P1["maps to a business object — Product"]
 ```
 
 ### the service — e.g. the catalog service
@@ -244,9 +244,9 @@ _Role: service (owns its data)_
 ```mermaid
 flowchart TD
   R["the service — e.g. the catalog service"]
-  R --> P0["owns the capability business object and its data"]
-  R --> P1["owns its database — PostgreSQL 16 @ catalog-db-1"]
-  R --> P2["hides its implementation behind an API"]
+  R -->|"comprises"| P0["owns the capability business object and its data"]
+  R -->|"comprises"| P1["owns its database — PostgreSQL 16 @ catalog-db-1"]
+  R -->|"comprises"| P2["hides its implementation behind an API"]
 ```
 
 ### the autonomous team
@@ -256,15 +256,15 @@ _Role: team (owns the service)_
 ```mermaid
 flowchart TD
   R["the autonomous team"]
-  R --> P0["a two-pizza team of 6-10 people"]
-  R --> P1["develops, tests and deploys the service alone"]
+  R -->|"comprises"| P0["a two-pizza team of 6-10 people"]
+  R -->|"comprises"| P1["develops, tests and deploys the service alone"]
 ```
 
 ```mermaid
 flowchart LR
-  CAP["business capability: product catalog"] --> SVC["catalog service"]
-  SVC --> DB[("PostgreSQL 16 @ catalog-db-1")]
-  SVC --> TEAM["two-pizza team (6-10)"]
+  CAP["business capability: product catalog"] -->|"maps to"| SVC["catalog service"]
+  SVC -->|"owns"| DB[("PostgreSQL 16 @ catalog-db-1")]
+  SVC -->|"run by"| TEAM["two-pizza team (6-10)"]
   DB -->|"query result"| SVC
 ```
 
@@ -303,9 +303,9 @@ A discount rule currently lives in three services, so every change to it means c
 
 ```mermaid
 flowchart LR
-  R["discount_rule change"] --> OWN["owner = order service"]
-  OWN --> ONE["1 service touched"]
-  OWN --> ONE_T["1 team coordinates"]
+  R["discount_rule change"] -->|"owned by"| OWN["owner = order service"]
+  OWN -->|"touches"| ONE["1 service touched"]
+  OWN -->|"coordinates"| ONE_T["1 team coordinates"]
 ```
 
 ```java
@@ -346,9 +346,9 @@ The team needs stable service boundaries for an online store. Order Management o
 
 ```mermaid
 flowchart LR
-  CAP["catalog, inventory, order, billing"] --> OBJ["each owns a business object"]
-  OBJ --> SVC["one service per capability"]
-  SVC --> H["Product/Service delivery"]
+  CAP["catalog, inventory, order, billing"] -->|"groups into"| OBJ["each owns a business object"]
+  OBJ -->|"becomes"| SVC["one service per capability"]
+  SVC -->|"delivers"| H["Product/Service delivery"]
 ```
 
 ```java
@@ -389,10 +389,10 @@ A proposed service is owned by two people and exposes its database schema to cal
 
 ```mermaid
 flowchart LR
-  SVC["proposed service"] --> SIZE["6-10 members"]
-  SVC --> API["exposed API"]
-  API --> LC["loosely coupled"]
-  SIZE --> TE["testable"]
+  SVC["proposed service"] -->|"has"| SIZE["6-10 members"]
+  SVC -->|"exposes"| API["exposed API"]
+  API -->|"keeps"| LC["loosely coupled"]
+  SIZE -->|"enables"| TE["testable"]
 ```
 
 ```java
@@ -434,10 +434,10 @@ The team has the code but not the boundaries; the architect proposes starting fr
 
 ```mermaid
 flowchart LR
-  ORG["org groups"] --> CAP1["capability"]
-  DM["domain model"] --> CAP2["capability"]
-  CAP1 --> IT["iterate"]
-  CAP2 --> IT
+  ORG["org groups"] -->|"informs"| CAP1["capability"]
+  DM["domain model"] -->|"informs"| CAP2["capability"]
+  CAP1 -->|"refined by"| IT["iterate"]
+  CAP2 -->|"refined by"| IT
 ```
 
 ```java
@@ -477,9 +477,9 @@ Define services corresponding to business capabilities; a capability often corre
 
 ```mermaid
 flowchart LR
-  R["discount_rule change"] --> OWN["owner = order service"]
-  OWN --> ONE["1 service touched"]
-  OWN --> ONE_T["1 team coordinates"]
+  R["discount_rule change"] -->|"owned by"| OWN["owner = order service"]
+  OWN -->|"touches"| ONE["1 service touched"]
+  OWN -->|"coordinates"| ONE_T["1 team coordinates"]
 ```
 
 

@@ -139,7 +139,7 @@ registerChapter({
       q: "What duplication risk do separate gateways introduce, and how should the common code be handled so it does not block the teams?",
       solution: "Separate gateways can re-implement the same edge functionality; the common code should live in a shared library used by all gateways, and the update process must stay lightweight or the gateway becomes a bottleneck.",
       components: ["Mobile gateway", "Web gateway", "shared edge-function library", "verify_access_token"],
-      diagram: "flowchart LR\n  GM[\"GW-M\"] -->|needs| F[\"verify_access_token\"]\n  GW[\"GW-W\"] -->|needs| F\n  F -->|moved into| LIB[\"shared library\"]\n  LIB --> GM\n  LIB --> GW",
+      diagram: "flowchart LR\n  GM[\"GW-M\"] -->|needs| F[\"verify_access_token\"]\n  GW[\"GW-W\"] -->|needs| F\n  F -->|moved into| LIB[\"shared library\"]\n  LIB -->|\"used by\"| GM\n  LIB -->|\"used by\"| GW",
       code: "// GATEWAY SIDE — two stacks would duplicate a common edge function unless it is shared\n// PARTIES: GWM = Mobile gateway · GWW = Web gateway · LIB = shared edge-function library\n// DEF: edge — the gateway edge where per-client logic such as auth runs; here the function \"verify_access_token\" held in edge_fn\n// STATE (before):\n//    edge_fn : {}                              // where the auth edge function lives\n// DEF: add_edge_function · CALLED BY: GWM and GWW both needing the same function\n// -> function : \"verify_access_token\"          // a common function both gateways need\n//    step 1 · GWM implements it    edge_fn : {} -> {owner:\"mobile team\", code:\"verify_access_token\"}\n//    step 2 · GWW copies it    edge_fn : {owner:\"mobile team\", code:\"verify_access_token\"} -> {owner:\"web team\", code:\"verify_access_token (copy 2)\"}\n//    step 3 · refactor into LIB    edge_fn : {owner:\"web team\", code:\"verify_access_token (copy 2)\"} -> {owner:\"shared library\", code:\"verify_access_token\"}\n// <- edge_fn : {owner:\"shared library\", code:\"verify_access_token\"} · one shared implementation used by both gateways, the duplicate removed\n//    alt the two gateways used different stacks : the code could not be shared -> the function stays duplicated in two places",
       tieback: "This is the chapter's duplication-and-bottleneck risk, resolved by putting common edge functionality in a shared library.",
       refs: ["The duplication and bottleneck risks"],
@@ -175,7 +175,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  WEB[\"WEB desktop client\"] --> GWW[\"GW-W web gateway\"]\n  MOB[\"MOB mobile client\"] --> GWM[\"GW-M mobile gateway\"]\n  GWW --> PROD[\"Product service\"]\n  GWM --> PROD\n  GWW --> LIB[\"Shared library verify_access_token\"]\n  GWM --> LIB",
+    wiring: "flowchart LR\n  WEB[\"WEB desktop client\"] -->|\"calls\"| GWW[\"GW-W web gateway\"]\n  MOB[\"MOB mobile client\"] -->|\"calls\"| GWM[\"GW-M mobile gateway\"]\n  GWW -->|\"calls\"| PROD[\"Product service\"]\n  GWM -->|\"calls\"| PROD\n  GWW -->|\"uses\"| LIB[\"Shared library verify_access_token\"]\n  GWM -->|\"uses\"| LIB",
     program: `// SYSTEM DESIGN — BFF: client -> per-client gateway -> upstream services, one product fetched for two devices
 // PARTIES: WEB = the desktop client · MOB = the mobile client · GWW = web gateway (public API team) · GWM = mobile gateway (mobile team) · PROD = Product service
 // DEF: api_shape — the fields a gateway tailors for one client; here WEB gets 5 fields and MOB gets 2

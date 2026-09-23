@@ -122,11 +122,11 @@ registerChapter({
       solution: "Because every subdomain lives in one component and one database, the whole operation runs as a single local ACID transaction — no network hops, no saga.",
       components: ["Single deployable component — every subdomain in one process", "Single database — one transaction spans all subdomains", "Local operation — no network round trips", "ACID commit — all writes durable together, or none"],
       diagram: `flowchart LR
-  P["placeOrder(PO-5002)"] --> T1["BEGIN T1"]
-  T1 --> O["write order row"]
-  T1 --> C["reserve credit"]
-  O --> CM["COMMIT T1"]
-  C --> CM`,
+  P["placeOrder(PO-5002)"] -->|"starts"| T1["BEGIN T1"]
+  T1 -->|"writes"| O["write order row"]
+  T1 -->|"reserves"| C["reserve credit"]
+  O -->|"commits"| CM["COMMIT T1"]
+  C -->|"commits"| CM`,
       code: `// DATABASE SIDE — one operation spanning Orders + Credit stays a single ACID transaction in one database
 // PARTIES: APP = the monolith · DB = PostgreSQL 16 @ monolith-db-1
 // DEF: credit — the Credit subdomain's ledger, keyed by customer id; here credit entity "CUST-9" = {used:100}
@@ -153,10 +153,10 @@ registerChapter({
       solution: "A single shared artifact forces a full rebuild, full test, and full redeploy for every change — the dark energy forces the monolith cannot fully satisfy.",
       components: ["One shared artifact — the single app.war", "One pipeline — builds and tests every subdomain", "Full redeploy — every instance replaced together", "Six teams — blocked on each other's changes"],
       diagram: `flowchart LR
-  C["tax fix in Orders"] --> B["rebuild whole WAR"]
-  B --> T["rerun 200 tests"]
-  T --> D["redeploy 4 instances"]
-  D --> X["Billing change ships too"]`,
+  C["tax fix in Orders"] -->|"forces"| B["rebuild whole WAR"]
+  B -->|"triggers"| T["rerun 200 tests"]
+  T -->|"gates"| D["redeploy 4 instances"]
+  D -->|"ships"| X["Billing change ships too"]`,
       code: `// PIPELINE SIDE — one team's one-line change rebuilds the single shared artifact for everyone
 // PARTIES: TA = Team Orders · TBL = Team Billing · CI = the one pipeline
 // STATE (before):
@@ -181,9 +181,9 @@ registerChapter({
       solution: "Simple and efficient local interactions, ACID over BASE, and minimal runtime and design-time coupling — the monolith wins on all five.",
       components: ["Simple interactions — one local call", "Efficient interactions — zero network round trips", "ACID transaction — no saga", "Low runtime + design-time coupling"],
       diagram: `flowchart LR
-  OP["placeOrder + reserveCredit"] --> L["local, 0 hops"]
-  OP --> A["one ACID txn"]
-  OP --> NC["no cross-service coupling"]`,
+  OP["placeOrder + reserveCredit"] -->|"stays"| L["local, 0 hops"]
+  OP -->|"runs in"| A["one ACID txn"]
+  OP -->|"avoids"| NC["no cross-service coupling"]`,
       code: `// OPERATION SIDE — the five dark-matter forces keep one operation local, efficient, and ACID
 // PARTIES: APP = the monolith · DB = PostgreSQL 16 @ monolith-db-1
 // DEF: credit — the Credit subdomain's ledger; here credit entity "CUST-9" = {used:100}
@@ -209,7 +209,7 @@ registerChapter({
       solution: "Organize subdomains into vertical slices of presentation, business, and persistence logic, and speed the pipeline with incremental builds.",
       components: ["Vertical slice — presentation + business + persistence per subdomain", "Incremental build — rebuild only changed slices", "Parallelized build + test steps", "Automated merge queue"],
       diagram: `flowchart LR
-  E["edit orders/persistence"] --> S["orders slice"]
+  E["edit orders/persistence"] -->|"touches"| S["orders slice"]
   S -->|rebuild| IB["incremental build"]
   BL["billing slice"] -.skip.-> IB`,
       code: `// SLICE SIDE — a modular monolith packages each subdomain as a vertical slice, containing the change
@@ -262,7 +262,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  CLI[\"Client\"] -->|\"POST /orders/PO-2001\"| APP[\"Monolith (one process)\"]\n  APP --> BL[\"business logic tier\"]\n  BL --> DA[\"data-access layer\"]\n  DA -->|\"INSERT / query\"| DB[(\"PostgreSQL 16 @ monolith-db-1\")]\n  DB -->|\"row back\"| DA\n  APP -->|\"response\"| CLI",
+    wiring: "flowchart LR\n  CLI[\"Client\"] -->|\"POST /orders/PO-2001\"| APP[\"Monolith (one process)\"]\n  APP -->|\"routes to\"| BL[\"business logic tier\"]\n  BL -->|\"calls\"| DA[\"data-access layer\"]\n  DA -->|\"INSERT / query\"| DB[(\"PostgreSQL 16 @ monolith-db-1\")]\n  DB -->|\"row back\"| DA\n  APP -->|\"response\"| CLI",
     program: `// SYSTEM DESIGN — the monolith is one process with three tiers inside it, all hitting one database: client -> presentation tier -> business logic -> data-access layer -> PostgreSQL 16 @ monolith-db-1
 // PARTIES: CLI = customer client (sends synchronous requests) · APP = the monolith (one process holding the presentation tier, business logic, and data-access layer) · DB = PostgreSQL 16 @ monolith-db-1
 // DEF: tier — one vertical layer inside the single process; here the 3 tiers "presentation", "business", "data-access"

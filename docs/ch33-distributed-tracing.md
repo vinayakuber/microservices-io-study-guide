@@ -245,9 +245,9 @@ _Role: writer_
 ```mermaid
 flowchart TD
   R["each service process (GW, Order, Kitchen, Payment) — the writer"]
-  R --> P0["Tracer — mints trace/span ids, propagates B3/W3C headers"]
-  R --> P1["Reporter — batches finished spans"]
-  R --> P2["Sender — transport adapter: HTTP / Kafka / RabbitMQ"]
+  R -->|"comprises"| P0["Tracer — mints trace/span ids, propagates B3/W3C headers"]
+  R -->|"comprises"| P1["Reporter — batches finished spans"]
+  R -->|"comprises"| P2["Sender — transport adapter: HTTP / Kafka / RabbitMQ"]
 ```
 
 ### RabbitMQ broker — the transport
@@ -257,8 +257,8 @@ _Role: transport_
 ```mermaid
 flowchart TD
   R["RabbitMQ broker — the transport"]
-  R --> P0["queue #quot;zipkin#quot; — the span channel"]
-  R --> P1["decouples writers from the collector, buffers under load"]
+  R -->|"comprises"| P0["queue #quot;zipkin#quot; — the span channel"]
+  R -->|"comprises"| P1["decouples writers from the collector, buffers under load"]
 ```
 
 ### Zipkin server (one central process, NOT per-host) — collector + aggregator + reader
@@ -268,10 +268,10 @@ _Role: collector + aggregator/store + reader_
 ```mermaid
 flowchart TD
   R["Zipkin server (one central process, NOT per-host) — collector + aggregator + reader"]
-  R --> P0["Collector — ingests spans (HTTP POST /api/v2/spans, or Kafka/RabbitMQ)"]
-  R --> P1["Storage — MySQL 8 @ zipkin-db-1, Cassandra, or Elasticsearch (the trace store)"]
-  R --> P2["Query API — REST: fetch a trace by id"]
-  R --> P3["UI — Zipkin Lens (the timeline browser)"]
+  R -->|"comprises"| P0["Collector — ingests spans (HTTP POST /api/v2/spans, or Kafka/RabbitMQ)"]
+  R -->|"comprises"| P1["Storage — MySQL 8 @ zipkin-db-1, Cassandra, or Elasticsearch (the trace store)"]
+  R -->|"comprises"| P2["Query API — REST: fetch a trace by id"]
+  R -->|"comprises"| P3["UI — Zipkin Lens (the timeline browser)"]
 ```
 
 ### operator — the reader
@@ -281,14 +281,14 @@ _Role: reader_
 ```mermaid
 flowchart TD
   R["operator — the reader"]
-  R --> P0["queries a trace id"]
-  R --> P1["reads the timeline, finds the slow hop"]
+  R -->|"comprises"| P0["queries a trace id"]
+  R -->|"comprises"| P1["reads the timeline, finds the slow hop"]
 ```
 
 ```mermaid
 flowchart LR
   subgraph APP["writer: each service process"]
-    TR["Tracer — mints ids, propagates headers"] --> RP["Reporter — batches spans"] --> SD["Sender — HTTP/Kafka/RabbitMQ"]
+    TR["Tracer — mints ids, propagates headers"] -->|"forwards spans"| RP["Reporter — batches spans"] -->|"forwards batches"| SD["Sender — HTTP/Kafka/RabbitMQ"]
   end
   SD -->|"publish span"| BRK["transport: RabbitMQ (queue zipkin)"]
   BRK -->|"consume"| CL["collector: Zipkin collector"]
@@ -347,7 +347,7 @@ flowchart LR
   G -->|"open root span, parent empty"| S["root span 6f9a3c1b8e2d4001"]
   G -->|"fill header"| H["traceparent 00-4bf92f3577b34da6a3ce90d0e2b88a4d-6f9a3c1b8e2d4001-01"]
   S -->|"writer reports via RabbitMQ"| Z["Zipkin: collector + store + query"]
-  H --> Z
+  H -->|"propagates to"| Z
   Z -->|"operator queries trace_id"| R["4 spans by parent+start"]
   R -->|"timeline"| O["operator: slow hop KIT 14 ms"]
 ```
@@ -545,7 +545,7 @@ flowchart LR
   G -->|"open root span, parent empty"| S["root span 6f9a3c1b8e2d4001"]
   G -->|"fill header"| H["traceparent 00-4bf92f3577b34da6a3ce90d0e2b88a4d-6f9a3c1b8e2d4001-01"]
   S -->|"writer reports via RabbitMQ"| Z["Zipkin: collector + store + query"]
-  H --> Z
+  H -->|"propagates to"| Z
   Z -->|"operator queries trace_id"| R["4 spans by parent+start"]
   R -->|"timeline"| O["operator: slow hop KIT 14 ms"]
 ```

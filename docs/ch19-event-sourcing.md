@@ -212,9 +212,9 @@ _Role: command side / event store_
 ```mermaid
 flowchart TD
   R["Order Service command side — appends events"]
-  R --> P0["append — one atomic write per state change"]
-  R --> P1["event store — EventStoreDB 24 @ orders-events-1"]
-  R --> P2["delivers each saved event to subscribers like a broker"]
+  R -->|"comprises"| P0["append — one atomic write per state change"]
+  R -->|"comprises"| P1["event store — EventStoreDB 24 @ orders-events-1"]
+  R -->|"comprises"| P2["delivers each saved event to subscribers like a broker"]
 ```
 
 ### projector / event handler
@@ -224,8 +224,8 @@ _Role: projector/event handler_
 ```mermaid
 flowchart TD
   R["projector / event handler"]
-  R --> P0["consume — receives each saved event"]
-  R --> P1["fold — apply() of each event into the read model"]
+  R -->|"comprises"| P0["consume — receives each saved event"]
+  R -->|"comprises"| P1["fold — apply() of each event into the read model"]
 ```
 
 ### read model database
@@ -235,8 +235,8 @@ _Role: read model DB_
 ```mermaid
 flowchart TD
   R["read model database"]
-  R --> P0["PostgreSQL 16 @ orders-view-1"]
-  R --> P1["holds the precomputed current state the projector folded"]
+  R -->|"comprises"| P0["PostgreSQL 16 @ orders-view-1"]
+  R -->|"comprises"| P1["holds the precomputed current state the projector folded"]
 ```
 
 ### query side
@@ -246,8 +246,8 @@ _Role: query side_
 ```mermaid
 flowchart TD
   R["query side"]
-  R --> P0["reads the current state directly"]
-  R --> P1["no replay at query time"]
+  R -->|"comprises"| P0["reads the current state directly"]
+  R -->|"comprises"| P1["no replay at query time"]
 ```
 
 ```mermaid

@@ -177,9 +177,9 @@ _Role: service instance_
 ```mermaid
 flowchart TD
   R["order-service instance — the service instance"]
-  R --> P0["Registers its own host and IP on startup"]
-  R --> P1["Renews the lease on a heartbeat timer"]
-  R --> P2["Unregisters itself on shutdown"]
+  R -->|"comprises"| P0["Registers its own host and IP on startup"]
+  R -->|"comprises"| P1["Renews the lease on a heartbeat timer"]
+  R -->|"comprises"| P2["Unregisters itself on shutdown"]
 ```
 
 ### self-registrar (in-process chassis code) — the registrar
@@ -189,8 +189,8 @@ _Role: self-registrar_
 ```mermaid
 flowchart TD
   R["self-registrar (in-process chassis code) — the registrar"]
-  R --> P0["Writes the instance row on boot"]
-  R --> P1["Pushes the ttl out on each heartbeat"]
+  R -->|"comprises"| P0["Writes the instance row on boot"]
+  R -->|"comprises"| P1["Pushes the ttl out on each heartbeat"]
 ```
 
 ### service registry (Eureka) — the registry
@@ -200,8 +200,8 @@ _Role: registry_
 ```mermaid
 flowchart TD
   R["service registry (Eureka) — the registry"]
-  R --> P0["Holds name -&gt; instance rows"]
-  R --> P1["Evicts entries whose lease lapses"]
+  R -->|"comprises"| P0["Holds name -&gt; instance rows"]
+  R -->|"comprises"| P1["Evicts entries whose lease lapses"]
 ```
 
 ```mermaid

@@ -179,8 +179,8 @@ _Role: service_
 ```mermaid
 flowchart TD
   R["the service instance"]
-  R --> P0["starts and stops the app"]
-  R --> P1["never talks to the registry itself"]
+  R -->|"comprises"| P0["starts and stops the app"]
+  R -->|"comprises"| P1["never talks to the registry itself"]
 ```
 
 ### the third-party registrar
@@ -190,9 +190,9 @@ _Role: registrar_
 ```mermaid
 flowchart TD
   R["the third-party registrar"]
-  R --> P0["Netflix Prana sidecar"]
-  R --> P1["observes / polls the instance"]
-  R --> P2["registers on startup, unregisters on shutdown"]
+  R -->|"comprises"| P0["Netflix Prana sidecar"]
+  R -->|"comprises"| P1["observes / polls the instance"]
+  R -->|"comprises"| P2["registers on startup, unregisters on shutdown"]
 ```
 
 ### the service registry
@@ -202,9 +202,9 @@ _Role: registry_
 ```mermaid
 flowchart TD
   R["the service registry"]
-  R --> P0["Eureka"]
-  R --> P1["stores the reachable endpoints"]
-  R --> P2["serves discovery lookups"]
+  R -->|"comprises"| P0["Eureka"]
+  R -->|"comprises"| P1["stores the reachable endpoints"]
+  R -->|"comprises"| P2["serves discovery lookups"]
 ```
 
 ```mermaid
@@ -250,9 +250,9 @@ A second order-service instance boots at 10.0.2.6, then gets hard-killed with no
 
 ```mermaid
 flowchart LR
-  B["boot 10.0.2.6"] --> R["register"]
-  K["hard kill"] --> S["stale entry"]
-  S --> D["client routed to dead host"]
+  B["boot 10.0.2.6"] -->|"triggers"| R["register"]
+  K["hard kill"] -->|"leaves"| S["stale entry"]
+  S -->|"causes"| D["client routed to dead host"]
 ```
 
 ```java
@@ -295,7 +295,7 @@ A non-JVM service must appear in the registry, but the team does not want to emb
 
 ```mermaid
 flowchart LR
-  SVC["order-service (non-JVM)"] --> RGR["registrar sidecar"]
+  SVC["order-service (non-JVM)"] -->|"runs beside"| RGR["registrar sidecar"]
   RGR -->|"register"| REG["registry"]
   RGR -->|"unregister"| REG
 ```
@@ -383,7 +383,7 @@ The team runs the registrar themselves rather than relying on Kubernetes or Mara
 ```mermaid
 flowchart LR
   RGR["registrar (down)"] -. "no register/unregister" .-> REG["registry"]
-  REG --> S["stale registry entries"]
+  REG -->|"holds"| S["stale registry entries"]
 ```
 
 ```java
@@ -421,9 +421,9 @@ A third-party registrar registers the instance when it starts and unregisters it
 
 ```mermaid
 flowchart LR
-  B["boot 10.0.2.6"] --> R["register"]
-  K["hard kill"] --> S["stale entry"]
-  S --> D["client routed to dead host"]
+  B["boot 10.0.2.6"] -->|"triggers"| R["register"]
+  K["hard kill"] -->|"leaves"| S["stale entry"]
+  S -->|"causes"| D["client routed to dead host"]
 ```
 
 

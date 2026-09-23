@@ -90,9 +90,9 @@ registerChapter({
       solution: "An instance must be registered on startup, unregistered on shutdown, and evicted if it crashes or runs but cannot handle requests, or the registry drifts from reality.",
       components: ["Register on startup", "Unregister on shutdown", "Evict crashed instances", "Evict broken instances"],
       diagram: `flowchart LR
-  B["boot 10.0.2.6"] --> R["register"]
-  K["hard kill"] --> S["stale entry"]
-  S --> D["client routed to dead host"]`,
+  B["boot 10.0.2.6"] -->|"triggers"| R["register"]
+  K["hard kill"] -->|"leaves"| S["stale entry"]
+  S -->|"causes"| D["client routed to dead host"]`,
       code: `// REGISTRY SIDE — why the registration lifecycle exists: stale entries route requests to dead endpoints
 // PARTIES: SVC = order-service instance · REG = service registry · CLI = a client resolving order-service
 // STATE (before):
@@ -118,7 +118,7 @@ registerChapter({
       solution: "A separate registrar — a sidecar like Prana, a parent process, or a Docker helper — registers the instance on startup and unregisters it on shutdown, acting on the service's behalf.",
       components: ["Co-located registrar (sidecar/parent/helper)", "Register on startup", "Unregister on shutdown", "Service stays oblivious"],
       diagram: `flowchart LR
-  SVC["order-service (non-JVM)"] --> RGR["registrar sidecar"]
+  SVC["order-service (non-JVM)"] -->|"runs beside"| RGR["registrar sidecar"]
   RGR -->|"register"| REG["registry"]
   RGR -->|"unregister"| REG`,
       code: `// REGISTRAR SIDE — a separate process registers and unregisters the instance on its behalf
@@ -173,7 +173,7 @@ registerChapter({
       components: ["Registrar on the discovery path", "Install/configure/maintain burden", "High availability requirement"],
       diagram: `flowchart LR
   RGR["registrar (down)"] -. "no register/unregister" .-> REG["registry"]
-  REG --> S["stale registry entries"]`,
+  REG -->|"holds"| S["stale registry entries"]`,
       code: `// REGISTRAR SIDE — the registrar is a critical component: if it dies, register/unregister stops and the registry drifts
 // PARTIES: RGR = registrar · REG = registry · SVC = order-service instance
 // STATE (before):

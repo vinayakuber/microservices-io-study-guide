@@ -209,9 +209,9 @@ _Role: API composer_
 ```mermaid
 flowchart TD
   R["API Composer"]
-  R --> P0["query — invokes each provider service that owns a fragment"]
-  R --> P1["join — merges fragments in memory on a shared key"]
-  R --> P2["returns one combined response"]
+  R -->|"comprises"| P0["query — invokes each provider service that owns a fragment"]
+  R -->|"comprises"| P1["join — merges fragments in memory on a shared key"]
+  R -->|"comprises"| P2["returns one combined response"]
 ```
 
 ### provider services
@@ -221,9 +221,9 @@ _Role: provider services_
 ```mermaid
 flowchart TD
   R["provider services"]
-  R --> P0["Order Service — owns the order rows"]
-  R --> P1["Customer Service — owns the customer rows"]
-  R --> P2["Inventory Service — owns the stock rows"]
+  R -->|"comprises"| P0["Order Service — owns the order rows"]
+  R -->|"comprises"| P1["Customer Service — owns the customer rows"]
+  R -->|"comprises"| P2["Inventory Service — owns the stock rows"]
 ```
 
 ### their databases
@@ -233,8 +233,8 @@ _Role: databases_
 ```mermaid
 flowchart TD
   R["their databases"]
-  R --> P0["PostgreSQL 16 @ orders-db-1"]
-  R --> P1["PostgreSQL 16 @ customers-db-1"]
+  R -->|"comprises"| P0["PostgreSQL 16 @ orders-db-1"]
+  R -->|"comprises"| P1["PostgreSQL 16 @ customers-db-1"]
 ```
 
 ```mermaid

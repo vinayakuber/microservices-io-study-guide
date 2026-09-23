@@ -234,9 +234,9 @@ _Role: client_
 ```mermaid
 flowchart TD
   R["order-service client — the client"]
-  R --> P0["Queries the registry for a service name"]
-  R --> P1["Selects one instance from the returned set"]
-  R --> P2["Load-balances across the instances"]
+  R -->|"comprises"| P0["Queries the registry for a service name"]
+  R -->|"comprises"| P1["Selects one instance from the returned set"]
+  R -->|"comprises"| P2["Load-balances across the instances"]
 ```
 
 ### service registry (Eureka) — the store of locations
@@ -246,8 +246,8 @@ _Role: service registry_
 ```mermaid
 flowchart TD
   R["service registry (Eureka) — the store of locations"]
-  R --> P0["Keeps the name -&gt; instances map"]
-  R --> P1["Returns instance locations on query"]
+  R -->|"comprises"| P0["Keeps the name -&gt; instances map"]
+  R -->|"comprises"| P1["Returns instance locations on query"]
 ```
 
 ### order-service instances — the targets
@@ -257,8 +257,8 @@ _Role: service instances_
 ```mermaid
 flowchart TD
   R["order-service instances — the targets"]
-  R --> P0["Self-register on startup"]
-  R --> P1["Serve the direct request"]
+  R -->|"comprises"| P0["Self-register on startup"]
+  R -->|"comprises"| P1["Serve the direct request"]
 ```
 
 ```mermaid
@@ -351,7 +351,7 @@ An order-service client must place an order but does not know which instances ar
 
 ```mermaid
 flowchart LR
-  C["client"] --> REG["service registry"]
+  C["client"] -->|"queries"| REG["service registry"]
   REG -->|"10.0.3.7, 10.0.3.8"| C
   C -->|"direct"| SVC["order-service instance"]
 ```
@@ -395,7 +395,7 @@ The registration proxy's configured URL is http://REGISTRATION-SERVICE/user — 
 ```mermaid
 flowchart LR
   P["proxy"] -->|"logical name"| RBN["Ribbon"]
-  RBN --> EUK["Eureka"]
+  RBN -->|"queries"| EUK["Eureka"]
   EUK -->|"10.0.4.4:8080"| RBN
   RBN -->|"rewritten URL"| SVC["registration-service"]
 ```
@@ -442,7 +442,7 @@ The team weighs client-side discovery against a server-side router for the same 
 flowchart LR
   CS["client-side"] -->|"2 hops"| D1["registry -> instance"]
   SS["server-side"] -->|"3 hops"| D2["router -> registry -> instance"]
-  CS --> COUP["coupled to registry"]
+  CS -->|"incurs"| COUP["coupled to registry"]
 ```
 
 ```java

@@ -146,7 +146,7 @@ registerChapter({
       solution: "The client queries the service registry, which knows all instance locations, then calls the chosen instance directly — no router in the middle.",
       components: ["Service registry query", "Returned instance set", "Direct call to the instance"],
       diagram: `flowchart LR
-  C["client"] --> REG["service registry"]
+  C["client"] -->|"queries"| REG["service registry"]
   REG -->|"10.0.3.7, 10.0.3.8"| C
   C -->|"direct"| SVC["order-service instance"]`,
       code: `// CLIENT SIDE — resolve a logical name to a concrete instance, then call that instance directly
@@ -173,7 +173,7 @@ registerChapter({
       components: ["@EnableEurekaClient", "@LoadBalanced RestTemplate", "Ribbon (queries Eureka)", "Resolved network location"],
       diagram: `flowchart LR
   P["proxy"] -->|"logical name"| RBN["Ribbon"]
-  RBN --> EUK["Eureka"]
+  RBN -->|"queries"| EUK["Eureka"]
   EUK -->|"10.0.4.4:8080"| RBN
   RBN -->|"rewritten URL"| SVC["registration-service"]`,
       code: `// CLIENT SIDE — the chassis (Spring Cloud) resolves a logical name via Eureka + Ribbon under the hood
@@ -203,7 +203,7 @@ registerChapter({
       diagram: `flowchart LR
   CS["client-side"] -->|"2 hops"| D1["registry -> instance"]
   SS["server-side"] -->|"3 hops"| D2["router -> registry -> instance"]
-  CS --> COUP["coupled to registry"]`,
+  CS -->|"incurs"| COUP["coupled to registry"]`,
       code: `// CLIENT SIDE — hop-count comparison: client-side discovery takes fewer hops and moving parts than server-side
 // PARTIES: CLI = client · REG = registry · SVC = order-service instance · RTR = router (server-side only)
 // STATE (before):

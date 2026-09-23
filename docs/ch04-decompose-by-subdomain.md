@@ -216,8 +216,8 @@ _Role: domain_
 ```mermaid
 flowchart TD
   R["the domain — the business problem space"]
-  R --> P0["the business DDD models — e.g. food delivery"]
-  R --> P1["splits into multiple subdomains"]
+  R -->|"comprises"| P0["the business DDD models — e.g. food delivery"]
+  R -->|"comprises"| P1["splits into multiple subdomains"]
 ```
 
 ### a subdomain — a distinct part of the business
@@ -227,8 +227,8 @@ _Role: subdomain (core/supporting/generic)_
 ```mermaid
 flowchart TD
   R["a subdomain — a distinct part of the business"]
-  R --> P0["classified core (key differentiator), supporting, or generic"]
-  R --> P1["often has a key domain object — Order"]
+  R -->|"comprises"| P0["classified core (key differentiator), supporting, or generic"]
+  R -->|"comprises"| P1["often has a key domain object — Order"]
 ```
 
 ### the service — one per subdomain
@@ -238,16 +238,16 @@ _Role: service (owns its data)_
 ```mermaid
 flowchart TD
   R["the service — one per subdomain"]
-  R --> P0["owns the subdomain model and its data"]
-  R --> P1["owns its database — PostgreSQL 16 @ order-db-1"]
-  R --> P2["cohesive, loosely coupled behind an API"]
+  R -->|"comprises"| P0["owns the subdomain model and its data"]
+  R -->|"comprises"| P1["owns its database — PostgreSQL 16 @ order-db-1"]
+  R -->|"comprises"| P2["cohesive, loosely coupled behind an API"]
 ```
 
 ```mermaid
 flowchart LR
-  DOM["domain: food delivery"] --> SUB["subdomain: order management (core)"]
-  SUB --> SVC["order service"]
-  SVC --> DB[("PostgreSQL 16 @ order-db-1")]
+  DOM["domain: food delivery"] -->|"decomposes into"| SUB["subdomain: order management (core)"]
+  SUB -->|"maps to"| SVC["order service"]
+  SVC -->|"owns"| DB[("PostgreSQL 16 @ order-db-1")]
   DB -->|"query result"| SVC
 ```
 
@@ -285,10 +285,10 @@ A food-delivery startup is one codebase. The architect wants service boundaries 
 
 ```mermaid
 flowchart LR
-  D["food delivery domain"] --> S1["catalog subdomain"]
-  D --> S2["orders subdomain"]
-  S1 --> V1["catalog service"]
-  S2 --> V2["orders service"]
+  D["food delivery domain"] -->|"decomposes into"| S1["catalog subdomain"]
+  D -->|"decomposes into"| S2["orders subdomain"]
+  S1 -->|"maps to"| V1["catalog service"]
+  S2 -->|"maps to"| V2["orders service"]
 ```
 
 ```java
@@ -329,9 +329,9 @@ The delivery team must decide where to pour in-house effort. It lists three cand
 
 ```mermaid
 flowchart LR
-  R["search ranking"] --> CORE["core · invest in-house"]
-  S["customer support"] --> SUP["supporting · in-house or outsource"]
-  E["email delivery"] --> GEN["generic · buy off the shelf"]
+  R["search ranking"] -->|"classified as"| CORE["core · invest in-house"]
+  S["customer support"] -->|"classified as"| SUP["supporting · in-house or outsource"]
+  E["email delivery"] -->|"classified as"| GEN["generic · buy off the shelf"]
 ```
 
 ```java
@@ -372,10 +372,10 @@ With subdomains identified, the architect maps each to a service and insists the
 
 ```mermaid
 flowchart LR
-  SUB["subdomains"] --> SVC["one service per subdomain"]
-  SVC --> COH["cohesive"]
-  SVC --> LC["loosely coupled behind an API"]
-  SVC --> TM["cross-functional team"]
+  SUB["subdomains"] -->|"maps to"| SVC["one service per subdomain"]
+  SVC -->|"kept"| COH["cohesive"]
+  SVC -->|"kept"| LC["loosely coupled behind an API"]
+  SVC -->|"owned by"| TM["cross-functional team"]
 ```
 
 ```java
@@ -417,10 +417,10 @@ The architect has no written list of subdomains. She starts from the company's o
 
 ```mermaid
 flowchart LR
-  ORG["org groups"] --> SUB1["subdomain"]
-  DM["domain model"] --> SUB2["subdomain"]
-  SUB1 --> IT["iterate"]
-  SUB2 --> IT
+  ORG["org groups"] -->|"informs"| SUB1["subdomain"]
+  DM["domain model"] -->|"informs"| SUB2["subdomain"]
+  SUB1 -->|"refined by"| IT["iterate"]
+  SUB2 -->|"refined by"| IT
 ```
 
 ```java
@@ -460,10 +460,10 @@ Define services corresponding to DDD subdomains; a domain consists of multiple s
 
 ```mermaid
 flowchart LR
-  D["food delivery domain"] --> S1["catalog subdomain"]
-  D --> S2["orders subdomain"]
-  S1 --> V1["catalog service"]
-  S2 --> V2["orders service"]
+  D["food delivery domain"] -->|"decomposes into"| S1["catalog subdomain"]
+  D -->|"decomposes into"| S2["orders subdomain"]
+  S1 -->|"maps to"| V1["catalog service"]
+  S2 -->|"maps to"| V2["orders service"]
 ```
 
 

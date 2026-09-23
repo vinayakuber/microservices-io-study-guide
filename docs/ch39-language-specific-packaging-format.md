@@ -193,8 +193,8 @@ _Role: build pipeline_
 ```mermaid
 flowchart TD
   R["Deployment pipeline — the builder"]
-  R --> P0["compiles the service into one runnable JAR"]
-  R --> P1["produces restaurant-service-3.1.0.jar"]
+  R -->|"comprises"| P0["compiles the service into one runnable JAR"]
+  R -->|"comprises"| P1["produces restaurant-service-3.1.0.jar"]
 ```
 
 ### Machine — the runtime host
@@ -204,8 +204,8 @@ _Role: machine (runtime)_
 ```mermaid
 flowchart TD
   R["Machine — the runtime host"]
-  R --> P0["installs JDK 17 and Tomcat 10"]
-  R --> P1["boots the packaged service"]
+  R -->|"comprises"| P0["installs JDK 17 and Tomcat 10"]
+  R -->|"comprises"| P1["boots the packaged service"]
 ```
 
 ### JVM process — the running service
@@ -215,8 +215,8 @@ _Role: JVM process_
 ```mermaid
 flowchart TD
   R["JVM process — the running service"]
-  R --> P0["loads the JAR and serves traffic"]
-  R --> P1["runs as jvm-8121"]
+  R -->|"comprises"| P0["loads the JAR and serves traffic"]
+  R -->|"comprises"| P1["runs as jvm-8121"]
 ```
 
 ```mermaid
@@ -349,8 +349,8 @@ flowchart LR
   MACH -->|"launch"| J2["jvm-2 :8082"]
   MACH -->|"launch"| J3["jvm-3 :8083"]
   J1 -->|"own port"| P["ports 3"]
-  J2 --> P
-  J3 --> P
+  J2 -->|"own port"| P
+  J3 -->|"own port"| P
 ```
 
 ```java

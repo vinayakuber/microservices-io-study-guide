@@ -221,8 +221,8 @@ _Role: command side_
 ```mermaid
 flowchart TD
   R["Order Service — command side"]
-  R --> P0["createOrder handler — appends order_created to the event stream"]
-  R --> P1["updateOrder handler — appends order_updated for the total change"]
+  R -->|"comprises"| P0["createOrder handler — appends order_created to the event stream"]
+  R -->|"comprises"| P1["updateOrder handler — appends order_updated for the total change"]
 ```
 
 ### Event store — the write model
@@ -232,8 +232,8 @@ _Role: event store_
 ```mermaid
 flowchart TD
   R["Event store — the write model"]
-  R --> P0["EventStoreDB 24 @ orders-events-1 — append-only source of truth"]
-  R --> P1["publishes each event to the broker BRK"]
+  R -->|"comprises"| P0["EventStoreDB 24 @ orders-events-1 — append-only source of truth"]
+  R -->|"comprises"| P1["publishes each event to the broker BRK"]
 ```
 
 ### Order History Service — query side
@@ -243,8 +243,8 @@ _Role: projections + query side_
 ```mermaid
 flowchart TD
   R["Order History Service — query side"]
-  R --> P0["projector — folds events into the view model"]
-  R --> P1["MongoDB 7 @ orders-view-1 — serves the history queries"]
+  R -->|"comprises"| P0["projector — folds events into the view model"]
+  R -->|"comprises"| P1["MongoDB 7 @ orders-view-1 — serves the history queries"]
 ```
 
 ```mermaid

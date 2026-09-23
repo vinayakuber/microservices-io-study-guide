@@ -7,6 +7,9 @@
 //      This is the exact bug where a part/text containing `"` breaks a quoted
 //      label — GitHub HTML-decodes the fence before mermaid sees it, so the
 //      only safe escape for a quote inside a label is mermaid's `#quot;` (no `&`).
+//      Also (R18) flags BARE arrows — `A --> B` with no label. A diagram whose
+//      arrows carry no label shows the shape and the connection but not the
+//      MEANING; the label is the "1000 words" the diagram is supposed to convey.
 //   2. FULL PARSE (when jsdom + js/mermaid.min.js are available): runs
 //      mermaid.parse on every block TWICE — once raw, once after a single-pass
 //      HTML-entity decode (simulating GitHub's textContent). Both must parse.
@@ -52,7 +55,7 @@ function collectBlocks() {
       for (const d of (Array.isArray(sd.decomposition) ? sd.decomposition : [])) {
         // recompute the tree exactly as tools/to_markdown.js renders it
         let t = 'flowchart TD\n  R["' + mmEsc(d.box) + '"]\n';
-        (Array.isArray(d.parts) ? d.parts : []).forEach((p, i) => { t += `  R --> P${i}["${mmEsc(p)}"]\n`; });
+        (Array.isArray(d.parts) ? d.parts : []).forEach((p, i) => { t += `  R -->|"comprises"| P${i}["${mmEsc(p)}"]\n`; });
         push(t, `${ch.id} decomposition: ${d.box}`);
       }
     }
@@ -117,6 +120,52 @@ function structuralIssues(src) {
   return issues;
 }
 
+function stripQuoted(s) {
+  return s.replace(/"[^"]*"/g, '""').replace(/'[^']*'/g, "''");
+}
+const EDGE_ARROW = /(-->|---|-.->|==>|--o|--x|<-->|<->|<-)/;
+function isLabeledEdge(t) {
+  if (/(-->|---|==>|-.->|--o|--x)\s*\|/.test(t)) return true; // A -->|text| B
+  if (/--\s+\S.*?\s+(-->|---)/.test(t)) return true;          // A -- text --> B
+  if (/-\s*\.\s*\S.*?\.\s*->/.test(t)) return true;           // A -. text .-> B
+  if (/==\s+\S.*?\s+==>/.test(t)) return true;                // A == text ==> B
+  return false;
+}
+// R18: a diagram must convey shape + connection + MEANING. The mechanical proxy
+// is that every arrow carries a label naming the relationship. A bare `A --> B`
+// shows the connection but never says why — it is a picture without the point.
+function bareEdgeIssues(src) {
+  const issues = [];
+  src.split('\n').forEach((line, i) => {
+    const t = line.trim();
+    if (!t) return;
+    if (!EDGE_ARROW.test(stripQuoted(t))) return; // node/classDef line, not an edge
+    if (isLabeledEdge(t)) return;
+    issues.push(`  line ${i + 1}: bare arrow (no meaning label) — ${t.slice(0, 70)}`);
+  });
+  return issues;
+}
+// A broken node label (a `"` at one end of a `[...]` label but not the other)
+// destroys the shape the diagram is meant to convey. Detect a shifted quote —
+// `["text]` (missing close) or `[text"]` (missing open), including the cylinder
+// `[(text)"]` form. Correct quoted labels are stripped first, so a legit label
+// that contains an inner `[...]` range (e.g. `["fixed [12:00,13:00)"]`) is never
+// flagged.
+function shiftedQuoteIssues(src) {
+  const issues = [];
+  src.split('\n').forEach((line, i) => {
+    const t = line.trim();
+    if (!t) return;
+    const stripped = t
+      .replace(/\["[^"]*"\]/g, '[]')                  // correct square [".."]
+      .replace(/\[\(\s*"[^"]*"\s*\)\]/g, '[()]');     // correct cylinder [("..")]
+    if (/\["[^\]\[]*\]/.test(stripped)) issues.push(`  line ${i + 1}: node label missing closing quote — ${t.slice(0, 70)}`);
+    else if (/\[[^\]\[]*"\]/.test(stripped)) issues.push(`  line ${i + 1}: node label missing opening quote — ${t.slice(0, 70)}`);
+    else if (/\[\(\s*"[^\)"]*\)\]/.test(stripped)) issues.push(`  line ${i + 1}: cylinder label missing closing quote — ${t.slice(0, 70)}`);
+  });
+  return issues;
+}
+
 async function fullParseSetup() {
   let JSDOM;
   const candidates = [
@@ -165,6 +214,16 @@ async function fullParseSetup() {
     if (iss.length) {
       issues += iss.length;
       console.log(`STRUCT ${b.label}:\n${iss.join('\n')}`);
+    }
+    const bare = bareEdgeIssues(b.src);
+    if (bare.length) {
+      issues += bare.length;
+      console.log(`BARE ${b.label}:\n${bare.join('\n')}`);
+    }
+    const shifted = shiftedQuoteIssues(b.src);
+    if (shifted.length) {
+      issues += shifted.length;
+      console.log(`SHIFT ${b.label}:\n${shifted.join('\n')}`);
     }
   }
 

@@ -114,7 +114,7 @@ registerChapter({
       components: ["Well-known router address", "Registry query by the router", "Forward to an instance", "Discovery-free client"],
       diagram: `flowchart LR
   C["client"] -->|"well-known address"| R["router"]
-  R --> REG["registry"]
+  R -->|"queries"| REG["registry"]
   REG -->|"instances"| R
   R -->|"forward"| SVC["order-service instance"]`,
       code: `// ROUTER SIDE — the client calls a well-known router, which consults the registry and forwards to an instance
@@ -142,9 +142,9 @@ registerChapter({
       solution: "The ELB load-balances traffic (router) and also functions as the registry; instances are registered explicitly via an API call or automatically via an autoscaling group.",
       components: ["ELB as router", "ELB as registry", "Explicit API registration", "Autoscaling-group registration"],
       diagram: `flowchart LR
-  C["client"] --> ELB["ELB (router + registry)"]
-  ELB --> I1["i-abc"]
-  ELB --> I2["i-def"]
+  C["client"] -->|"calls"| ELB["ELB (router + registry)"]
+  ELB -->|"routes to"| I1["i-abc"]
+  ELB -->|"routes to"| I2["i-def"]
   ASG["autoscaling group"] -->|"register i-ghi"| ELB`,
       code: `// ELB SIDE — the load balancer is also the registry; instances register explicitly or via an autoscaling group
 // PARTIES: CLI = client · ELB = Elastic Load Balancer (router + registry) · EC2 = service instances
@@ -199,7 +199,7 @@ registerChapter({
   C["client"] -->|"hop 1"| R["router"]
   R -->|"hop 2"| REG["registry"]
   R -->|"hop 3"| SVC["instance"]
-  R --> REP["replicas + protocols"]`,
+  R -->|"requires"| REP["replicas + protocols"]`,
       code: `// ROUTER SIDE — server-side discovery adds a network hop and a component that must be replicated and protocol-fit
 // PARTIES: CLI = client · RTR = router · REG = registry · SVC = order-service instance
 // STATE (before):

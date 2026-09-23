@@ -25,6 +25,10 @@
 //       with the interview question being solved — the problem, the use case,
 //       and the premise. A pipeline without a question is a solution looking
 //       for a problem.
+//   R18 (diagram-level, enforced by tools/validate_mermaid.js) every mermaid
+//       arrow must carry a label naming the relationship — shape + connection
+//       + MEANING. A bare `A --> B` shows the boxes and the line but never says
+//       why they connect; the label is the "1000 words" the diagram conveys.
 //   R14 (chapter-level) every chapter with a program must cover BOTH a write
 //       path (data created/stored) AND a read path (data queried/served back).
 //       A write-only chapter hides how its store is consumed; a read-only

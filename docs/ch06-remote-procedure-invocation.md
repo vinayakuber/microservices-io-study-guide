@@ -231,8 +231,8 @@ _Role: caller_
 ```mermaid
 flowchart TD
   R["the caller — Registration Service"]
-  R --> P0["builds the request { email: #quot;bob@example.com#quot; }"]
-  R --> P1["waits synchronously for the reply"]
+  R -->|"comprises"| P0["builds the request { email: #quot;bob@example.com#quot; }"]
+  R -->|"comprises"| P1["waits synchronously for the reply"]
 ```
 
 ### the client stub/proxy — RegistrationServiceProxy
@@ -242,8 +242,8 @@ _Role: interface (client proxy)_
 ```mermaid
 flowchart TD
   R["the client stub/proxy — RegistrationServiceProxy"]
-  R --> P0["serializes the request over HTTP"]
-  R --> P1["hides the transport from the caller"]
+  R -->|"comprises"| P0["serializes the request over HTTP"]
+  R -->|"comprises"| P1["hides the transport from the caller"]
 ```
 
 ### the server — User Registration instance
@@ -253,8 +253,8 @@ _Role: server_
 ```mermaid
 flowchart TD
   R["the server — User Registration instance"]
-  R --> P0["runs the business logic"]
-  R --> P1["stores the row and returns the reply"]
+  R -->|"comprises"| P0["runs the business logic"]
+  R -->|"comprises"| P1["stores the row and returns the reply"]
 ```
 
 ```mermaid
@@ -304,7 +304,7 @@ A new user signs up through the registration service, which calls the user-regis
 flowchart LR
   C["Registration Service"] -->|"POST /register"| SVC["User Registration service"]
   SVC -->|"200 OK"| C
-  C --> R["Right(user-14)"]
+  C -->|"yields"| R["Right(user-14)"]
 ```
 
 ```java
@@ -348,7 +348,7 @@ The same email tries to sign up a second time, and the user-registration service
 flowchart LR
   C["Registration Service"] -->|"POST /register"| SVC["User Registration service"]
   SVC -->|"409 CONFLICT"| C
-  C --> L["Left(DuplicateRegistrationError)"]
+  C -->|"yields"| L["Left(DuplicateRegistrationError)"]
 ```
 
 ```java
@@ -393,7 +393,7 @@ The user-registration service has gone unresponsive, and the registration servic
 ```mermaid
 flowchart LR
   C["Registration Service"] -->|"POST /register"| SVC["User Registration (down)"]
-  C --> T["thread WAITING -> timeout"]
+  C -->|"blocks in"| T["thread WAITING -> timeout"]
 ```
 
 ```java
@@ -435,7 +435,7 @@ Before its first call, the registration service must find a user-registration in
 
 ```mermaid
 flowchart LR
-  C["Registration Service"] --> DISC["service registry"]
+  C["Registration Service"] -->|"queries"| DISC["service registry"]
   DISC -->|"10.0.2.9:8080"| C
   C -->|"behind breaker"| SVC["User Registration instance"]
 ```
@@ -480,7 +480,7 @@ The client uses a request/reply-based protocol to make requests to a service, vi
 flowchart LR
   C["Registration Service"] -->|"POST /register"| SVC["User Registration service"]
   SVC -->|"200 OK"| C
-  C --> R["Right(user-14)"]
+  C -->|"yields"| R["Right(user-14)"]
 ```
 
 

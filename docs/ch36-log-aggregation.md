@@ -203,8 +203,8 @@ _Role: writer_
 ```mermaid
 flowchart TD
   R["Three services — the writers"]
-  R --> P0["Order Service — writes a log line tagged REQ-3001"]
-  R --> P1["Customer Service and Payment Service — write their own lines for REQ-3001"]
+  R -->|"comprises"| P0["Order Service — writes a log line tagged REQ-3001"]
+  R -->|"comprises"| P1["Customer Service and Payment Service — write their own lines for REQ-3001"]
 ```
 
 ### Central logging service — collector + aggregator/store
@@ -214,8 +214,8 @@ _Role: collector / aggregator/store_
 ```mermaid
 flowchart TD
   R["Central logging service — collector + aggregator/store"]
-  R --> P0["collects the lines shipped by each service"]
-  R --> P1["indexes them by request id into {#quot;REQ-3001#quot;:[1,2,3]}"]
+  R -->|"comprises"| P0["collects the lines shipped by each service"]
+  R -->|"comprises"| P1["indexes them by request id into {#quot;REQ-3001#quot;:[1,2,3]}"]
 ```
 
 ### Developer — the reader
@@ -225,8 +225,8 @@ _Role: reader_
 ```mermaid
 flowchart TD
   R["Developer — the reader"]
-  R --> P0["searches REQ-3001"]
-  R --> P1["reads the 3 correlated lines from the index"]
+  R -->|"comprises"| P0["searches REQ-3001"]
+  R -->|"comprises"| P1["reads the 3 correlated lines from the index"]
 ```
 
 ```mermaid
