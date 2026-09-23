@@ -102,10 +102,7 @@ registerChapter({
       q: 'How does the Service mesh pattern move cross-cutting concerns out of each service?',
       solution: 'A mesh that mediates all communication in and out of each service lets a proxy attached to the service intercept each outbound call and apply the concern on the traffic instead of inside the service.',
       components: ['Mesh — mediates all traffic', 'Sidecar proxy — per service', 'Outbound interception — sees each call', 'Concern applied on traffic — not in code'],
-      diagram: `flowchart LR
-  SVC["Order Service"] -->|"SELECT * FROM orders"| PROXY["Sidecar proxy"]
-  PROXY -->|"traced call"| DB["db:5432"]
-  PROXY -->|"attaches"| ID["trace id"]`,
+      
       code: `// MESH SIDE — a proxy intercepts every call out of a service, mediating all communication
 // PARTIES: SVC = Order Service · PROXY = its sidecar proxy · DB = PostgreSQL 16 @ orders-db-1
 // STATE (before):
@@ -127,10 +124,7 @@ registerChapter({
       q: 'How does the mesh enable distributed tracing across services?',
       solution: 'The proxy gives each external request a unique identifier that is passed between services, and each service hop records a span against the shared id so the chain is reconstructable.',
       components: ['Unique identifier — assigned by the proxy', 'Shared id — passed between services', 'Span per hop — recorded against the id', 'Reconstructable chain — the goal'],
-      diagram: `flowchart LR
-  P1["Proxy A"] -->|"id trc-9f2a"| SVCB["Customer Service"]
-  SVCB -->|"same id"| P2["Proxy B"]
-  P2 -->|"records span"| CHAIN["chain: order -> customer"]`,
+      
       code: `// MESH SIDE — one unique id travels with the request across services so a call chain can be traced
 // PARTIES: U1 = a user request · PROXY = sidecar of Order Service · SVCB = Customer Service
 // DEF: trace — the whole chain of spans that share one trace_id for a single request; here trace_id "trc-9f2a" = the order-service -> customer-service chain
@@ -153,11 +147,7 @@ registerChapter({
       q: 'How does the mesh expose health and metrics without changing the service?',
       solution: 'The proxy exposes a health URL a monitoring service can ping to determine the health of the application, and it records metrics about what the application is doing and reports them.',
       components: ['Health URL — exposed by the proxy', 'Monitoring service — pings it', 'Metrics — recorded by the proxy', 'Report — emitted to the monitor'],
-      diagram: `flowchart LR
-  MON["Monitoring service"] -->|"GET /health every 10 s"| PROXY["Sidecar proxy"]
-  PROXY -->|"status UP"| MON
-  PROXY -->|"metric 1"| MON
-  SVC["Order Service"] ---|"proxied by"| PROXY`,
+      
       code: `// MESH SIDE — a health URL and per-request metrics, both handled at the proxy without touching service code
 // PARTIES: MON = monitoring service · PROXY = the sidecar proxy · SVC = Order Service
 // STATE (before):
@@ -179,11 +169,7 @@ registerChapter({
       q: 'What does the mesh externalize, and which two patterns does the reference relate it to?',
       solution: 'The mesh supplies credentials and network locations of external services outside the service and configures a logging framework such as log4j or logback once; it relates to the microservice chassis and is often implemented with the sidecar pattern.',
       components: ['Externalized configuration — credentials and locations', 'Logging framework — configured once', 'Microservice chassis — an alternative', 'Sidecar — the usual implementation'],
-      diagram: `flowchart LR
-  PROXY["Sidecar proxy"] -->|"injects"| CFG["db:5432, brk:9092, secret"]
-  PROXY -->|"configures once"| LOG["logback"]
-  CFG -->|"supplied"| SVC["Order Service"]
-  LOG -->|"overlaps"| CH["Chassis + Sidecar"]`,
+      
       code: `// MESH SIDE — credentials and network locations are injected by the mesh, and logging is configured once
 // PARTIES: PROXY = sidecar proxy · SVC = Order Service · BRK = message broker
 // STATE (before):
@@ -232,7 +218,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  SVC[\"Order Service\"] -->|\"SELECT * FROM orders\"| PX[\"sidecar proxy (data plane)\"]\n  PX -->|\"mTLS + route lookup\"| DB[(\"PostgreSQL 16 @ orders-db-1\")]\n  CP[\"control plane\"] -->|\"pushes route config\"| PX\n  CP -->|\"distributes cert cert-7f21\"| PX\n  PX -->|\"reports metrics\"| MON[\"monitoring service\"]",
+    
     program: `// SYSTEM DESIGN — service mesh: service -> sidecar proxy (data plane) -> control plane
 // PARTIES: SVC = Order Service (business service) · PROXY = sidecar proxy (data plane: intercepts traffic, mTLS, retries/circuit-break, metrics) · CP = control plane (route-config distributor + certificate authority) · DB = PostgreSQL 16 @ orders-db-1 (the proxied backend)
 // DEF: route — one control-plane rule mapping a target host to its backend; here "db:5432" -> "orders-db-1"

@@ -10,28 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 2 · microservices
 
 > **Why this matters:** The microservice pattern turns the same subdomains into independently deployable services, with one rule about how subdomains may be shared.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Two or more services</b><br/>independently deployable, loosely coupled"]:::start
-  n1["<b>2. Group subdomains into services</b><br/>services empty becomes catalog, inventory, order, delivery"]:::core
-  n2["<b>3. Each subdomain in exactly one service</b><br/>placement unassigned becomes one-to-one"]:::step
-  n3["<b>4. Shared library is the exception</b><br/>CommonLib owners 0 becomes 4"]:::step
-  n4["<b>5. Ownership follows the subdomains</b><br/>the team owns its non-library subdomains"]:::step
-  n5["<b>6. Four services</b><br/>each non-library subdomain in a single service"]:::stop
-  n6["<b>Merge two subdomains</b><br/>services 4 becomes 3, one service may hold more"]:::warn
-  n0 -->|"1. decompose"| n1
-  n1 -->|"2. place each"| n2
-  n2 -->|"3. allow the exception"| n3
-  n3 -->|"4. team owns it"| n4
-  n4 -->|"5. count"| n5
-  n2 -->|"6. or merge two"| n6
-```
-
 1. **Two or more services** — Structure the application as a set of two or more independently deployable, loosely coupled components, a.k.a. services.
 
 2. **Each service owns one or more subdomains** — A service consists of one or more subdomains, and each subdomain is part of a single service.
@@ -58,28 +36,6 @@ flowchart TD
 ### Independent deployability
 
 > **Why this matters:** Independence is the whole point: each service gets its own repository and pipeline so teams ship without waiting on each other.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Each service owns its repository and pipeline</b><br/>order has P1 and 12 tests, inventory P2 and 8"]:::start
-  n1["<b>2. Build only the order service</b><br/>built_services empty becomes order"]:::step
-  n2["<b>3. Run only order tests</b><br/>tests_run 20 becomes 12"]:::step
-  n3["<b>4. Deploy order alone</b><br/>deployed order v1.0 becomes v1.1"]:::core
-  n4["<b>5. Inventory pipeline never runs</b><br/>its service is unchanged"]:::step
-  n5["<b>6. order v1.1 live</b><br/>Team Orders did not wait for Team Inventory"]:::stop
-  n6["<b>Single shared pipeline</b><br/>both services rebuild, tests_run 12 becomes 20"]:::warn
-  n0 -->|"1. release v1.1"| n1
-  n1 -->|"2. own tests"| n2
-  n2 -->|"3. own deploy"| n3
-  n3 -->|"4. other side idle"| n4
-  n4 -->|"5. shipped"| n5
-  n2 -->|"6. if pipelines shared"| n6
-```
 
 1. **Own source code repository** — To be independently deployable, each service typically has its own source code repository.
 
@@ -113,32 +69,6 @@ flowchart TD
 
 > **Why this matters:** Some system operations are local to one service, but the ones that span services must be rebuilt from local transactions because each service has its own database.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Some operations span services</b><br/>local vs distributed, each has its own database"]:::start
-  n1["<b>2. API gateway is the entry point</b><br/>routes the client request to the order service"]:::step
-  n2["<b>3. Each service has its own database</b><br/>a single ACID transaction cannot span them"]:::core
-  n3["<b>4. Local txn in order service</b><br/>T1 state NEW becomes DONE, creates the order"]:::step
-  n4["<b>5. Local txn in credit service</b><br/>T3 state NEW becomes DONE, reserves credit"]:::step
-  n5["<b>6. Local txn in inventory service</b><br/>T2 state NEW becomes DONE, reserves stock"]:::step
-  n6["<b>7. A saga of local transactions</b><br/>no single ACID commit across services"]:::core
-  n7["<b>8. Saga completed</b><br/>PO-2001 via 3 local transactions, eventually consistent"]:::stop
-  n8["<b>Step 3 fails</b><br/>compensating transactions undo T1 and T3"]:::warn
-  n0 -->|"1. entry point"| n1
-  n1 -->|"2. loose coupling means"| n2
-  n2 -->|"3. first local txn"| n3
-  n3 -->|"4. second"| n4
-  n4 -->|"5. third"| n5
-  n5 -->|"6. no single commit"| n6
-  n6 -->|"7. saga done"| n7
-  n5 -->|"8. if step 3 fails"| n8
-```
-
 1. **Local vs distributed operations** — Some system operations are local to a single service, while others are distributed across multiple services.
 
 2. **Each service has its own database** — Loose coupling requires each service to have its own database, so a single ACID transaction cannot span services.
@@ -167,36 +97,6 @@ flowchart TD
 ### The collaboration patterns and known uses
 
 > **Why this matters:** Four patterns rebuild a distributed operation from local pieces, and the big web properties show them at scale.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Four patterns rebuild distributed operations</b><br/>from local pieces"]:::start
-  n1["<b>2a. Saga</b><br/>distributed command as local transactions"]:::step
-  n2["<b>2b. Command-side replica</b><br/>replicate read-only data to the command service"]:::step
-  n3["<b>2c. API composition and CQRS</b><br/>distributed query as local queries"]:::step
-  n4["<b>3. Transaction Outbox ties them together</b><br/>atomically update entities and send a message"]:::core
-  n5["<b>4. Fan out the query</b><br/>pending_calls 0 becomes 6, six backend services"]:::step
-  n6["<b>5. Each service queries its own database</b><br/>responses empty becomes feed, recs, meta, subs, ads, profile"]:::step
-  n7["<b>6. Compose the six results</b><br/>composed none becomes 6-merged"]:::step
-  n8["<b>7. Deliver one page</b><br/>1 response assembled from 6 local queries"]:::stop
-  n9["<b>A service is down</b><br/>responses 6 becomes 5, a partial page"]:::warn
-  n0 -->|"1. pattern one"| n1
-  n0 -->|"1. pattern two"| n2
-  n0 -->|"1. pattern three"| n3
-  n1 -->|"2. all use messaging"| n4
-  n2 -->|"2. all use messaging"| n4
-  n3 -->|"2. all use messaging"| n4
-  n4 -->|"3. composition path"| n5
-  n5 -->|"4. fan out"| n6
-  n6 -->|"5. merge"| n7
-  n7 -->|"6. deliver"| n8
-  n6 -->|"7. if one is down"| n9
-```
 
 1. **Saga** — Saga implements a distributed command as a series of local transactions.
 
@@ -275,16 +175,6 @@ flowchart TD
   R -->|"comprises"| P1["no single ACID commit spans two services"]
 ```
 
-```mermaid
-flowchart LR
-  CLI["Client"] -->|"GET /orders/PO-2001"| GW["API gateway"]
-  GW -->|"route"| SVC["order service"]
-  SVC -->|"own business logic"| BL["business logic"]
-  BL -->|"write / read"| DB[("PostgreSQL 16 @ order-db-1")]
-  DB -->|"rows back"| BL
-  GW -->|"compose one page"| CLI
-```
-
 ```java
 // SYSTEM DESIGN — microservices: client -> API gateway -> microservices (own business logic + own database) -> service databases; a distributed command becomes a saga of local transactions
 // PARTIES: CLI = customer client · GW = API gateway (the entry point, routes and composes) · SVC = order service (owns the Order subdomain) · DB = PostgreSQL 16 @ order-db-1 (the order service's own database)
@@ -317,13 +207,6 @@ An architect is turning a monolith's subdomains into services and must decide wh
 - Subdomain — belongs to a single service
 - Shared-library subdomain — the one allowed exception
 - Team ownership — follows the non-library subdomains
-
-```mermaid
-flowchart LR
-  SUB["ProductCatalog, Inventory, Order"] -->|"becomes"| SV["one service each"]
-  LIB["CommonLib"] -->|shared| SV
-  LIB -->|shared| SV2["other services"]
-```
 
 ```java
 // DESIGN SIDE — assign each subdomain to exactly one service; a shared library is the lone exception
@@ -359,14 +242,6 @@ Team Orders wants to ship a fix while Team Payment is mid-refactor. Under the mo
 - Own deployment pipeline
 - Per-service tests
 - Independent release
-
-```mermaid
-flowchart LR
-  TO["Team Orders fix"] -->|"touches"| P1["order pipeline"]
-  P1 -->|"deploys"| D1["deploy order v2.3"]
-  TP["Team Payment refactor"] -.own pipeline.-> P2["payment pipeline"]
-  P2 -.untouched.-> D2["payment still v2.2"]
-```
 
 ```java
 // DEPLOY SIDE — a team ships its service alone through its own repository and pipeline
@@ -406,14 +281,6 @@ A 'checkout' command must now touch order, payment, and shipping services, each 
 - Saga — series of local transactions
 - API gateway — the entry point
 
-```mermaid
-flowchart LR
-  API["API gateway"] -->|"routes to"| OSV["order: T1"]
-  API -->|"routes to"| PSV["payment: T2"]
-  API -->|"routes to"| SSV["shipping: T3"]
-  OSV -->|"each commits its own DB"| SAGA["eventually consistent saga"]
-```
-
 ```java
 // ORDER SIDE — a distributed command spans three services, each committing to its own database
 // PARTIES: API = API gateway · OSV = order service · PSV = payment service · SSV = shipping service
@@ -450,15 +317,6 @@ A client requests its home feed, which needs data from six services. The team as
 - API composition + CQRS — distributed query
 - Transaction Outbox — atomic publish
 
-```mermaid
-flowchart LR
-  Q["getHomeFeed"] -->|"calls"| API["API composition"]
-  API -->|"queries"| S1["catalog"]
-  API -->|"queries"| S2["watchlist"]
-  API -->|"queries"| S3["profile"]
-  API -->|"6 local queries -> 1 page"| P["composed page"]
-```
-
 ```java
 // GATEWAY SIDE — one distributed query becomes a series of local queries (API composition)
 // PARTIES: GW = API gateway · SVC1..SVC6 = six backend services, each with its own DB
@@ -494,11 +352,19 @@ _From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-syste
 
 Structure the application as a set of two or more independently deployable, loosely coupled services; each service owns one or more subdomains and typically has its own source repository and its own build, test and deploy pipeline.
 
-```mermaid
-flowchart LR
-  SUB["ProductCatalog, Inventory, Order"] -->|"becomes"| SV["one service each"]
-  LIB["CommonLib"] -->|shared| SV
-  LIB -->|shared| SV2["other services"]
+```java
+// DESIGN SIDE — assign each subdomain to exactly one service; a shared library is the lone exception
+// PARTIES: ARC = architect applying the microservice pattern
+// STATE (before):
+//    subdomains : { "ProductCatalog":{type:"business"}, "Inventory":{type:"business"}, "Order":{type:"business"}, "CommonLib":{type:"library"} }
+//    services : []
+// DEF: decompose · CALLED BY: ARC grouping subdomains into services
+// -> subdomain_list : ["ProductCatalog","Inventory","Order","CommonLib"]
+//    step 1 · create a service per business subdomain : services : [] -> ["catalog","inventory","order"]
+//    step 2 · place each subdomain in exactly one service : placement : "unassigned" -> "one-to-one"
+//    step 3 · share the library across all three : CommonLib.owners : 0 -> 3   BECAUSE a shared-library subdomain is the one allowed exception
+// <- service_count : 3 · every non-library subdomain belongs to a single service
+//    alt merge two subdomains : services : 3 -> 2  (a service may hold more than one subdomain)
 ```
 
 

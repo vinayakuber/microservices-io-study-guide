@@ -10,36 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 6 · microservices
 
 > **Why this matters:** RPI is the familiar synchronous call: the client sends a request and waits for a reply, with no broker in between.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Request/reply protocol, no broker</b><br/>pick how to invoke the remote service"]:::start
-  n1["<b>2a. REST</b><br/>HTTP request and response"]:::step
-  n2["<b>2b. gRPC</b><br/>binary RPC"]:::step
-  n3["<b>2c. Apache Thrift</b><br/>cross-language RPC"]:::step
-  n4["<b>3. CLIENT POSTs the request</b><br/>email ada example, password s3cret"]:::step
-  n5["<b>4. SVC creates the user and answers</b><br/>status PENDING becomes 200"]:::core
-  n6["<b>5. CLIENT reads the status code</b><br/>verdict UNSET becomes OK"]:::step
-  n7["<b>6. CLIENT returns the new id</b><br/>result null becomes user-9"]:::step
-  n8["<b>7. Reply user-9, Right</b><br/>one request, one prompt reply over HTTP"]:::stop
-  n9["<b>No reply arrives</b><br/>the client blocks, both sides must be up"]:::warn
-  n0 -->|"1a. protocol one"| n1
-  n0 -->|"1b. protocol two"| n2
-  n0 -->|"1c. protocol three"| n3
-  n1 -->|"2. send the call"| n4
-  n2 -->|"2. send the call"| n4
-  n3 -->|"2. send the call"| n4
-  n4 -->|"3. wait"| n5
-  n5 -->|"4. read code"| n6
-  n6 -->|"5. map"| n7
-  n7 -->|"6. reply"| n8
-  n5 -->|"7. if service down"| n9
-```
-
 1. **Send a request** — The client uses a request/reply protocol (REST, gRPC, or Apache Thrift) to call a service.
 
 2. **Wait for the reply** — The client blocks until the reply arrives, then carries on.
@@ -67,29 +37,6 @@ flowchart TD
 ### Map errors to typed results
 
 > **Why this matters:** A failed or duplicate call must become a typed result, not an unhandled exception.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Proxy inspects the HTTP status</b><br/>the response code decides the result type"]:::start
-  n1["<b>2. Client POSTs the request</b><br/>same email, ada example, signs up again"]:::step
-  n2["<b>3. Service answers</b><br/>status PENDING becomes a code"]:::core
-  n3["<b>4a. 200 OK path</b><br/>verdict OK, return Right id"]:::step
-  n4["<b>4b. 409 CONFLICT path</b><br/>verdict CONFLICT, Left DuplicateRegistrationError"]:::step
-  n5["<b>5. Typed result</b><br/>Right or Left, not an unhandled exception"]:::stop
-  n6["<b>Service down</b><br/>no reply at all, both sides must be up"]:::warn
-  n0 -->|"1. send the call"| n1
-  n1 -->|"2. code comes back"| n2
-  n2 -->|"3a. status is 200"| n3
-  n2 -->|"3b. status is 409"| n4
-  n3 -->|"4. typed"| n5
-  n4 -->|"4. typed"| n5
-  n2 -->|"5. no answer"| n6
-```
 
 1. **Catch the status** — The proxy inspects the HTTP status code of the response.
 
@@ -120,28 +67,6 @@ flowchart TD
 
 > **Why this matters:** Because both client and service must be up for the whole interaction, RPI reduces availability and blocks threads.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Both sides must be available</b><br/>client and service for the whole interaction"]:::start
-  n1["<b>2. CLIENT blocks its thread</b><br/>thread FREE becomes WAITING"]:::step
-  n2["<b>3. SVC is down, no reply arrives</b><br/>elapsed_ms 0 becomes 800"]:::core
-  n3["<b>4. The timer expires</b><br/>verdict UNSET becomes TIMEOUT"]:::step
-  n4["<b>5. The thread is released</b><br/>thread WAITING becomes FREE"]:::step
-  n5["<b>6. TIMEOUT after 800 ms</b><br/>800 ms of the caller thread spent waiting"]:::stop
-  n6["<b>SVC slow but alive</b><br/>the reply arrives late, no broker to buffer"]:::warn
-  n0 -->|"1. thread waits"| n1
-  n1 -->|"2. no answer"| n2
-  n2 -->|"3. timer fires"| n3
-  n3 -->|"4. release"| n4
-  n4 -->|"5. timeout"| n5
-  n2 -->|"6. if merely slow"| n6
-```
-
 1. **Both sides must be available** — Client and service must be available for the duration of the interaction.
 
 2. **Threads wait** — The caller thread is held while it waits for the reply.
@@ -169,28 +94,6 @@ flowchart TD
 ### Discovery and resilience wiring
 
 > **Why this matters:** A client must find a service instance and guard the call: discovery resolves the location, a circuit breaker contains failure.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. The client must find an instance</b><br/>discovery resolves the location"]:::start
-  n1["<b>2. CLIENT asks the registry</b><br/>lookup null becomes user-registration"]:::step
-  n2["<b>3. Registry returns a network location</b><br/>location null becomes 10.0.0.7 8080"]:::core
-  n3["<b>4. CLIENT builds the URL from config</b><br/>url null becomes http 10.0.0.7 8080 register"]:::step
-  n4["<b>5. Invoke behind a circuit breaker</b><br/>request null becomes email ada example"]:::step
-  n5["<b>6. Reply user-9</b><br/>URL from discovery, call guarded by a breaker"]:::stop
-  n6["<b>Breaker open</b><br/>the call fails fast without touching SVC"]:::warn
-  n0 -->|"1. lookup"| n1
-  n1 -->|"2. answer"| n2
-  n2 -->|"3. build URL"| n3
-  n3 -->|"4. invoke"| n4
-  n4 -->|"5. reply"| n5
-  n4 -->|"6. if breaker open"| n6
-```
 
 1. **Discover the instance** — The client needs to discover locations of service instances, via client-side or server-side discovery.
 
@@ -257,13 +160,6 @@ flowchart TD
   R -->|"comprises"| P1["stores the row and returns the reply"]
 ```
 
-```mermaid
-flowchart LR
-  CLIENT["caller: Registration Service"] -->|"call via stub"| STUB["client proxy: RegistrationServiceProxy"]
-  STUB -->|"HTTP POST /register"| SVC["server: User Registration"]
-  SVC -->|"reply user-14"| CLIENT
-```
-
 ```java
 // SYSTEM DESIGN — RPI as a pipeline: caller -> client stub/proxy -> transport (HTTP) -> server skeleton -> business logic -> reply
 // PARTIES: CLIENT = Registration Service (caller: builds the request and waits for the reply) · STUB = client proxy RegistrationServiceProxy (interface: hides the HTTP transport) · SVC = User Registration instance (server: runs the business logic and returns the reply)
@@ -299,13 +195,6 @@ A new user signs up through the registration service, which calls the user-regis
 - Request/reply protocol (REST)
 - Remote service
 - Right(id) result
-
-```mermaid
-flowchart LR
-  C["Registration Service"] -->|"POST /register"| SVC["User Registration service"]
-  SVC -->|"200 OK"| C
-  C -->|"yields"| R["Right(user-14)"]
-```
 
 ```java
 // CLIENT SIDE — RPI: the client POSTs a request and waits for a reply, with no broker in between
@@ -343,13 +232,6 @@ The same email tries to sign up a second time, and the user-registration service
 - Status-code inspection
 - 200 -> Right(id)
 - 409 CONFLICT -> Left(DuplicateRegistrationError)
-
-```mermaid
-flowchart LR
-  C["Registration Service"] -->|"POST /register"| SVC["User Registration service"]
-  SVC -->|"409 CONFLICT"| C
-  C -->|"yields"| L["Left(DuplicateRegistrationError)"]
-```
 
 ```java
 // CLIENT SIDE — RPI error path: a duplicate sign-up maps a 409 CONFLICT to a typed error
@@ -390,12 +272,6 @@ The user-registration service has gone unresponsive, and the registration servic
 - Timeout expiry
 - No broker to buffer
 
-```mermaid
-flowchart LR
-  C["Registration Service"] -->|"POST /register"| SVC["User Registration (down)"]
-  C -->|"blocks in"| T["thread WAITING -> timeout"]
-```
-
 ```java
 // CLIENT SIDE — RPI availability: client and service must both be available for the whole call
 // PARTIES: CLIENT = Registration Service · SVC = User Registration service (unresponsive)
@@ -433,13 +309,6 @@ Before its first call, the registration service must find a user-registration in
 - Externalized config URL
 - Circuit breaker wrapper
 
-```mermaid
-flowchart LR
-  C["Registration Service"] -->|"queries"| DISC["service registry"]
-  DISC -->|"10.0.2.9:8080"| C
-  C -->|"behind breaker"| SVC["User Registration instance"]
-```
-
 ```java
 // CLIENT SIDE — RPI wiring: discover an instance, resolve its URL, then invoke behind a breaker
 // PARTIES: CLIENT = Registration Service · DISC = service registry · SVC = User Registration instance
@@ -476,11 +345,22 @@ _From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-syste
 
 The client uses a request/reply-based protocol to make requests to a service, via REST, gRPC, or Apache Thrift.
 
-```mermaid
-flowchart LR
-  C["Registration Service"] -->|"POST /register"| SVC["User Registration service"]
-  SVC -->|"200 OK"| C
-  C -->|"yields"| R["Right(user-14)"]
+```java
+// CLIENT SIDE — RPI: the client POSTs a request and waits for a reply, with no broker in between
+// PARTIES: CLIENT = Registration Service · SVC = User Registration service (remote)
+// STATE (before):
+//    request : null
+//    status : "PENDING"
+//    verdict : "UNSET"
+//    result : null
+//    url : "http://user-reg:8080/register"
+// DEF: registerUser · CALLED BY: a new user signing up (RestTemplate.postForEntity)
+// -> email : "bob@example.com" · -> password : "hunter2"
+//    step 1 · CLIENT POSTs the request to SVC : request : null -> { email: "bob@example.com", password: "hunter2" }
+//    step 2 · SVC creates the user and answers : status : "PENDING" -> 200
+//    step 3 · CLIENT reads the status code : verdict : "UNSET" -> "OK"
+//    step 4 · CLIENT returns the new id : result : null -> "user-14"
+// <- reply : "user-14" (Right) · one request, one prompt reply over HTTP
 ```
 
 

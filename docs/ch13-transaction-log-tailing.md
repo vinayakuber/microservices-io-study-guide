@@ -10,30 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.13 · microservices
 
 > **Why this matters:** Instead of polling the outbox table, the relay reads the database's own transaction log and publishes every message the log shows was committed to the outbox.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Order Service commits</b><br/>SVC commits a transaction that inserts outbox row 1, E1"]:::start
-  n1["<b>2. WAL records the commit</b><br/>log becomes one entry, op insert, table outbox, row E1"]:::core
-  n2["<b>3. Tailer reads at position 0</b><br/>next unread WAL entry is found"]:::step
-  n3["<b>4. Publish E1</b><br/>published : empty becomes E1"]:::step
-  n4["<b>5. Advance position</b><br/>position : 0 becomes 1"]:::core
-  n5["<b>6. Broker receives E1</b><br/>tailer position now 1"]:::stop
-  n6["<b>No new log entry</b><br/>position already at the tail, nothing to publish"]:::warn
-  n0 -->|"commit appends to the log"| n1
-  n1 -->|"tailer polls the log"| n2
-  n2 -->|"entry found"| n3
-  n2 -->|"no entry yet - wait"| n6
-  n3 -->|"send E1"| n4
-  n4 -->|"position saved"| n5
-  n5 -->|"keep tailing the next entry"| n2
-  n6 -->|"retry the read"| n2
-```
-
 1. **Read the log** — The relay tails the database transaction log: MySQL binlog, Postgres WAL, or DynamoDB streams.
 
 2. **Find outbox inserts** — Each outbox insert shows up as a log entry the relay can recognize.
@@ -65,29 +41,6 @@ flowchart TD
 
 > **Why this matters:** Tailing the log gets the outbox's atomicity for free: the log records only committed writes, so the relay can never publish an event from a transaction that rolled back.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Service commits transaction T1</b><br/>inserts outbox row E1"]:::start
-  n1["<b>2. Binlog records the commit</b><br/>binlog becomes seq 10, write to outbox, row E1"]:::core
-  n2["<b>3. Tailer sees seq 10</b><br/>publishes E1 to BRK"]:::step
-  n3["<b>4. Broker never enlisted</b><br/>no 2PC needed, BRK receives E1"]:::core
-  n4["<b>5. Another transaction rolls back</b><br/>outbox row E2 inserted then undone"]:::warn
-  n5["<b>6. Binlog unchanged</b><br/>a rolled-back write is never committed to the log"]:::warn
-  n6["<b>7. E2 never published</b><br/>BRK receives only E1, zero copies of E2"]:::stop
-  n0 -->|"commit path"| n1
-  n1 -->|"tailer reads committed row"| n2
-  n2 -->|"publish E1"| n3
-  n0 -->|"rollback path, second tx"| n4
-  n4 -->|"insert E2 then undo"| n5
-  n5 -->|"no committed entry"| n6
-  n3 -->|"only committed writes reach the broker"| n6
-```
-
 1. **The log records commits only** — A rolled-back transaction's outbox insert never appears in the committed log.
 
 2. **Relay publishes committed rows** — Every message the relay publishes is backed by a committed outbox row.
@@ -117,33 +70,6 @@ flowchart TD
 ### Database-specific and duplicate-prone
 
 > **Why this matters:** Log tailing is accurate but couples the relay to one database's log format, and a relay that crashes mid-read can publish the same entry twice.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Tailer reads an entry</b><br/>seq 10, row E1, saved position 9"]:::start
-  n1["<b>2. One reader per database</b><br/>must speak MySQL binlog, Postgres WAL, or DynamoDB streams"]:::warn
-  n2["<b>3. Publish E1</b><br/>published : empty becomes E1"]:::step
-  n3["<b>4. Crash before saving</b><br/>position stays 9, tailer dies"]:::warn
-  n4["<b>5. Restart resumes at 9</b><br/>reads seq 10 again"]:::step
-  n5["<b>6. Re-publish E1</b><br/>published : E1 becomes E1, E1, duplicate"]:::warn
-  n6["<b>7. Save position 10</b><br/>position : 9 becomes 10"]:::step
-  n7["<b>8. Consumer dedupes</b><br/>processed becomes E1 true, INSERT ON CONFLICT DO NOTHING"]:::core
-  n8["<b>9. Delivered twice, handled once</b><br/>CNS skips the second copy"]:::stop
-  n0 -->|"read the log"| n1
-  n1 -->|"recognize the insert"| n2
-  n2 -->|"crash before save"| n3
-  n2 -->|"no crash - save position"| n6
-  n3 -->|"restart from saved position"| n4
-  n4 -->|"same entry re-read"| n5
-  n5 -->|"save position now"| n6
-  n6 -->|"consumer receives copies"| n7
-  n7 -->|"duplicate skipped"| n8
-```
 
 1. **One reader per database** — The tailer must understand MySQL binlog, Postgres WAL, or DynamoDB streams specifically.
 
@@ -223,13 +149,6 @@ flowchart TD
   R -->|"comprises"| P0["Consumes each event off the broker"]
 ```
 
-```mermaid
-flowchart LR
-  DB[("source database: transaction log")] -->|"tail binlog/WAL"| TLR["log tailer / miner"]
-  TLR -->|"publish OrderCreated"| BRK[("message broker RabbitMQ")]
-  BRK -->|"consume"| CNS["subscriber"]
-```
-
 ```java
 // SYSTEM DESIGN — transaction log tailing as a pipeline: database transaction log -> log tailer/miner -> message broker -> subscriber (consumer)
 // PARTIES: DB = MySQL 8 @ orders-db-1 (source database) · TLR = log tailer (transaction log miner) · BRK = message broker (RabbitMQ) · CNS = subscriber (consumer)
@@ -266,14 +185,6 @@ Your order service writes events to an outbox table, and you want a relay that d
 - Tailer process — reads the log at a saved position
 - Outbox insert — the log entry to recognize
 - Message broker — receives each published message
-
-```mermaid
-flowchart LR
-  SVC["Order Service commits"] -->|outbox insert| DB[("PostgreSQL")]
-  DB -->|WAL entry| WAL[("Write-ahead log")]
-  WAL -->|read at position| TLR["Log tailer"]
-  TLR -->|publish OrderCreated| BRK[("Message broker")]
-```
 
 ```java
 // TAILER SIDE — the relay reads the WAL and publishes each committed outbox insert
@@ -316,14 +227,6 @@ You are worried a relay could publish an event for a transaction that later roll
 - Tailer — publishes only what the log shows committed
 - Broker — never enlisted, so no 2PC
 
-```mermaid
-flowchart LR
-  TX1["Commit OrderCreated"] -->|binlog write| LOG[("Binlog")]
-  TX2["Rollback OrderShipped"] -->|no committed write| LOG
-  LOG -->|only committed rows| TLR["Publishes OrderCreated only"]
-  TLR -->|"publishes to"| BRK[("Broker, never enlisted")]
-```
-
 ```java
 // TAILER SIDE — the log carries only committed writes, so a rolled-back event is never published
 // PARTIES: SVC = Order Service · DB = MySQL 8 @ orders-db-1 · LOG = binlog · TLR = log tailer · BRK = message broker
@@ -363,15 +266,6 @@ Your tailer published an event but crashed before it saved its log position. On 
 - Crash window — publish before position-save
 - Re-read entry — published twice
 - Consumer dedupe — processed-message table
-
-```mermaid
-flowchart LR
-  TLR["Tailer reads seq 70"] -->|publish OrderCreated| BRK[("Broker")]
-  TLR -->|crash before save| P["position stays 69"]
-  P -->|restart, re-read seq 70| TLR2["Tailer re-publishes"]
-  TLR2 -->|"publishes to"| BRK
-  BRK -->|OrderCreated x2| CNS["Consumer dedupes to once"]
-```
 
 ```java
 // TAILER SIDE — a crash between publish and position-save re-reads an entry, so consumers dedupe
@@ -414,14 +308,6 @@ Your team built a tailer for MySQL binlog, then split a service onto PostgreSQL 
 - DynamoDB streams — a third mechanism
 - Tailer — written per database
 
-```mermaid
-flowchart LR
-  MY[("MySQL binlog")] -->|reader A| TLR["Tailer"]
-  PG[("Postgres WAL")] -->|reader B| TLR
-  DD[("DynamoDB streams")] -->|reader C| TLR
-  TLR -->|"publishes to"| BRK[("Broker")]
-```
-
 ```java
 // TAILER SIDE — each database logs commits in its own format, so the tailer needs a database-specific reader
 // PARTIES: TLR = log tailer · BRK = message broker
@@ -460,12 +346,25 @@ _From the 28 problems:_ 19-distributed-message-queue · 26-payment-system
 
 Tail the log and publish each outbox insert to the broker, using MySQL binlog, Postgres WAL, or DynamoDB table streams.
 
-```mermaid
-flowchart LR
-  SVC["Order Service commits"] -->|outbox insert| DB[("PostgreSQL")]
-  DB -->|WAL entry| WAL[("Write-ahead log")]
-  WAL -->|read at position| TLR["Log tailer"]
-  TLR -->|publish OrderCreated| BRK[("Message broker")]
+```java
+// TAILER SIDE — the relay reads the WAL and publishes each committed outbox insert
+// PARTIES: SVC = Order Service · DB = PostgreSQL 16 @ orders-db-1 · WAL = write-ahead log · TLR = log tailer · BRK = message broker
+// STATE (before):
+//    outbox : [ ]
+//    wal : [ ]
+//    position : 0
+//    published : [ ]
+// DEF: commit_outbox · CALLED BY: SVC committing a transaction that inserts outbox row 50
+// -> event : "OrderCreated"
+//    step 1 · insert outbox row : outbox : [ ] -> [ (50, "OrderCreated") ]
+//    step 2 · WAL records the commit : wal : [ ] -> [ { "op":"insert", "table":"outbox", "row":(50,"OrderCreated") } ]   BECAUSE the commit is appended to the WAL as a log entry
+// <- output : DB has (50,"OrderCreated") committed · WAL has 1 new entry
+// DEF: tail_once · CALLED BY: TLR reading the WAL at its saved position 0
+// -> read : next WAL entry at position 0
+//    step 1 · read next entry : entry : "none" -> { "op":"insert", "row":(50,"OrderCreated") }   BECAUSE position 0 is the first unread WAL entry
+//    step 2 · publish OrderCreated : published : [ ] -> [ "OrderCreated" ]
+//    step 3 · advance position : position : 0 -> 1
+// <- output : BRK receives [ "OrderCreated" ] · tailer position now 1
 ```
 
 

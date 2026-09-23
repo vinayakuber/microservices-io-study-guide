@@ -10,26 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 4 · microservices
 
 > **Why this matters:** DDD calls the application's problem space the domain, and its parts are subdomains — the boundaries this pattern turns into services.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. The domain is the problem space</b><br/>DDD calls the business the domain"]:::start
-  n1["<b>2. Split the problem space into parts</b><br/>domain parts empty becomes catalog, inventory, orders, delivery"]:::core
-  n2["<b>3. Each part becomes a subdomain</b><br/>subdomains empty becomes the four named subdomains"]:::step
-  n3["<b>4. Tag each as distinct</b><br/>distinct_areas 0 becomes 4"]:::step
-  n4["<b>5. Four subdomains</b><br/>the domain holds multiple subdomains"]:::stop
-  n5["<b>A part is really two subdomains</b><br/>subdomain_count 4 becomes 5, found by iteration"]:::warn
-  n0 -->|"1. split"| n1
-  n1 -->|"2. name them"| n2
-  n2 -->|"3. distinct areas"| n3
-  n3 -->|"4. count"| n4
-  n3 -->|"5. if one splits"| n5
-```
-
 1. **The domain is the problem space** — DDD refers to the application's problem space — the business — as the domain.
 
 2. **A domain has multiple subdomains** — A domain consists of multiple subdomains, and each subdomain corresponds to a different part of the business.
@@ -57,26 +37,6 @@ flowchart TD
 
 > **Why this matters:** Not every subdomain deserves the same investment, so DDD classifies them by business value before you build.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Classify by business value</b><br/>not every subdomain deserves equal effort"]:::start
-  n1["<b>2. A differentiator is CORE</b><br/>recommendations unset becomes core"]:::core
-  n2["<b>3. Related but not differentiating is SUPPORTING</b><br/>accounting unset becomes supporting"]:::step
-  n3["<b>4. Not business-specific is GENERIC</b><br/>email unset becomes generic"]:::step
-  n4["<b>5. Three classes set</b><br/>invest in core first, outsource or buy the rest"]:::stop
-  n5["<b>Every subdomain marked core</b><br/>prioritize 1 becomes 3, no differentiator"]:::warn
-  n0 -->|"1. rate it"| n1
-  n1 -->|"2. next"| n2
-  n2 -->|"3. next"| n3
-  n3 -->|"4. priorities"| n4
-  n1 -->|"5. if all core"| n5
-```
-
 1. **Core subdomains** — Core subdomains are the key differentiator for the business and the most valuable part of the application.
 
 2. **Supporting subdomains** — Supporting subdomains relate to what the business does but are not a differentiator; they can be implemented in-house or outsourced.
@@ -102,26 +62,6 @@ flowchart TD
 ### Map subdomains to services
 
 > **Why this matters:** Each subdomain becomes one service, keeping the result cohesive and loosely coupled — the same forces as business-capability decomposition.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. One service per subdomain</b><br/>services correspond to each subdomain"]:::start
-  n1["<b>2. Build the four services</b><br/>services empty becomes catalog, inventory, order, delivery"]:::step
-  n2["<b>3. Keep each service cohesive</b><br/>cohesion unknown becomes strong"]:::core
-  n3["<b>4. Keep services loosely coupled</b><br/>coupling unknown becomes loose"]:::step
-  n4["<b>5. Four services</b><br/>mapped to subdomains, not technical layers"]:::stop
-  n5["<b>Merge two subdomains</b><br/>services 4 becomes 3, one may hold more"]:::warn
-  n0 -->|"1. build"| n1
-  n1 -->|"2. cohesion"| n2
-  n2 -->|"3. coupling"| n3
-  n3 -->|"4. count"| n4
-  n2 -->|"5. or merge"| n5
-```
 
 1. **One service per subdomain** — The corresponding microservice architecture has services corresponding to each subdomain.
 
@@ -150,30 +90,6 @@ flowchart TD
 ### Identifying the subdomains
 
 > **Why this matters:** Like business capabilities, subdomains are found by analyzing the business and its structure, starting from the org structure and the domain model.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Understand the business</b><br/>its structure and areas of expertise"]:::start
-  n1["<b>2. Start from the organization structure</b><br/>groups may be subdomains"]:::step
-  n2["<b>3. Start from the domain model</b><br/>subdomains often have a key domain object"]:::step
-  n3["<b>4. An org group suggests one</b><br/>Fulfillment Team becomes fulfillment"]:::core
-  n4["<b>5. A domain object suggests another</b><br/>Order becomes order management"]:::step
-  n5["<b>6. Confirm the expertise</b><br/>expertise none becomes fulfillment operations"]:::step
-  n6["<b>7. Two subdomains found</b><br/>from org structure and domain model"]:::stop
-  n7["<b>A subdomain is missed</b><br/>2 becomes 3 on a later pass, iterative"]:::warn
-  n0 -->|"1. org structure"| n1
-  n1 -->|"2. domain model"| n2
-  n2 -->|"3. group"| n3
-  n3 -->|"4. object"| n4
-  n4 -->|"5. expertise"| n5
-  n5 -->|"6. found"| n6
-  n5 -->|"7. iterate"| n7
-```
 
 1. **Understand the business** — Identifying subdomains requires understanding the business, its organizational structure and the different areas of expertise.
 
@@ -243,14 +159,6 @@ flowchart TD
   R -->|"comprises"| P2["cohesive, loosely coupled behind an API"]
 ```
 
-```mermaid
-flowchart LR
-  DOM["domain: food delivery"] -->|"decomposes into"| SUB["subdomain: order management (core)"]
-  SUB -->|"maps to"| SVC["order service"]
-  SVC -->|"owns"| DB[("PostgreSQL 16 @ order-db-1")]
-  DB -->|"query result"| SVC
-```
-
 ```java
 // SYSTEM DESIGN — decompose by subdomain: domain (food delivery) -> subdomain (core/supporting/generic) -> service (owns its subdomain data)
 // PARTIES: DOM = the domain (the business problem space: food delivery) · SUB = subdomain (a distinct part of the business, classified core/supporting/generic) · SVC = order service (owns the order-management subdomain) · DB = PostgreSQL 16 @ order-db-1 (the order service's own database)
@@ -282,14 +190,6 @@ A food-delivery startup is one codebase. The architect wants service boundaries 
 - Domain — the problem space
 - Subdomain — a distinct part of the business
 - One service per subdomain
-
-```mermaid
-flowchart LR
-  D["food delivery domain"] -->|"decomposes into"| S1["catalog subdomain"]
-  D -->|"decomposes into"| S2["orders subdomain"]
-  S1 -->|"maps to"| V1["catalog service"]
-  S2 -->|"maps to"| V2["orders service"]
-```
 
 ```java
 // DECOMPOSITION SIDE — the DDD domain (the business) splits into subdomains, each becoming a service
@@ -327,13 +227,6 @@ The delivery team must decide where to pour in-house effort. It lists three cand
 - Supporting — related but not differentiating
 - Generic — off-the-shelf software
 
-```mermaid
-flowchart LR
-  R["search ranking"] -->|"classified as"| CORE["core · invest in-house"]
-  S["customer support"] -->|"classified as"| SUP["supporting · in-house or outsource"]
-  E["email delivery"] -->|"classified as"| GEN["generic · buy off the shelf"]
-```
-
 ```java
 // CLASSIFICATION SIDE — each subdomain is core, supporting, or generic, deciding the investment
 // PARTIES: ARC = architect · BIZ = the business
@@ -369,14 +262,6 @@ With subdomains identified, the architect maps each to a service and insists the
 - Cohesive services
 - Loosely coupled services behind an API
 - Cross-functional teams around business value
-
-```mermaid
-flowchart LR
-  SUB["subdomains"] -->|"maps to"| SVC["one service per subdomain"]
-  SVC -->|"kept"| COH["cohesive"]
-  SVC -->|"kept"| LC["loosely coupled behind an API"]
-  SVC -->|"owned by"| TM["cross-functional team"]
-```
 
 ```java
 // MAPPING SIDE — each subdomain of the food-delivery business becomes one cohesive, loosely coupled service
@@ -415,14 +300,6 @@ The architect has no written list of subdomains. She starts from the company's o
 - Areas of expertise
 - Iterative refinement
 
-```mermaid
-flowchart LR
-  ORG["org groups"] -->|"informs"| SUB1["subdomain"]
-  DM["domain model"] -->|"informs"| SUB2["subdomain"]
-  SUB1 -->|"refined by"| IT["iterate"]
-  SUB2 -->|"refined by"| IT
-```
-
 ```java
 // IDENTIFICATION SIDE — find subdomains from the org structure and the domain model
 // PARTIES: ARC = architect analyzing the business
@@ -458,12 +335,21 @@ _From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-syste
 
 Define services corresponding to DDD subdomains; a domain consists of multiple subdomains, each corresponding to a different part of the business.
 
-```mermaid
-flowchart LR
-  D["food delivery domain"] -->|"decomposes into"| S1["catalog subdomain"]
-  D -->|"decomposes into"| S2["orders subdomain"]
-  S1 -->|"maps to"| V1["catalog service"]
-  S2 -->|"maps to"| V2["orders service"]
+```java
+// DECOMPOSITION SIDE — the DDD domain (the business) splits into subdomains, each becoming a service
+// PARTIES: ARC = architect · DOM = the domain (the application's problem space)
+// STATE (before):
+//    domain : { parts: [] }
+//    subdomains : []
+//    services : []
+// DEF: split · CALLED BY: ARC modeling the domain of a food-delivery business
+// -> domain : "food delivery"
+//    step 1 · split the problem space into parts : domain.parts : [] -> ["catalog","kitchen","orders","riders"]
+//    step 2 · each part becomes a subdomain : subdomains : [] -> ["restaurant catalog","kitchen operations","order management","rider dispatch"]
+//    step 3 · each subdomain becomes a service : services : [] -> ["catalog","kitchen","order","dispatch"]
+//    step 4 · count the distinct parts : distinct_areas : 0 -> 4   BECAUSE each subdomain corresponds to a different part of the business
+// <- service_count : 4 · the domain holds multiple subdomains, one service each
+//    alt a part is really two subdomains : service_count : 4 -> 5 (a subdomain is found by iteration)
 ```
 
 

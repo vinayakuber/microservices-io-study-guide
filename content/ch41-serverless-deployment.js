@@ -102,11 +102,7 @@ registerChapter({
       q: 'What do you give the serverless infrastructure, and what does it hide?',
       solution: 'You package your Node.js, Java, or Python code as a ZIP file, upload it, and specify the name of the function that handles events plus the resource limits; the infrastructure hides any concept of servers.',
       components: ['ZIP package — the code', 'Handler name — which function handles events', 'Resource limits — the performance spec', 'Hidden servers — no OS/VM/container to manage'],
-      diagram: `flowchart LR
-  DEV["Developer"] -->|"upload restaurant.zip"| LAMBDA["Serverless infrastructure"]
-  DEV -->|"handler index.handler"| LAMBDA
-  DEV -->|"memory 128"| LAMBDA
-  LAMBDA -->|"hides"| HIDDEN["no OS, VM, or container"]`,
+      
       code: `// UPLOAD SIDE — hand the provider your code plus a handler name and resource limits, no servers to manage
 // PARTIES: DEV = developer · LAMBDA = the serverless deployment infrastructure
 // STATE (before):
@@ -128,11 +124,7 @@ registerChapter({
       q: 'How does a serverless function get invoked when an event occurs?',
       solution: 'The function is a stateless component invoked to handle events; Lambda finds an idle instance, launching one if none are available, invokes the handler with the event, and isolates each instance using containers on EC2 instances under the covers.',
       components: ['Idle instance — found or launched', 'Handler — invoked with the event', 'Containers on EC2 — hidden isolation', 'Enough instances — for the load'],
-      diagram: `flowchart LR
-  S3["Object store"] -->|"object-created photo-7.jpg"| LAMBDA["Lambda"]
-  LAMBDA -->|"find or launch"| I["instance i-1"]
-  I -->|"invoke"| H["index.handler"]
-  H -->|"isolated by"| C["container on EC2"]`,
+      
       code: `// INVOKE SIDE — an event fires and the infrastructure runs enough isolated instances of your function
 // PARTIES: S3 = Amazon S3 @ orders-assets-bucket · LAMBDA = the deployment infrastructure · FUNC = the function instance
 // STATE (before):
@@ -154,11 +146,7 @@ registerChapter({
       q: 'How does an HTTP request reach a serverless function?',
       solution: 'An API gateway transforms the HTTP request into an event object, invokes the lambda function with the event, and generates an HTTP response from the function\'s result.',
       components: ['API gateway — the HTTP entry', 'Request transform — into an event object', 'Lambda invocation — with the event', 'Response generation — from the result'],
-      diagram: `flowchart LR
-  CLIENT["HTTP caller"] -->|"GET /restaurants/42"| GW["API Gateway"]
-  GW -->|"event object"| FUNC["Lambda function"]
-  FUNC -->|"result"| GW
-  GW -->|"status 200"| CLIENT`,
+      
       code: `// GATEWAY SIDE — an HTTP request is transformed into an event, the function runs, and a response is generated
 // PARTIES: CLIENT = the HTTP caller · GW = API Gateway · FUNC = the lambda function
 // STATE (before):
@@ -180,11 +168,7 @@ registerChapter({
       q: 'How is serverless priced, and what constraints come with it?',
       solution: 'Cost is a function of each invocation\'s duration measured in 100 millisecond increments and the memory consumed; constraints are few supported languages, stateless request-driven applications only, and latency risk on spikes because capacity cannot be pre-provisioned.',
       components: ['Duration — 100 ms increments', 'Memory — the other cost factor', 'Few languages + stateless only — the constraints', 'Latency risk — cannot pre-provision'],
-      diagram: `flowchart LR
-  LAMBDA["Lambda"] -->|"duration 300 ms"| BILL["3 x 100 ms increments"]
-  BILL -->|"times memory"| COST["cost 3 units"]
-  LAMBDA -->|"constraints"| LIM["few langs, stateless"]
-  LAMBDA -->|"spike"| LAT["high latency"]`,
+      
       code: `// COST SIDE — you pay per request for duration and memory, and you trade away pre-provisioned capacity
 // PARTIES: LAMBDA = the provider · APP = the application being served
 // STATE (before):
@@ -242,7 +226,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  C[\"client\"] -->|\"GET /restaurants/42\"| GW[\"API Gateway\"]\n  GW -->|\"event object\"| RT[\"function runtime (Lambda)\"]\n  RT -->|\"loads restaurant.zip\"| FN[\"function index.handler\"]\n  RT -->|\"cold start\"| I[\"instance i-1\"]\n  FN -->|\"result\"| GW\n  GW -->|\"status 200\"| C",
+    
     program: `// SYSTEM DESIGN — serverless: client request -> API gateway -> function runtime -> function
 // PARTIES: CLIENT = the HTTP caller (client) · GW = API Gateway (transforms HTTP into an event, builds the response) · RT = function runtime (AWS Lambda: loads the ZIP, cold-start, scales to zero) · FN = the function (index.handler running the uploaded code)
 // DEF: event — the payload the runtime passes to the handler; here {"method":"GET","path":"/restaurants/42"}

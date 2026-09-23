@@ -10,32 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.12 · microservices
 
 > **Why this matters:** Once the Transactional Outbox pattern has stored events in the database, something must move them to the broker; polling the outbox table with a plain SQL query is the simplest relay.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Timer fires one poll</b><br/>a timer wakes the relay every 100 ms"]:::start
-  n1["<b>2. Select unsent rows</b><br/>query : SELECT rows FROM outbox WHERE sent=false, returns row 1 E1 and row 2 E2"]:::step
-  n2["<b>3. Publish row 1</b><br/>published : empty becomes E1"]:::step
-  n3["<b>4. Mark row 1 sent</b><br/>outbox row 1 : sent=false becomes sent=true"]:::core
-  n4["<b>5. Publish row 2</b><br/>published : E1 becomes E1, E2"]:::step
-  n5["<b>6. Mark row 2 sent</b><br/>outbox row 2 : sent=false becomes sent=true"]:::core
-  n6["<b>7. Poll cycle complete</b><br/>BRK received E1 and E2, outbox now fully sent"]:::stop
-  n7["<b>No unsent rows</b><br/>query returns empty, nothing published this cycle"]:::warn
-  n0 -->|"timer wakes the relay"| n1
-  n1 -->|"rows found"| n2
-  n1 -->|"no rows - wait for next poll"| n7
-  n2 -->|"send E1"| n3
-  n3 -->|"advance to next row"| n4
-  n4 -->|"send E2"| n5
-  n5 -->|"outbox drained"| n6
-  n6 -->|"next cycle in 100 ms"| n0
-  n7 -->|"retry on the next timer"| n0
-```
-
 1. **Select unsent rows** — A relay process runs a query for outbox rows that have not yet been sent.
 
 2. **Publish each row** — The relay publishes each returned message or event to the broker.
@@ -61,29 +35,6 @@ flowchart TD
 ### Publishing in order is tricky
 
 > **Why this matters:** The relay must reproduce the order the application wrote events in, but a naive poll without an explicit ordering can hand the broker events out of order.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Two events await publishing</b><br/>outbox has row 1 E1 and row 2 E2, both sent=false"]:::start
-  n1["<b>2. Poll with no ORDER BY</b><br/>query SELECT rows WHERE sent=false, database returns id 2 before id 1"]:::step
-  n2["<b>3. Events published out of order</b><br/>published becomes E2 then E1, order WRONG, E1 should precede E2"]:::warn
-  n3["<b>4. Add ORDER BY id ASC</b><br/>query orders rows by id so id 1 comes first"]:::step
-  n4["<b>5. Publish id 1</b><br/>published : empty becomes E1"]:::step
-  n5["<b>6. Publish id 2</b><br/>published : E1 becomes E1, E2"]:::step
-  n6["<b>7. Correct order reached</b><br/>BRK receives E1 then E2, commit order reproduced"]:::stop
-  n0 -->|"query with no ORDER BY"| n1
-  n1 -->|"DB returns id 2 first"| n2
-  n2 -->|"fix - add ORDER BY id"| n3
-  n0 -->|"query already ordered by id"| n3
-  n3 -->|"id 1 returned first"| n4
-  n4 -->|"then id 2"| n5
-  n5 -->|"commit order preserved"| n6
-```
 
 1. **Order by a sequence** — The relay orders unsent rows by their outbox id so earlier events are read first.
 
@@ -112,28 +63,6 @@ flowchart TD
 ### Any SQL database, not every NoSQL store
 
 > **Why this matters:** Polling is portable because it only needs a standard query, but a database that cannot express the unsent-row query cannot use this relay.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Outbox needs a queryable table</b><br/>row E1, sent=false, awaits publication"]:::start
-  n1["<b>2. Relay polls MySQL</b><br/>query SELECT unsent rows returns 1 unsent row"]:::step
-  n2["<b>3. Publish E1</b><br/>published : empty becomes E1"]:::step
-  n3["<b>4. Mark the row sent</b><br/>outbox row sent=false becomes sent=true"]:::core
-  n4["<b>5. SQL database supports polling</b><br/>BRK receives E1"]:::stop
-  n5["<b>6. NoSQL has no unsent-row query</b><br/>outbox is a per-record property, query returns 0 rows"]:::warn
-  n6["<b>7. Fall back to log tailing</b><br/>publish nothing, use transaction log tailing instead"]:::warn
-  n0 -->|"poll via MySQL"| n1
-  n0 -->|"poll via NoSQL store"| n5
-  n1 -->|"one unsent row found"| n2
-  n2 -->|"send E1"| n3
-  n3 -->|"row marked sent"| n4
-  n5 -->|"query cannot be expressed"| n6
-```
 
 1. **A plain SELECT is enough** — Any SQL database exposes the outbox table to a standard query for unsent rows.
 
@@ -212,14 +141,6 @@ flowchart TD
   R -->|"comprises"| P0["Consumes each event off the broker"]
 ```
 
-```mermaid
-flowchart LR
-  DB[("source database: outbox table")] -->|"SELECT sent=false ORDER BY id"| RLY["polling publisher relay"]
-  RLY -->|"publish OrderCreated"| BRK[("message broker RabbitMQ")]
-  RLY -->|"mark sent=true"| DB
-  BRK -->|"consume"| SUB["subscriber"]
-```
-
 ```java
 // SYSTEM DESIGN — polling publisher as a pipeline: source database (outbox table) -> polling publisher relay -> message broker -> subscriber (consumer)
 // PARTIES: DB = PostgreSQL 16 @ orders-db-1 (outbox table) · RLY = polling publisher relay (polls, publishes, marks) · BRK = message broker (RabbitMQ) · SUB = subscriber (consumer)
@@ -255,14 +176,6 @@ You have applied the Transactional Outbox pattern and your order service now sto
 - Unsent-row query — SELECT ... WHERE sent=false
 - Mark-sent update — sets sent=true per published row
 - Message broker — receives the published events
-
-```mermaid
-flowchart LR
-  T["Timer 250ms tick"] -->|poll| DB[("Outbox table")]
-  DB -->|2 unsent rows| RLY["Relay"]
-  RLY -->|publish each| BRK[("Message broker")]
-  RLY -->|mark sent=true| DB
-```
 
 ```java
 // RELAY SIDE — one poll cycle drains two unsent outbox rows into the broker
@@ -300,14 +213,6 @@ Your order aggregate wrote two events in one transaction — OrderCreated then O
 - Unordered query — SELECT without ORDER BY
 - Ordered query — SELECT ... ORDER BY id ASC
 - Message broker — receives events in publish order
-
-```mermaid
-flowchart LR
-  DB[("Outbox table")] -->|unordered query| BAD["Publishes id 21 first"]
-  BAD -->|"publishes to"| BRK[("Broker: OrderApproved then OrderCreated")]
-  DB -->|ORDER BY id ASC| GOOD["Publishes id 20 first"]
-  GOOD -->|"publishes to"| BRK2[("Broker: OrderCreated then OrderApproved")]
-```
 
 ```java
 // RELAY SIDE — ordering: the same order's two events must reach the broker in commit order
@@ -347,13 +252,6 @@ Your team stores domain events in a NoSQL document store where each document has
 - NoSQL store — outbox is a per-record property
 - Unsent-row query — cannot be expressed in the NoSQL store
 - Transaction log tailing — the alternative relay
-
-```mermaid
-flowchart LR
-  SQL[("MySQL outbox table")] -->|SELECT sent=false| RLY["Relay publishes the row"]
-  NOSQL[("NoSQL doc store")] -->|no unsent-row query| NONE["Relay finds 0 rows"]
-  NONE -->|"forces"| TLT["Use transaction log tailing instead"]
-```
 
 ```java
 // RELAY SIDE — polling needs a queryable outbox: any SQL database has it, some NoSQL stores do not
@@ -395,15 +293,6 @@ Your relay runs every 250 ms. After one poll publishes a row and marks it sent, 
 - Poll 2 — selects only sent=false rows
 - Broker — receives no duplicate from the relay
 
-```mermaid
-flowchart LR
-  P1["Poll 1"] -->|SELECT sent=false| DB[("Outbox table")]
-  P1 -->|publish OrderCreated| BRK[("Broker")]
-  P1 -->|UPDATE sent=true| DB
-  P2["Poll 2"] -->|SELECT sent=false| DB
-  P2 -->|0 rows match| BRK
-```
-
 ```java
 // RELAY SIDE — two consecutive polls: after a row is marked sent, the next poll skips it
 // PARTIES: RLY = relay · DB = MySQL 8 @ orders-db-1 (outbox table) · BRK = message broker
@@ -439,12 +328,21 @@ _From the 28 problems:_ 19-distributed-message-queue
 
 Publish messages by polling the outbox table: select unsent rows, publish each, then mark it sent.
 
-```mermaid
-flowchart LR
-  T["Timer 250ms tick"] -->|poll| DB[("Outbox table")]
-  DB -->|2 unsent rows| RLY["Relay"]
-  RLY -->|publish each| BRK[("Message broker")]
-  RLY -->|mark sent=true| DB
+```java
+// RELAY SIDE — one poll cycle drains two unsent outbox rows into the broker
+// PARTIES: RLY = relay process · DB = PostgreSQL 16 @ orders-db-1 (outbox table) · BRK = message broker
+// DEF: outbox — the table of stored events awaiting publication = [ (10, "OrderCreated", sent=false), (11, "PaymentAuthorized", sent=false) ]
+// STATE (before):
+//    outbox : [ (10, "OrderCreated", sent=false), (11, "PaymentAuthorized", sent=false) ]
+//    published : [ ]
+// DEF: poll_once · CALLED BY: a scheduler tick every 250 ms
+// -> query : SELECT * FROM outbox WHERE sent=false   // returns 2 unsent rows
+//    step 1 · fetch rows    : rows : [ ] -> [ (10, "OrderCreated", sent=false), (11, "PaymentAuthorized", sent=false) ]
+//    step 2 · publish row 10 : published : [ ] -> [ "OrderCreated" ]
+//    step 3 · mark row 10    : outbox : [(10,"OrderCreated",sent=false),(11,"PaymentAuthorized",sent=false)] -> [(10,"OrderCreated",sent=true),(11,"PaymentAuthorized",sent=false)]
+//    step 4 · publish row 11 : published : [ "OrderCreated" ] -> [ "OrderCreated", "PaymentAuthorized" ]
+//    step 5 · mark row 11    : outbox : [(10,"OrderCreated",sent=true),(11,"PaymentAuthorized",sent=false)] -> [(10,"OrderCreated",sent=true),(11,"PaymentAuthorized",sent=true)]
+// <- output : BRK received [ "OrderCreated", "PaymentAuthorized" ] · outbox now fully sent
 ```
 
 

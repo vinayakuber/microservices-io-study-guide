@@ -10,24 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns p.416 · microservices
 
 > **Why this matters:** Serverless removes the need to manage any low-level infrastructure — operating systems, virtual machines, containers. You hand the provider your code plus the handler name and resource limits, and it runs the code.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Package the code</b><br/>Node.js, Java, or Python packed as restaurant.zip"]:::start
-  n1["<b>2. Upload it</b><br/>function : null becomes restaurant, the ZIP goes to the infrastructure"]:::step
-  n2["<b>3. Name the handler and limits</b><br/>handler : null becomes index.handler, limits : empty becomes memory 128"]:::core
-  n3["<b>4. No servers to manage</b><br/>no OS, VM, or container is managed by your team"]:::stop
-  n4["<b>Redeploy a fresh ZIP</b><br/>code : restaurant.zip becomes restaurant-v2.zip"]:::warn
-  n0 -->|"1. pack the code"| n1
-  n1 -->|"2. hand it to the provider"| n2
-  n2 -->|"3. handler plus limits"| n3
-  n1 -->|"4. the next version uploads again"| n4
-```
-
 1. **Package the code** — Package your Node.js, Java, or Python code for the service as a ZIP file.
 
 2. **Upload it** — Upload the ZIP to the deployment infrastructure and describe the desired performance characteristics.
@@ -52,24 +34,6 @@ flowchart TD
 ### Invoke on an event
 
 > **Why this matters:** An AWS Lambda function is a stateless component invoked to handle events. When an event occurs, the infrastructure finds an idle instance — launching one if none exist — and invokes the handler.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Find an idle instance</b><br/>instances : empty becomes i-1, launch one if none exist"]:::start
-  n1["<b>2. Invoke the handler</b><br/>handler_runs : 0 becomes 1, event object-created for photo-7.jpg"]:::step
-  n2["<b>3. Isolate under the covers</b><br/>containers : 0 becomes 1, a hidden container isolates the instance"]:::core
-  n3["<b>4. Event handled</b><br/>the function ran, nothing provisioned by you"]:::stop
-  n4["<b>No idle instance available</b><br/>instances : empty becomes i-1, a fresh launch adds startup latency"]:::warn
-  n0 -->|"1. reuse or launch"| n1
-  n1 -->|"2. run the handler"| n2
-  n2 -->|"3. hidden isolation"| n3
-  n0 -->|"4. the cold start path"| n4
-```
 
 1. **Find an idle instance** — Lambda finds an idle instance of your function, launching one if none are available.
 
@@ -96,24 +60,6 @@ flowchart TD
 
 > **Why this matters:** A serverless function can be invoked several ways. One of them is HTTP: a gateway transforms the HTTP request into an event object, invokes the function, and turns the result back into an HTTP response.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Transform the request</b><br/>http : empty becomes method GET, path /restaurants/42"]:::start
-  n1["<b>2. Invoke the lambda</b><br/>http becomes handled, the event is passed to the function"]:::step
-  n2["<b>3. Generate the response</b><br/>response : null becomes status 200"]:::core
-  n3["<b>4. One HTTP call, one reply</b><br/>the request became an event and a response"]:::stop
-  n4["<b>Function returned an error</b><br/>response : null becomes status 500"]:::warn
-  n0 -->|"1. HTTP into an event object"| n1
-  n1 -->|"2. call the function"| n2
-  n2 -->|"3. build the HTTP reply"| n3
-  n2 -->|"4. the error result"| n4
-```
-
 1. **Transform the request** — The gateway turns the HTTP request into an event object.
 
 2. **Invoke the lambda** — The gateway invokes the lambda function with the event.
@@ -138,24 +84,6 @@ flowchart TD
 ### Pay per request, with constraints
 
 > **Why this matters:** Serverless is extremely elastic and you pay per request rather than for underutilized VMs. But it carries real constraints: few languages, stateless-only, and latency risk when load spikes and nothing is pre-provisioned.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Price by duration and memory</b><br/>increments : 0 becomes 3, 300 ms at 100 ms each"]:::start
-  n1["<b>2. Accept the constraints</b><br/>bill : 0 becomes 3, few languages and stateless only"]:::warn
-  n2["<b>3. Accept the latency risk</b><br/>latency : 0 becomes 350 ms, spikes cannot be pre-provisioned"]:::warn
-  n3["<b>4. Pay per request</b><br/>extremely elastic, but you cannot pre-provision capacity"]:::stop
-  n4["<b>Warm instance on steady load</b><br/>latency : 350 becomes 10 ms, no startup cost"]:::core
-  n0 -->|"1. cost is duration times memory"| n1
-  n1 -->|"2. trade away languages and state"| n2
-  n2 -->|"3. trade away pre-provisioning"| n3
-  n2 -->|"4. the warm path is fast"| n4
-```
 
 1. **Price by duration and memory** — The cost of each invocation is a function of its duration, measured in 100 millisecond increments, and the memory consumed.
 
@@ -232,16 +160,6 @@ flowchart TD
   R -->|"comprises"| P1["Stateless — runs only in response to an event"]
 ```
 
-```mermaid
-flowchart LR
-  C["client"] -->|"GET /restaurants/42"| GW["API Gateway"]
-  GW -->|"event object"| RT["function runtime (Lambda)"]
-  RT -->|"loads restaurant.zip"| FN["function index.handler"]
-  RT -->|"cold start"| I["instance i-1"]
-  FN -->|"result"| GW
-  GW -->|"status 200"| C
-```
-
 ```java
 // SYSTEM DESIGN — serverless: client request -> API gateway -> function runtime -> function
 // PARTIES: CLIENT = the HTTP caller (client) · GW = API Gateway (transforms HTTP into an event, builds the response) · RT = function runtime (AWS Lambda: loads the ZIP, cold-start, scales to zero) · FN = the function (index.handler running the uploaded code)
@@ -276,14 +194,6 @@ Your team is tired of owning operating systems, VMs, and containers. You want to
 - Handler name — which function handles events
 - Resource limits — the performance spec
 - Hidden servers — no OS/VM/container to manage
-
-```mermaid
-flowchart LR
-  DEV["Developer"] -->|"upload restaurant.zip"| LAMBDA["Serverless infrastructure"]
-  DEV -->|"handler index.handler"| LAMBDA
-  DEV -->|"memory 128"| LAMBDA
-  LAMBDA -->|"hides"| HIDDEN["no OS, VM, or container"]
-```
 
 ```java
 // UPLOAD SIDE — hand the provider your code plus a handler name and resource limits, no servers to manage
@@ -320,14 +230,6 @@ A new photo just landed in S3, and your function must run to process it. You hav
 - Containers on EC2 — hidden isolation
 - Enough instances — for the load
 
-```mermaid
-flowchart LR
-  S3["Object store"] -->|"object-created photo-7.jpg"| LAMBDA["Lambda"]
-  LAMBDA -->|"find or launch"| I["instance i-1"]
-  I -->|"invoke"| H["index.handler"]
-  H -->|"isolated by"| C["container on EC2"]
-```
-
 ```java
 // INVOKE SIDE — an event fires and the infrastructure runs enough isolated instances of your function
 // PARTIES: S3 = Amazon S3 @ orders-assets-bucket · LAMBDA = the deployment infrastructure · FUNC = the function instance
@@ -362,14 +264,6 @@ Your function must also be reachable over plain HTTP. A browser GET to /restaura
 - Request transform — into an event object
 - Lambda invocation — with the event
 - Response generation — from the result
-
-```mermaid
-flowchart LR
-  CLIENT["HTTP caller"] -->|"GET /restaurants/42"| GW["API Gateway"]
-  GW -->|"event object"| FUNC["Lambda function"]
-  FUNC -->|"result"| GW
-  GW -->|"status 200"| CLIENT
-```
 
 ```java
 // GATEWAY SIDE — an HTTP request is transformed into an event, the function runs, and a response is generated
@@ -406,14 +300,6 @@ Serverless is extremely elastic, but you are worried about the bill and about wh
 - Few languages + stateless only — the constraints
 - Latency risk — cannot pre-provision
 
-```mermaid
-flowchart LR
-  LAMBDA["Lambda"] -->|"duration 300 ms"| BILL["3 x 100 ms increments"]
-  BILL -->|"times memory"| COST["cost 3 units"]
-  LAMBDA -->|"constraints"| LIM["few langs, stateless"]
-  LAMBDA -->|"spike"| LAT["high latency"]
-```
-
 ```java
 // COST SIDE — you pay per request for duration and memory, and you trade away pre-provisioned capacity
 // PARTIES: LAMBDA = the provider · APP = the application being served
@@ -447,12 +333,19 @@ _From the 28 problems:_ 01-scale-from-zero-to-millions
 
 Use an infrastructure that hides any concept of reserved or preallocated resources — it takes your code and runs it, and you are charged for each request based on the resources consumed.
 
-```mermaid
-flowchart LR
-  DEV["Developer"] -->|"upload restaurant.zip"| LAMBDA["Serverless infrastructure"]
-  DEV -->|"handler index.handler"| LAMBDA
-  DEV -->|"memory 128"| LAMBDA
-  LAMBDA -->|"hides"| HIDDEN["no OS, VM, or container"]
+```java
+// UPLOAD SIDE — hand the provider your code plus a handler name and resource limits, no servers to manage
+// PARTIES: DEV = developer · LAMBDA = the serverless deployment infrastructure
+// STATE (before):
+//    function : null                    // nothing deployed yet
+//    limits : {}                        // desired performance characteristics, unset
+// DEF: deploy handler with memory 128 · CALLED BY: DEV uploading a ZIP
+// -> code : "restaurant.zip" · -> handler : "index.handler" · -> memory : 128
+//    step 1 · upload the ZIP   // function : null -> "restaurant"   BECAUSE the infrastructure takes your code and runs it
+//    step 2 · describe the limits   // limits : {} -> {"memory":128}   // you specify resource limits, not servers
+//    step 3 · register the handler   // handler : null -> "index.handler"   // the name of the function that handles events
+// <- function : "restaurant" · no OS, VM, or container is managed by anyone on your team
+//    alt new version : code : "restaurant.zip" -> "restaurant-v2.zip"   BECAUSE a redeploy uploads a fresh ZIP
 ```
 
 

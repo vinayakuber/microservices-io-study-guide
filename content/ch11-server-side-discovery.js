@@ -112,11 +112,7 @@ registerChapter({
       q: "How does a router hide the changing set of instances from the client?",
       solution: "The client calls a router (load balancer) at a well-known location; the router queries the registry and forwards the request to an available instance, so the client never performs discovery.",
       components: ["Well-known router address", "Registry query by the router", "Forward to an instance", "Discovery-free client"],
-      diagram: `flowchart LR
-  C["client"] -->|"well-known address"| R["router"]
-  R -->|"queries"| REG["registry"]
-  REG -->|"instances"| R
-  R -->|"forward"| SVC["order-service instance"]`,
+      
       code: `// ROUTER SIDE — the client calls a well-known router, which consults the registry and forwards to an instance
 // PARTIES: CLI = client · RTR = router (load balancer) · REG = service registry · SVC = order-service instance
 // DEF: router — the load balancer the client calls at a well-known address = RTR, which forwards to router_target "10.0.3.7:8080"
@@ -141,11 +137,7 @@ registerChapter({
       q: "How does an ELB collapse the router and the registry into one, and how do instances get registered?",
       solution: "The ELB load-balances traffic (router) and also functions as the registry; instances are registered explicitly via an API call or automatically via an autoscaling group.",
       components: ["ELB as router", "ELB as registry", "Explicit API registration", "Autoscaling-group registration"],
-      diagram: `flowchart LR
-  C["client"] -->|"calls"| ELB["ELB (router + registry)"]
-  ELB -->|"routes to"| I1["i-abc"]
-  ELB -->|"routes to"| I2["i-def"]
-  ASG["autoscaling group"] -->|"register i-ghi"| ELB`,
+      
       code: `// ELB SIDE — the load balancer is also the registry; instances register explicitly or via an autoscaling group
 // PARTIES: CLI = client · ELB = Elastic Load Balancer (router + registry) · EC2 = service instances
 // DEF: target — one EC2 instance the ELB load-balances across = elb_targets hosts "10.0.5.1" and "10.0.5.2"
@@ -166,9 +158,7 @@ registerChapter({
       q: "How do cluster proxies on every host implement server-side discovery?",
       solution: "Each host runs a proxy; the client connects to the local proxy's port for the service, and the proxy forwards the request to an instance somewhere in the cluster.",
       components: ["Per-host proxy", "Local port per service", "Proxy forwarding into the cluster"],
-      diagram: `flowchart LR
-  C["client"] -->|"localhost:8080"| PRX["host proxy"]
-  PRX -->|"forward"| SVC["order-service pod 10.0.6.9"]`,
+      
       code: `// CLUSTER SIDE — each host runs a proxy; the client connects to the local proxy's port and it forwards into the cluster
 // PARTIES: CLI = client on a host · PRX = per-host proxy (server-side router) · SVC = service instance in the cluster
 // DEF: cluster — the set of hosts whose services the proxy reaches = cluster_map mapping order-service to "port 8080"
@@ -195,11 +185,7 @@ registerChapter({
       q: "What are the costs of server-side discovery compared to client-side?",
       solution: "More network hops than client-side discovery, plus a router that must be installed, configured, replicated for availability and capacity, and made to support the needed protocols.",
       components: ["Extra network hop", "Install/configure the router", "Replicate the router", "Protocol support (HTTP, gRPC, Thrift)"],
-      diagram: `flowchart LR
-  C["client"] -->|"hop 1"| R["router"]
-  R -->|"hop 2"| REG["registry"]
-  R -->|"hop 3"| SVC["instance"]
-  R -->|"requires"| REP["replicas + protocols"]`,
+      
       code: `// ROUTER SIDE — server-side discovery adds a network hop and a component that must be replicated and protocol-fit
 // PARTIES: CLI = client · RTR = router · REG = registry · SVC = order-service instance
 // STATE (before):
@@ -256,7 +242,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  CLI[\"client\"] -->|\"well-known address\"| RTR[\"router / load balancer\"]\n  RTR -->|\"query order-service\"| REG[(\"service registry Eureka\")]\n  REG -->|\"10.0.1.7:8080, 10.0.1.8:8080\"| RTR\n  RTR -->|\"forward\"| SVC[\"order-service instance 10.0.1.7:8080\"]",
+    
     program: `// SYSTEM DESIGN — server-side discovery as a pipeline: client -> router/load balancer -> service registry -> service instances (the client never discovers)
 // PARTIES: CLI = client (calls only the router) · RTR = router (load balancer that queries the registry and forwards) · REG = service registry (Eureka) · SVC = order-service instances
 // DEF: registry — REG's map of service name -> instances; here {"order-service" -> ["10.0.1.7:8080", "10.0.1.8:8080"]}

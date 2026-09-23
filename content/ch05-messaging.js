@@ -120,10 +120,7 @@ registerChapter({
       q: "How does the notification style of messaging let a service announce an event and return immediately?",
       solution: "A notification is a message that expects no reply, so the sender publishes it to a channel and returns at once; a consumer reads it later.",
       components: ["Sender service", "Message channel", "Consumer (reads later)", "No reply expected"],
-      diagram: `flowchart LR
-  SVC["Order Service"] -->|"publishes to"| BRK["channel"]
-  BRK -->|"delivers to"| CON["Refund consumer"]
-  SVC -. "returns immediately" .-> SVC`,
+      
       code: `// ORDER SERVICE SIDE — publish an OrderCancelled event to a channel; the consumer reads it later
 // PARTIES: SVC = Order Service · BRK = message broker · CON = Refund consumer
 // STATE (before):
@@ -151,11 +148,7 @@ registerChapter({
       q: "How does the request/response style get a prompt answer over a channel, and how is the reply matched to its request?",
       solution: "The sender sends a request with a reply-to channel and a correlation id, and the provider replies on that channel, so the reply is matched to the request.",
       components: ["Request message", "Reply-to channel", "Correlation id", "Prompt reply"],
-      diagram: `flowchart LR
-  C["Checkout"] -->|"requests via"| RQ["request channel"]
-  RQ -->|"routes to"| P["Inventory service"]
-  P -->|"replies via"| RP["reply-to channel"]
-  RP -->|"returns to"| C`,
+      
       code: `// CONSUMER SERVICE SIDE — request/response: send a request, expect a prompt reply over a channel
 // PARTIES: CLIENT = Checkout · BRK = message broker · SVC = Inventory service
 // DEF: channel — a named conduit through which messages flow; here the reply_to channel "reply_channel" carried "REQ-91:yes 18.75"
@@ -180,11 +173,7 @@ registerChapter({
       q: "How does the publish/subscribe style fan one event out to several recipients?",
       solution: "A publisher writes a message to a topic and knows nothing of its recipients; the broker delivers a copy to each subscriber (zero or more).",
       components: ["Publisher", "Topic", "Broker fan-out", "Multiple subscribers"],
-      diagram: `flowchart LR
-  PUB["Payment service"] -->|"publishes to"| TOP["topic: payments"]
-  TOP -->|"delivers to"| B["Billing"]
-  TOP -->|"delivers to"| S["Shipping"]
-  TOP -->|"delivers to"| L["Loyalty"]`,
+      
       code: `// BROKER SIDE — publish/subscribe: one publisher, three subscribers (zero or more recipients)
 // PARTIES: PUB = Payment service · BRK = message broker · SUB1 = Billing · SUB2 = Shipping · SUB3 = Loyalty
 // DEF: inbox — a per-subscriber mailbox the broker delivers one copy into; here inbox_billing, inbox_shipping, and inbox_loyalty each receive "PaymentProcessed(PAY-311)"
@@ -211,10 +200,7 @@ registerChapter({
       q: "How does messaging buy availability through buffering, and what does that buffering cost?",
       solution: "The broker keeps messages queued until the consumer can process them, decoupling sender from consumer, at the cost of running a highly available broker.",
       components: ["Message broker buffer", "Down consumer", "Loose runtime coupling", "Broker complexity"],
-      diagram: `flowchart LR
-  SVC["Order Service"] -->|"publishes to"| Q["broker queue"]
-  Q -. "held while down" .-> CON["Consumer (DOWN)"]
-  Q -->|"replays to"| R["replays on reconnect"]`,
+      
       code: `// BROKER SIDE — buffering buys availability: consumer down, broker holds the queue until it returns
 // PARTIES: BRK = message broker · SVC = Order Service (publisher) · CON = Consumer
 // STATE (before):
@@ -267,7 +253,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  PUB[\"sender: Order Service\"] -->|\"publish message\"| BRK[\"transport: RabbitMQ queue orders\"]\n  BRK -->|\"deliver copy\"| CON[\"receiver: Kitchen consumer\"]",
+    
     program: `// SYSTEM DESIGN — messaging as a pipeline: sender/producer (builds the message, sends it) -> transport (RabbitMQ channel) -> receiver/consumer (subscribes, handles the message)
 // PARTIES: PUB = Order Service (producer/writer: builds the message and publishes it) · BRK = RabbitMQ broker (transport: the message channel) · CON = Kitchen consumer (reader: subscribes and handles messages)
 // DEF: message — the payload a sender writes to a channel; here "OrderCreated(PO-2001)"

@@ -10,28 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 30 (p.379) · micr
 
 > **Why this matters:** Every service must be built, tested, packaged, and given cross-cutting concerns before its business logic can start. That one-to-two-day cost is trivial for one monolith but unaffordable across tens or hundreds of services.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. The setup tax</b><br/>build, test, package before any business logic"]:::start
-  n1["<b>2. Cross-cutting concerns</b><br/>security, config, logging, health, metrics, tracing"]:::step
-  n2["<b>3. Microservice extras</b><br/>registration, discovery, circuit breakers"]:::step
-  n3["<b>4. Six concerns, three services</b><br/>3 times 6 equals 18 wirings by hand"]:::core
-  n4["<b>5. Days per service</b><br/>one to two days each, unaffordable across tens of services"]:::warn
-  n5["<b>6. Chassis instead</b><br/>wire the 6 concerns once, services inherit - 6 not 18"]:::core
-  n6["<b>7. Minutes per service</b><br/>new service adopts wiring instead of re-building it"]:::stop
-  n0 -->|"1. build, test, package"| n1
-  n1 -->|"2. add registration and breakers"| n2
-  n2 -->|"3. multiply by hand"| n3
-  n3 -->|"4. cost explodes"| n4
-  n3 -->|"5. centralize the wiring"| n5
-  n5 -->|"6. inherit instead of re-wire"| n6
-```
-
 1. **Build logic** — Builds, tests, and packages into a production-ready format such as a Docker image — in Java, Gradle or Maven plus CI config (CircleCI, GitHub Actions).
 
 2. **Cross-cutting concerns** — Security via an Access Token, externalized configuration, logging, a health-check URL, metrics, and distributed tracing.
@@ -64,32 +42,6 @@ flowchart TD
 
 > **Why this matters:** The chassis is the foundation: reusable build logic and mechanisms for cross-cutting concerns, assembled once and inherited by each service. Adopting it wires a new service in minutes instead of days.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Adopt chassis 2.4.0</b><br/>svc.build : none becomes gradle-plugin:2.4.0"]:::start
-  n1["<b>2. Security inherited</b><br/>svc.security : none becomes access-token-check"]:::step
-  n2["<b>3. Metrics inherited</b><br/>svc.metrics : none becomes counter:orders_created"]:::step
-  n3["<b>4. Tracing inherited</b><br/>svc.tracing : none becomes trace-id-filter"]:::step
-  n4["<b>5. Registration inherited</b><br/>svc.registered : false becomes true"]:::step
-  n5["<b>6. Boilerplate included</b><br/>database connection pool and HTTP request code shipped"]:::core
-  n6["<b>7. Service Template on top</b><br/>sample service holding code that does not belong in the chassis"]:::step
-  n7["<b>8. Production-ready service</b><br/>all concerns inherited at once, no re-wiring"]:::stop
-  n8["<b>9. Concern omitted</b><br/>an unwired mechanism leaves the service incomplete"]:::warn
-  n0 -->|"1. build plugin added"| n1
-  n1 -->|"2. access-token check"| n2
-  n2 -->|"3. metrics counter"| n3
-  n3 -->|"4. tracing filter"| n4
-  n4 -->|"5. self-register with the registry"| n5
-  n5 -->|"6. boilerplate supplied"| n6
-  n6 -->|"7. template layers on top"| n7
-  n0 -->|"8. a concern left unwired"| n8
-```
-
 1. **Reusable build logic** — The chassis ships build plugins (for example Gradle plugins) that build, test, and package a service.
 
 2. **Cross-cutting mechanisms** — It assembles and configures a collection of frameworks and libraries for security, logging, health checks, metrics, and tracing.
@@ -117,26 +69,6 @@ flowchart TD
 
 > **Why this matters:** Build logic and cross-cutting concerns change over time. With a chassis, a fix is made once and reaches every service through a version bump; with a Service Template it is copy/pasted into each codebase.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Release chassis once</b><br/>new version 2.4.0 carrying a logging fix"]:::start
-  n1["<b>2. Bump Order Service</b><br/>deps.SVC1 : chassis:2.3.0 becomes chassis:2.4.0"]:::step
-  n2["<b>3. Bump Customer Service</b><br/>deps.SVC2 : chassis:2.3.0 becomes chassis:2.4.0"]:::step
-  n3["<b>4. Bump Kitchen Service</b><br/>deps.SVC3 : chassis:2.3.0 becomes chassis:2.4.0"]:::step
-  n4["<b>5. Fix reaches all three</b><br/>dependencies, build logic, cross-cutting logic stay current together"]:::stop
-  n5["<b>6. Service Template</b><br/>copy-and-paste the fix into each codebase, one edit per service"]:::warn
-  n0 -->|"1. one release"| n1
-  n1 -->|"2. version bump"| n2
-  n2 -->|"3. version bump"| n3
-  n3 -->|"4. all three current"| n4
-  n0 -->|"5. template alternative - per-service edits"| n5
-```
-
 1. **Release once** — Release a new version of the chassis framework containing the needed change.
 
 2. **Bump each service** — Update each service to use the new chassis version.
@@ -163,30 +95,6 @@ flowchart TD
 ### One chassis per language
 
 > **Why this matters:** A chassis is tied to a programming language and framework, so a second language forces a second chassis. That is the pattern's main issue: it can be an obstacle to adopting a new language or framework.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Chassis is language-bound</b><br/>Java starts from Spring Boot, Spring Cloud, or Dropwizard"]:::start
-  n1["<b>2. Java chassis in place</b><br/>chassis.JVM = chassis-java:2.4.0"]:::core
-  n2["<b>3. Team adds a Go service</b><br/>the JVM chassis cannot run Go"]:::warn
-  n3["<b>4. Build a second chassis</b><br/>chassis_count : 1 becomes 2, chassis-go:1.0.0 on Gizmo, Micro, or Go kit"]:::step
-  n4["<b>5. Re-implement six concerns</b><br/>concerns_in_go : 0 becomes 6"]:::core
-  n5["<b>6. Two chassis to maintain</b><br/>upkeep doubles"]:::stop
-  n6["<b>7. Adoption obstacle</b><br/>building a second chassis can block a new language"]:::warn
-  n7["<b>8. Stay single-language</b><br/>one chassis, but Go adoption stays blocked"]:::stop
-  n0 -->|"1. framework-specific base"| n1
-  n1 -->|"2. team wants Go"| n2
-  n2 -->|"3. JVM chassis cannot serve Go"| n3
-  n3 -->|"4. repeat security, config, logging, health, metrics, tracing"| n4
-  n4 -->|"5. double the upkeep"| n5
-  n5 -->|"6. the main issue of the pattern"| n6
-  n1 -->|"7. stay single-language - Go blocked"| n7
-```
 
 1. **Language-specific frameworks** — Java starts from Spring Boot/Spring Cloud or Dropwizard; Go starts from Gizmo, Micro, or Go kit.
 
@@ -250,16 +158,6 @@ flowchart TD
   R -->|"comprises"| P1["service registration/discovery + circuit breakers"]
 ```
 
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|"adopts"| CHS["chassis framework 2.4.0"]
-  CHS -->|"wires"| CFG["externalized config"]
-  CHS -->|"wires"| LOG["logging + health check"]
-  CHS -->|"wires"| MET["metrics counter: orders_created"]
-  CHS -->|"wires"| TRC["tracing"]
-  CHS -->|"registers"| REG["service registry"]
-```
-
 ```java
 // SYSTEM DESIGN — microservice chassis: service (Order Service) -> chassis framework (shared libraries) -> cross-cutting concerns (security, config, logging, health, metrics, tracing)
 // PARTIES: SVC = Order Service (adopts the chassis) · CHS = chassis framework 2.4.0 (shared libraries) · REG = service registry (registration target)
@@ -293,15 +191,6 @@ The team is standing up three new services, and each one needs the same six cros
 - Customer Service
 - Kitchen Service
 - shared chassis
-
-```mermaid
-flowchart LR
-  C["Chassis"] -->|"wires 6 concerns once"| W["concern wiring"]
-  W -->|"wires"| O["Order Service"]
-  W -->|"wires"| U["Customer Service"]
-  W -->|"wires"| K["Kitchen Service"]
-  M["Manual: 3 x 6 = 18 wirings"] -.->|"vs"| W
-```
 
 ```java
 // TEAM SIDE — wiring six cross-cutting concerns once per service versus once in a chassis
@@ -341,15 +230,6 @@ A developer scaffolds a new Order Service and wants it production-ready in minut
 - Gradle plugin
 - service registry
 
-```mermaid
-flowchart LR
-  D["Developer"] -->|"scaffolds"| S["Order Service"]
-  S -->|"adopts"| C["chassis 2.4.0"]
-  C -->|"wires"| B["build"]
-  C -->|"wires"| T["security / metrics / tracing"]
-  C -->|"registers"| R["service registry"]
-```
-
 ```java
 // ORDER SERVICE SIDE — a new service adopts the chassis and inherits the cross-cutting wiring
 // PARTIES: SVC = Order Service · CHS = chassis framework 2.4.0 · REG = service registry
@@ -384,14 +264,6 @@ A logging vulnerability is fixed in the shared library. The team must push the f
 - Customer Service
 - Kitchen Service
 - chassis release
-
-```mermaid
-flowchart LR
-  R["Release chassis 2.4.0"] -->|"bump"| O["Order Service"]
-  R -->|"bump"| U["Customer Service"]
-  R -->|"bump"| K["Kitchen Service"]
-  O -->|"2.3.0 -> 2.4.0"| V["fix delivered"]
-```
 
 ```java
 // TEAM SIDE — a chassis upgrade delivers one fix to every service via a version bump
@@ -428,14 +300,6 @@ The team adds its first Go service, but the chassis is a Java framework built on
 - Gizmo/Micro/Go kit
 - second chassis
 
-```mermaid
-flowchart LR
-  J["Java services"] -->|"use"| JC["chassis-java:2.4.0"]
-  G["Go service"] -.->|"cannot use"| JC
-  G -->|"builds"| GC["chassis-go:1.0.0"]
-  GC -->|"re-wires 6 concerns"| X["duplicated work"]
-```
-
 ```java
 // TEAM SIDE — a second language forces a second chassis, so upkeep doubles
 // PARTIES: JVM = Java services · GO = Go services
@@ -469,13 +333,22 @@ _From the 28 problems:_ 01-scale-from-zero-to-millions
 
 A microservice chassis provides reusable build logic and mechanisms for cross-cutting concerns as one framework; the Service Template is a sample service built on it.
 
-```mermaid
-flowchart LR
-  C["Chassis"] -->|"wires 6 concerns once"| W["concern wiring"]
-  W -->|"wires"| O["Order Service"]
-  W -->|"wires"| U["Customer Service"]
-  W -->|"wires"| K["Kitchen Service"]
-  M["Manual: 3 x 6 = 18 wirings"] -.->|"vs"| W
+```java
+// TEAM SIDE — wiring six cross-cutting concerns once per service versus once in a chassis
+// PARTIES: SVC1 = Order Service · SVC2 = Customer Service · SVC3 = Kitchen Service
+// DEF: wiring — the act of connecting a cross-cutting concern to a service; here 3 services x 6 concerns = 18 wirings
+// STATE (before):
+//    manual_wiring : { SVC1: 0, SVC2: 0, SVC3: 0 }       // concerns wired by hand, per service
+//    chassis_wiring : { chassis: 0 }                     // concerns wired once, inside the chassis
+// DEF: setup · CALLED BY: a team standing up 3 new services
+// -> concern_count : 6   // = security + config + logging + health + metrics + tracing
+// -> service_count : 3
+//    step 1 · wire SVC1 by hand    manual_wiring.SVC1 : 0 -> 6   BECAUSE each service re-implements the 6 concerns
+//    step 2 · wire SVC2 by hand    manual_wiring.SVC2 : 0 -> 6
+//    step 3 · wire SVC3 by hand    manual_wiring.SVC3 : 0 -> 6
+//    step 4 · total by hand = 3 services x 6 concerns = 18 wirings
+// <- outcome : manual_wiring : { SVC1: 6, SVC2: 6, SVC3: 6 } = 18 wirings total
+//    alt chassis : wire once -> chassis_wiring.chassis : 0 -> 6, then SVC1/SVC2/SVC3 inherit = 6 wirings, not 18
 ```
 
 

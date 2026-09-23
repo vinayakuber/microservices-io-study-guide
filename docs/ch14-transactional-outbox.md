@@ -10,28 +10,6 @@ _Also known as: Application events · Chris Richardson · Microservice Patterns 
 
 > **Why this matters:** A command must change business data and publish an event as one atomic step, but 2PC across the database and broker is not viable; without atomicity you either lose the event for a committed change or leak an event from a rolled-back transaction.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Begin local transaction T1</b><br/>SVC starts a local transaction, BRK not enlisted, no 2PC"]:::start
-  n1["<b>2. Insert business row</b><br/>orders becomes PO-2001 PENDING"]:::step
-  n2["<b>3. Insert outbox row</b><br/>outbox becomes row 1, order_created"]:::core
-  n3["<b>4. Commit T1</b><br/>both rows become durable together"]:::core
-  n4["<b>5. Broker sees nothing yet</b><br/>outbox holds order_created, BRK received 0 messages so far"]:::stop
-  n5["<b>6. Rollback T1 instead</b><br/>orders stays empty, outbox drops the row"]:::warn
-  n6["<b>7. Event not published</b><br/>the rollback undoes both inserts, no event leaks"]:::warn
-  n0 -->|"start local tx"| n1
-  n1 -->|"same transaction"| n2
-  n2 -->|"same transaction"| n3
-  n3 -->|"commit path"| n4
-  n3 -->|"rollback path"| n5
-  n5 -->|"both inserts undone"| n6
-```
-
 1. **Update the aggregate** — The sender applies its normal business change to the database inside a local transaction.
 
 2. **Insert the outbox row** — In that same transaction it inserts the message or event into the outbox table.
@@ -59,31 +37,6 @@ flowchart TD
 
 > **Why this matters:** A separate relay reads the outbox and hands messages to the broker, and it must reproduce the order the application wrote them in.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Polling loop fires</b><br/>the relay wakes every 100 ms"]:::start
-  n1["<b>2. Read unsent rows in order</b><br/>query SELECT rows WHERE sent=false ORDER BY id ASC, returns id 1 then id 2"]:::step
-  n2["<b>3. Publish E1</b><br/>published : empty becomes E1, id 1 is first"]:::step
-  n3["<b>4. Mark id 1 sent</b><br/>outbox row 1 sent=false becomes sent=true"]:::core
-  n4["<b>5. Publish E2</b><br/>published : E1 becomes E1, E2"]:::step
-  n5["<b>6. Mark id 2 sent</b><br/>outbox row 2 sent=false becomes sent=true"]:::core
-  n6["<b>7. Broker receives in order</b><br/>BRK receives E1, E2 in id order, outbox fully sent"]:::stop
-  n7["<b>Query has no ORDER BY</b><br/>the database could return id 2 first, order wrong"]:::warn
-  n0 -->|"timer fires"| n1
-  n1 -->|"ordered by id"| n2
-  n1 -->|"no ORDER BY"| n7
-  n2 -->|"send E1"| n3
-  n3 -->|"next row"| n4
-  n4 -->|"send E2"| n5
-  n5 -->|"outbox drained"| n6
-  n7 -->|"add ORDER BY id to fix"| n2
-```
-
 1. **Read unsent rows in order** — The relay selects outbox rows that are not yet sent, ordered by their id.
 
 2. **Publish each to the broker** — Each row is published to the broker topic in the order it was read.
@@ -109,31 +62,6 @@ flowchart TD
 ### The crash window means at-least-once
 
 > **Why this matters:** The relay can crash after publishing a message but before recording that it did, so it publishes the same message again on restart; consumers must tolerate duplicates.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Relay polls the next row</b><br/>row 1, E1, sent=false"]:::start
-  n1["<b>2. Publish E1 to BRK</b><br/>published : empty becomes E1, BRK holds one copy"]:::step
-  n2["<b>3. Crash before mark</b><br/>row still sent=false, the relay dies"]:::warn
-  n3["<b>4. Restart polls again</b><br/>query returns row 1 again"]:::step
-  n4["<b>5. Re-publish E1</b><br/>published : E1 becomes E1, E1, at-least-once duplicate"]:::warn
-  n5["<b>6. Mark id 1 sent</b><br/>outbox row becomes sent=true"]:::step
-  n6["<b>7. Consumer dedupes</b><br/>processed becomes E1 true, INSERT ON CONFLICT DO NOTHING"]:::core
-  n7["<b>8. Delivered twice, handled once</b><br/>CNS idempotently skips the second copy"]:::stop
-  n0 -->|"read the unsent row"| n1
-  n1 -->|"crash before mark"| n2
-  n1 -->|"no crash - mark sent"| n5
-  n2 -->|"restart re-reads the row"| n3
-  n3 -->|"row still unsent"| n4
-  n4 -->|"mark sent after republish"| n5
-  n5 -->|"copies delivered"| n6
-  n6 -->|"duplicate skipped"| n7
-```
 
 1. **Publish then mark** — The relay publishes a row and only then marks it sent, leaving a window between the two writes.
 
@@ -164,28 +92,6 @@ flowchart TD
 ### Ordering must survive multiple instances
 
 > **Why this matters:** When several service instances update the same aggregate, each commits its own event, yet the broker must still receive them in the order the transactions committed.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Two instances, one aggregate</b><br/>SVC1 and SVC2 both update PO-2001"]:::start
-  n1["<b>2. T1 commits first</b><br/>SVC1 updates aggregate to APPROVED, inserts outbox row id 1 E1"]:::core
-  n2["<b>3. T2 commits after</b><br/>SVC2 updates aggregate to SHIPPED, inserts outbox row id 2 E2"]:::core
-  n3["<b>4. Relay reads by id</b><br/>rows ordered by id, not by which instance wrote them"]:::step
-  n4["<b>5. Publish E1 before E2</b><br/>id 1 is read first"]:::step
-  n5["<b>6. Commit order preserved</b><br/>T1 before T2 means E1 before E2 in the broker"]:::stop
-  n6["<b>Read by instance, not id</b><br/>would scramble E1 and E2, order lost"]:::warn
-  n0 -->|"SVC1 runs T1"| n1
-  n1 -->|"SVC2 runs T2"| n2
-  n2 -->|"both rows in outbox"| n3
-  n3 -->|"order by id"| n4
-  n3 -->|"no id ordering"| n6
-  n4 -->|"E1 then E2"| n5
-```
 
 1. **Sequence by commit order** — Each committed transaction inserts its outbox row, and the row id grows with commit order.
 
@@ -263,15 +169,6 @@ flowchart TD
   R -->|"comprises"| P1["Delivers them to subscribers"]
 ```
 
-```mermaid
-flowchart LR
-  SVC["order service (application)"] -->|"BEGIN ... write order + outbox ... COMMIT"| DB[("PostgreSQL 16 @ orders-db-1")]
-  DB -->|"SELECT outbox sent=false"| RLY["relay publisher"]
-  RLY -->|"publish OrderPlaced"| BRK[("message broker RabbitMQ")]
-  RLY -->|"mark sent=true"| DB
-  BRK -->|"consume"| CNS["subscriber"]
-```
-
 ```java
 // SYSTEM DESIGN — transactional outbox as a pipeline: application tx -> outbox table (same database) -> relay publisher -> broker (reliable, no dual-write)
 // PARTIES: SVC = order service (application) · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox in one instance) · RLY = relay publisher · BRK = message broker (RabbitMQ) · CNS = subscriber
@@ -308,14 +205,6 @@ Your order service must create an order and publish an OrderPlaced event, but a 
 - Outbox row — the event stored in the same transaction
 - Local commit — makes both rows durable together
 - Relay — publishes outbox rows after commit
-
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|INSERT order| DB[("Database")]
-  SVC -->|INSERT outbox row| DB
-  DB -->|COMMIT both or neither| DONE["Both durable"]
-  DB -.->|rollback| UNDO["Both dropped"]
-```
 
 ```java
 // ORDER SERVICE SIDE — commit a business write and its event together, without 2PC
@@ -354,14 +243,6 @@ Two events for the same order — OrderPlaced then PaymentAuthorized — sit in 
 - Publish step — one row per broker send
 - Mark-sent — UPDATE per row
 
-```mermaid
-flowchart LR
-  DB[("Outbox table")] -->|SELECT sent=false ORDER BY id ASC| RLY["Relay"]
-  RLY -->|publish id 101 first| BRK[("Broker")]
-  RLY -->|publish id 102 second| BRK
-  RLY -->|mark sent| DB
-```
-
 ```java
 // RELAY SIDE — publish unsent outbox rows to the broker in the order they were inserted
 // PARTIES: RLY = message relay · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox tables live in this ONE instance, so a single COMMIT covers both) · BRK = message broker
@@ -397,15 +278,6 @@ Your relay published an outbox row then crashed before marking it sent. On resta
 - Crash — row still unsent
 - Restart — re-publishes the row
 - Consumer processed table — dedupes
-
-```mermaid
-flowchart LR
-  RLY["Relay"] -->|publish OrderPlaced| BRK[("Broker")]
-  RLY -->|crash before mark| DB[("Outbox row still sent=false")]
-  DB -->|re-select on restart| RLY2["Relay re-publishes"]
-  RLY2 -->|"publishes to"| BRK
-  BRK -->|OrderPlaced x2| CNS["Consumer dedupes"]
-```
 
 ```java
 // RELAY + CONSUMER SIDE — a crash between publish and mark re-sends the row, so the consumer dedupes
@@ -447,14 +319,6 @@ Two instances of your order service update the same order — instance A approve
 - Outbox row id — commit order
 - Relay — publishes by id
 
-```mermaid
-flowchart LR
-  A["Instance A commits T1"] -->|row id 1| DB[("Outbox table")]
-  B["Instance B commits T2"] -->|row id 2| DB
-  DB -->|ORDER BY id| RLY["Relay"]
-  RLY -->|Approved then Shipped| BRK[("Broker")]
-```
-
 ```java
 // TWO SERVICE INSTANCES SIDE — one aggregate, two commits, and the broker still sees them in order
 // PARTIES: SVC1 = Order Service instance A · SVC2 = Order Service instance B · DB = PostgreSQL 16 @ orders-db-1 (the ONE instance both order-service instances commit to) · BRK = message broker
@@ -490,12 +354,21 @@ _From the 28 problems:_ 26-payment-system · 19-distributed-message-queue
 
 The service inserts an outbox row in the same transaction that updates the aggregate; a separate relay later publishes those rows to the broker.
 
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|INSERT order| DB[("Database")]
-  SVC -->|INSERT outbox row| DB
-  DB -->|COMMIT both or neither| DONE["Both durable"]
-  DB -.->|rollback| UNDO["Both dropped"]
+```java
+// ORDER SERVICE SIDE — commit a business write and its event together, without 2PC
+// PARTIES: SVC = Order Service · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox tables live in this ONE instance, so a single COMMIT covers both) · BRK = message broker
+// STATE (before):
+//    orders : { }
+//    outbox : [ ]
+//    tx : "none"
+// DEF: place_order · CALLED BY: U7 placing order "PO-77"
+// -> order_id : "PO-77" · -> total : 45.00
+//    step 1 · begin T1 : tx : "none" -> "open"   BECAUSE SVC starts a local transaction (BRK is NOT enlisted, so no 2PC)
+//    step 2 · insert business : orders : { } -> { "PO-77" : "PENDING" }
+//    step 3 · insert outbox row : outbox : [ ] -> [ (101, "OrderPlaced") ]
+//    step 4 · commit T1 : tx : "open" -> "committed"   BECAUSE both rows live in the same local transaction
+// <- result : outbox : [ (101, "OrderPlaced") ] · BRK received 0 messages so far
+//    alt rollback T1 : orders : { } -> { } · outbox : [ (101, "OrderPlaced") ] -> [ ] · event NOT published   BECAUSE the rollback undoes both inserts
 ```
 
 

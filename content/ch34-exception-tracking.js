@@ -102,10 +102,7 @@ registerChapter({
       q: 'Walk me through the first stage of Exception tracking — what does a service instance throw, and what exactly does the handler capture from it?',
       solution: 'The handler catches the exception and packages its error message plus the stack trace into a reportable record at the source, before anything is lost.',
       components: ['Order Service instance — throws and catches', 'Exception object — error message + stack trace', 'Handler catch block — packages the record', 'Report record — msg + stack + timestamp'],
-      diagram: `flowchart LR
-  U1["User calls GET /orders REQ-7001"] -->|"throws"| E["Exception: customer is null"]
-  E -->|"caught"| H["Handler catch block"]
-  H -->|"packages"| R["Report msg + stack + ts"]`,
+      
       code: `// ORDER SERVICE SIDE — one request throws, and the handler captures the message plus stack trace before the thread dies
 // PARTIES: SVC = Order Service instance · U1 = the user calling the service · DB = PostgreSQL 16 @ orders-db-1 (the table returns no row)
 // STATE (before):
@@ -127,10 +124,7 @@ registerChapter({
       q: 'How does a service report a captured exception to the centralized tracker, and why is the exception also written to the local log?',
       solution: 'The service POSTs the message plus stack trace to the tracking service, receives an acknowledgement, and also writes the same line to its local log so Log aggregation keeps a copy.',
       components: ['Order Service — the sender', 'Exception tracking service — the receiver', 'HTTP POST /exceptions — the transport', 'Local log file — the secondary copy'],
-      diagram: `flowchart LR
-  SVC["Order Service"] -->|"POST /exceptions"| TRK["Exception tracking service"]
-  TRK -->|"200 stored"| SVC
-  SVC -->|"also writes"| LOG["Local log file"]`,
+      
       code: `// ORDER SERVICE SIDE — the captured exception is POSTed to the centralized tracker and also written to the local log
 // PARTIES: SVC = Order Service instance · TRK = exception tracking service
 // STATE (before):
@@ -154,10 +148,7 @@ registerChapter({
       q: 'How does the centralized tracker de-duplicate exceptions — what is the key it fingerprints on, and what happens on the first sighting versus a repeat?',
       solution: 'The tracker fingerprints each exception by its stack trace, creates a tracked issue on the first sighting, and increments the same issue on every later report with the same fingerprint.',
       components: ['Stack-trace fingerprint — the dedup key', 'Issue store — fingerprint to count map', 'First sighting — creates the issue', 'Repeat — increments the count'],
-      diagram: `flowchart LR
-  SVC1["Instance 1 report"] -->|"fp FP-77A3"| TRK["Tracker issues map"]
-  SVC2["Instance 2 report"] -->|"fp FP-77A3"| TRK
-  TRK -->|"create then increment"| I["Issue FP-77A3 count 2"]`,
+      
       code: `// TRACKER SIDE — two instances of the same bug collapse into one tracked issue keyed on the stack-trace fingerprint
 // PARTIES: SVC1 = Order Service instance 1 · SVC2 = Order Service instance 2 · TRK = exception tracking service
 // STATE (before):
@@ -178,10 +169,7 @@ registerChapter({
       q: 'After aggregation, how does Exception tracking turn a pile of exceptions into a fixed product — what notifies the developer and what marks the issue resolved?',
       solution: 'The tracker notifies a developer when an issue needs attention; the developer investigates the message and stack trace, fixes the underlying cause, and marks the issue resolved.',
       components: ['Threshold crossing — triggers the notify', 'Notification — to the on-call developer', 'Investigation — reads msg + stack trace', 'Resolution state — OPEN to RESOLVED'],
-      diagram: `flowchart LR
-  TRK["Tracker issue count 2"] -->|"crosses threshold 1"| DEV["On-call developer"]
-  DEV -->|"commits fix"| FIX["commit-9f2c"]
-  FIX -->|"marks"| RES["state RESOLVED"]`,
+      
       code: `// TRACKER SIDE — an issue whose count crosses the threshold notifies the developer, who fixes and resolves it
 // PARTIES: TRK = exception tracking service · DEV = the on-call developer
 // STATE (before):
@@ -228,7 +216,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  SVC[\"Order Service\"] -->|\"throw EX-1001\"| TRK[\"Exception tracking service\"]\n  TRK -->|\"fold into fingerprint FP-77A3\"| DB[\"PostgreSQL 16 @ exc-db-1\"]\n  DB -->|\"issue count 2\"| DEV[\"Developer reader\"]",
+    
     program: `// SYSTEM DESIGN — exception tracking: service -> exception tracker (collect/dedup/aggregate) -> developer reader
 // PARTIES: SVC = Order Service (source service) · TRK = exception tracking service (collector + dedup aggregator) · DB = PostgreSQL 16 @ exc-db-1 (the exception store) · DEV = developer (reader)
 // DEF: exception — one thrown error; here EX-1001 "customer is null" from stack SVC.doGet line 42

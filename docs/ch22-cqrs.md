@@ -10,28 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 22 · microservice
 
 > **Why this matters:** Under Database per Service there is no shared table to join, and under Event sourcing the data is stored only as an event log — so the current state is no longer easily queried.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Data is split or event-only</b><br/>event_log holds order_created O-101 total 120.00 and order_updated O-101 total 95.00, append-only, no current-state row"]:::start
-  n1["<b>2. A simple read now needs work</b><br/>QR asks read_current_total for order O-101"]:::step
-  n2["<b>3. Replay order_created</b><br/>running 0.00 becomes 120.00"]:::step
-  n3["<b>4. Replay order_updated</b><br/>running 120.00 becomes 95.00"]:::step
-  n4["<b>5. Fold to current state</b><br/>current becomes 95.00 after replaying 2 events"]:::core
-  n5["<b>6. Answer, rebuilt not read</b><br/>current 95.00 produced by replay, not by reading one row"]:::stop
-  n6["<b>Alt - a current-state table</b><br/>one row read returns 95.00 directly, no replay needed"]:::warn
-  n0 -->|"1. no shared table to join"| n1
-  n1 -->|"2. replay the event log"| n2
-  n2 -->|"3. next event"| n3
-  n3 -->|"4. reduce to one value"| n4
-  n4 -->|"5. expensive read"| n5
-  n1 -->|"6. alt - table exists"| n6
-```
-
 1. **Data is split or event-only** — Database per Service scatters the rows; Event sourcing leaves only appended events, not a current-state table.
 
 2. **A simple read now needs work** — Answering one value can require joining services or replaying the event log.
@@ -60,26 +38,6 @@ flowchart TD
 
 > **Why this matters:** A view database is a read-only replica designed specifically to support one query or a group of related queries, with a schema and database type optimized for that query.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Query shapes the read side</b><br/>the query is order history for one customer"]:::start
-  n1["<b>2. Choose a store that fits</b><br/>store type relational becomes document, a NoSQL document or key-value store"]:::step
-  n2["<b>3. Denormalize the schema</b><br/>doc becomes customer C-77 with orders O-101 total 120.00 and O-102 total 80.00"]:::core
-  n3["<b>4. Insert the read-only view</b><br/>view_db becomes order_history for customer C-77"]:::core
-  n4["<b>5. One document answers the query</b><br/>a single read returns the whole order history"]:::stop
-  n5["<b>Alt - reuse a relational schema</b><br/>the same query needs a multi-table JOIN across service-owned tables"]:::warn
-  n0 -->|"1. pick for the query"| n1
-  n1 -->|"2. shape for the query"| n2
-  n2 -->|"3. store it read-only"| n3
-  n3 -->|"4. one read, one answer"| n4
-  n1 -->|"5. alt - relational"| n5
-```
-
 1. **Choose a store that fits the query** — The view is often a NoSQL database, such as a document database or a key-value store.
 
 2. **Denormalize the schema** — The shape is optimized for the query or queries the view must answer.
@@ -106,28 +64,6 @@ flowchart TD
 ### Keep the view up to date via domain events
 
 > **Why this matters:** The application keeps the view database up to date by subscribing to domain events published by the services that own the data — a command updates the write side, and an event updates the read side.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. A command updates the write side</b><br/>command order_id O-101 total 95.00 hits Order Service"]:::start
-  n1["<b>2. Write side applies the command</b><br/>write_db O-101 total 120.00 becomes 95.00"]:::step
-  n2["<b>3. The service publishes a domain event</b><br/>outbox gains order_updated O-101 total 95.00"]:::step
-  n3["<b>4. Broker carries the event</b><br/>the message broker routes order_updated to subscribers"]:::step
-  n4["<b>5. Read side subscribes and updates</b><br/>view_db O-101 total 120.00 becomes 95.00"]:::core
-  n5["<b>6. Replica caught up</b><br/>view matches write side, both hold 95.00"]:::stop
-  n6["<b>Event delayed</b><br/>view_db stays at 120.00 until the event is consumed, eventually consistent"]:::warn
-  n0 -->|"1. write then publish"| n1
-  n1 -->|"2. change published"| n2
-  n2 -->|"3. delivered to readers"| n3
-  n3 -->|"4. apply to the view"| n4
-  n4 -->|"5. consistent again"| n5
-  n3 -->|"6. delay - view stale"| n6
-```
 
 1. **A command updates the write side** — The owning service applies the command to its own source-of-truth database.
 
@@ -157,30 +93,6 @@ flowchart TD
 ### The tradeoffs
 
 > **Why this matters:** CQRS buys fast, denormalized, scalable views, but at the cost of complexity, potential code duplication, and replication lag that leaves views eventually consistent.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. CQRS trades speed for complexity</b><br/>fast denormalized views at a cost"]:::start
-  n1["<b>2. More moving parts</b><br/>the view database is extra infrastructure to build, deploy, and run"]:::warn
-  n2["<b>3. Code may be duplicated</b><br/>query logic can be repeated across write and read sides"]:::warn
-  n3["<b>4. The view lags the write side</b><br/>write_db O-101 holds 95.00 while view_db still shows 120.00"]:::warn
-  n4["<b>5. Measure the lag</b><br/>the event waits in the broker queue, lag 0 becomes 2 seconds"]:::core
-  n5["<b>6. View catches up</b><br/>RD processes the event, view_db 120.00 becomes 95.00, lag 2 becomes 0"]:::step
-  n6["<b>7. Eventually consistent</b><br/>the replica matches the write side after a 2-second lag"]:::stop
-  n7["<b>Reader during the lag</b><br/>reads 120.00 from view_db, older than the write side 95.00"]:::warn
-  n0 -->|"1. three costs"| n1
-  n0 -->|"2. three costs"| n2
-  n0 -->|"3. three costs"| n3
-  n3 -->|"4. staleness shown"| n4
-  n4 -->|"5. event processed"| n5
-  n5 -->|"6. caught up"| n6
-  n5 -->|"7. stale read"| n7
-```
 
 1. **More moving parts** — The view database is additional infrastructure to develop, deploy, and run.
 
@@ -247,15 +159,6 @@ flowchart TD
   R -->|"comprises"| P1["MongoDB 7 @ orders-view-1 — serves the history queries"]
 ```
 
-```mermaid
-flowchart LR
-  SVC["Order Service (command side)"] -->|"append order_updated"| ES["EventStoreDB 24 @ orders-events-1"]
-  ES -->|"publishes"| BRK["Broker"]
-  BRK -->|"events"| OH["Order History Service (query side)"]
-  OH -->|"folds into"| VDB["MongoDB 7 @ orders-view-1"]
-  VDB -->|"serves"| Q["history queries"]
-```
-
 ```java
 // SYSTEM DESIGN — CQRS: command side -> event store -> projections -> query side, one order updated end to end
 // PARTIES: SVC = Order Service (command side) · ES = EventStoreDB 24 @ orders-events-1 · OH = Order History Service (query side) · VDB = MongoDB 7 @ orders-view-1
@@ -287,14 +190,6 @@ Your order service writes to a normalized Order table, but queries must compute 
 - Read model — for queries
 - Replay — what reads must avoid
 - CQRS — separates the two models
-
-```mermaid
-flowchart LR
-  CMD["Command"] -->|writes| WM["Write model (normalized)"]
-  QRY["Query"] -->|reads| RM["Read model (denormalized)"]
-  WM -.->|replay + join| SLOW["slow reads"]
-  RM -->|precomputed| FAST["fast reads"]
-```
 
 ```java
 // ORDER SERVICE SIDE — the problem CQRS fixes: reading the current state from a normalized write model means replaying and joining
@@ -330,12 +225,6 @@ You want a query that returns an order with its customer name and line totals in
 - Document store — the storage engine
 - Single lookup — how the read is served
 
-```mermaid
-flowchart LR
-  QRY["Query"] -->|single lookup| VDB[("View DB (document)")]
-  VDB -->|returns| DOC["Doc C-42: order + customer + lines"]
-```
-
 ```java
 // ORDER SERVICE SIDE — the view database serves queries from a denormalized document, one lookup per read
 // PARTIES: QRY = the query · VDB = MongoDB 7 @ orders-view-1 (document store)
@@ -368,13 +257,6 @@ The write model updated an order's total, and the view database still shows the 
 - OrderUpdated event — carries the change
 - View database — stores the document
 - Event handler — applies the update
-
-```mermaid
-flowchart LR
-  WM["Write model"] -->|total 120.00 to 95.00| EVT["OrderUpdated"]
-  EVT -->|handler updates doc| VDB[("View DB")]
-  VDB -->|doc total 95.00| DOC["Doc C-42"]
-```
 
 ```java
 // ORDER SERVICE SIDE — the view stays up to date by consuming the write model's domain events
@@ -409,13 +291,6 @@ Immediately after an order total changed, a reader queries the view and still se
 - Event delivery — asynchronous
 - View handler — applies the event later
 - Reader — observes the lag
-
-```mermaid
-flowchart LR
-  WM["Write model total 95.00"] -->|OrderUpdated| EVT["event"]
-  EVT -->|delayed| VDB[("View DB still 120.00")]
-  VDB -->|reader| READER["sees 120.00 until caught up"]
-```
 
 ```java
 // ORDER SERVICE SIDE — the view is eventually consistent, so a reader can see the old total during the lag window
@@ -453,12 +328,18 @@ _From the 28 problems:_ 21-ad-click-aggregation · 13-search-autocomplete
 
 Define a read-only view database designed for a query, kept up to date by subscribing to domain events published by the services that own the data.
 
-```mermaid
-flowchart LR
-  CMD["Command"] -->|writes| WM["Write model (normalized)"]
-  QRY["Query"] -->|reads| RM["Read model (denormalized)"]
-  WM -.->|replay + join| SLOW["slow reads"]
-  RM -->|precomputed| FAST["fast reads"]
+```java
+// ORDER SERVICE SIDE — the problem CQRS fixes: reading the current state from a normalized write model means replaying and joining
+// PARTIES: SVC = Order Service · WM = the normalized write model
+// STATE (before):
+//    events : [{ type:"order_created", total:120.00 }, { type:"order_updated", total:95.00 }]
+//    computed : { total:"none" }
+// DEF: read_order_total · CALLED BY: a query on the normalized write model
+// -> order_id : "PO-77"
+//    step 1 · replay event 1 : computed.total : "none" -> 120.00
+//    step 2 · replay event 2 : computed.total : 120.00 -> 95.00   BECAUSE order_updated changed the total
+//    step 3 · join with other tables to finish the read : computed.total : 95.00 -> 95.00 (plus joins)
+// <- outcome : computed.total : 95.00 · every read replays events and joins, so a dedicated read model would be faster
 ```
 
 

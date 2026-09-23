@@ -10,24 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns p.380 · microservices
 
 > **Why this matters:** Every service has cross-cutting concerns to implement, and repeating them in each service is error-prone. A mesh that mediates all communication in and out moves those concerns out of the service code.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Sit between the service and the network</b><br/>the mesh mediates every call in and out"]:::start
-  n1["<b>2. Intercept the outbound call</b><br/>request : empty becomes call SELECT * FROM orders, to db:5432"]:::step
-  n2["<b>3. Apply the concern at the proxy</b><br/>trace_id : null becomes trc-9f2a, stamped before the call leaves"]:::core
-  n3["<b>4. Forward the traced call</b><br/>sent : 0 becomes 1, delivered to db:5432"]:::stop
-  n4["<b>Inbound reply also mediated</b><br/>reply : 0 becomes 1, the same proxy mediates the response"]:::warn
-  n0 -->|"1. all traffic flows through"| n1
-  n1 -->|"2. see the call before it leaves"| n2
-  n2 -->|"3. stamp then forward"| n3
-  n2 -->|"4. the return path too"| n4
-```
-
 1. **Sit between the service and the network** — The mesh mediates every call in and out of each service.
 
 2. **Intercept the outbound call** — A proxy attached to the service sees each request before it leaves.
@@ -52,24 +34,6 @@ flowchart TD
 ### Distributed tracing across services
 
 > **Why this matters:** When one external request fans out across services, you need to reconstruct the whole chain. The mesh instruments services with a unique identifier that is passed between them.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Assign a unique id</b><br/>trace_id : trc-9f2a at the first proxy"]:::start
-  n1["<b>2. Pass the id between services</b><br/>hops : empty becomes order-service, then customer-service"]:::step
-  n2["<b>3. Record a span per hop</b><br/>spans : 0 becomes 1, each hop records against the shared id"]:::core
-  n3["<b>4. Chain reconstructable</b><br/>one id rebuilds the whole call chain"]:::stop
-  n4["<b>Call bypasses the mesh</b><br/>trace_id : trc-9f2a becomes null, the call carries no id"]:::warn
-  n0 -->|"1. id assigned once"| n1
-  n1 -->|"2. the same id rides along"| n2
-  n2 -->|"3. a span per hop"| n3
-  n1 -->|"4. no mesh, no id"| n4
-```
 
 1. **Assign a unique id** — The proxy gives each external request a unique identifier.
 
@@ -97,24 +61,6 @@ flowchart TD
 
 > **Why this matters:** Operators need to know whether a service is up and how it is performing. The mesh exposes a health URL and records metrics without changing the service.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Expose a health URL</b><br/>the proxy answers /health for the monitor"]:::start
-  n1["<b>2. Record metrics</b><br/>health : empty becomes status UP, metric : 0 becomes 1"]:::step
-  n2["<b>3. Report the measurements</b><br/>samples : 0 becomes 1, emitted to the monitor"]:::core
-  n3["<b>4. Observability without a code change</b><br/>operators see what the service is doing"]:::stop
-  n4["<b>Service process failed</b><br/>health : status UP becomes status DOWN, the ping reports DOWN"]:::warn
-  n0 -->|"1. ping the health URL"| n1
-  n1 -->|"2. count the request"| n2
-  n2 -->|"3. emit to the monitor"| n3
-  n1 -->|"4. the process died"| n4
-```
-
 1. **Expose a health URL** — The proxy provides a URL a monitoring service can ping to determine the health of the application.
 
 2. **Record metrics** — The proxy measures what the application is doing and how it is performing.
@@ -139,24 +85,6 @@ flowchart TD
 ### Configuration and logging, plus the chassis link
 
 > **Why this matters:** Credentials, network locations, and logging configuration are cross-cutting too. The mesh externalizes configuration and configures logging once, and it overlaps with two related patterns.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Externalize configuration</b><br/>config : empty becomes db db:5432, broker brk:9092, secret s3cr3t"]:::start
-  n1["<b>2. Configure logging</b><br/>logger : null becomes logback, configured once"]:::step
-  n2["<b>3. Relate to chassis and sidecar</b><br/>injected : 0 becomes 1, the service reads config from the proxy"]:::core
-  n3["<b>4. Concerns live outside the service</b><br/>the chassis is another way, a mesh is often a sidecar"]:::stop
-  n4["<b>No mesh at all</b><br/>injected : 1 becomes 0, each service implements these itself"]:::warn
-  n0 -->|"1. pull credentials out"| n1
-  n1 -->|"2. one logging setup"| n2
-  n2 -->|"3. hand to the service"| n3
-  n2 -->|"4. without a mesh"| n4
-```
 
 1. **Externalize configuration** — Credentials and network locations of external services such as databases and message brokers are supplied outside the service.
 
@@ -221,15 +149,6 @@ flowchart TD
   R -->|"comprises"| P1["Cert distribution — hands each proxy its mTLS identity"]
 ```
 
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|"SELECT * FROM orders"| PX["sidecar proxy (data plane)"]
-  PX -->|"mTLS + route lookup"| DB[("PostgreSQL 16 @ orders-db-1")]
-  CP["control plane"] -->|"pushes route config"| PX
-  CP -->|"distributes cert cert-7f21"| PX
-  PX -->|"reports metrics"| MON["monitoring service"]
-```
-
 ```java
 // SYSTEM DESIGN — service mesh: service -> sidecar proxy (data plane) -> control plane
 // PARTIES: SVC = Order Service (business service) · PROXY = sidecar proxy (data plane: intercepts traffic, mTLS, retries/circuit-break, metrics) · CP = control plane (route-config distributor + certificate authority) · DB = PostgreSQL 16 @ orders-db-1 (the proxied backend)
@@ -265,13 +184,6 @@ Every service in your fleet duplicates the same cross-cutting behavior — loggi
 - Outbound interception — sees each call
 - Concern applied on traffic — not in code
 
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|"SELECT * FROM orders"| PROXY["Sidecar proxy"]
-  PROXY -->|"traced call"| DB["db:5432"]
-  PROXY -->|"attaches"| ID["trace id"]
-```
-
 ```java
 // MESH SIDE — a proxy intercepts every call out of a service, mediating all communication
 // PARTIES: SVC = Order Service · PROXY = its sidecar proxy · DB = PostgreSQL 16 @ orders-db-1
@@ -306,13 +218,6 @@ A single external request fans out across four services and you need to reconstr
 - Shared id — passed between services
 - Span per hop — recorded against the id
 - Reconstructable chain — the goal
-
-```mermaid
-flowchart LR
-  P1["Proxy A"] -->|"id trc-9f2a"| SVCB["Customer Service"]
-  SVCB -->|"same id"| P2["Proxy B"]
-  P2 -->|"records span"| CHAIN["chain: order -> customer"]
-```
 
 ```java
 // MESH SIDE — one unique id travels with the request across services so a call chain can be traced
@@ -350,14 +255,6 @@ Your operators need to know whether the order service is up and how it is perfor
 - Metrics — recorded by the proxy
 - Report — emitted to the monitor
 
-```mermaid
-flowchart LR
-  MON["Monitoring service"] -->|"GET /health every 10 s"| PROXY["Sidecar proxy"]
-  PROXY -->|"status UP"| MON
-  PROXY -->|"metric 1"| MON
-  SVC["Order Service"] ---|"proxied by"| PROXY
-```
-
 ```java
 // MESH SIDE — a health URL and per-request metrics, both handled at the proxy without touching service code
 // PARTIES: MON = monitoring service · PROXY = the sidecar proxy · SVC = Order Service
@@ -393,14 +290,6 @@ Credentials, database locations, and logging setup are cross-cutting too, and to
 - Microservice chassis — an alternative
 - Sidecar — the usual implementation
 
-```mermaid
-flowchart LR
-  PROXY["Sidecar proxy"] -->|"injects"| CFG["db:5432, brk:9092, secret"]
-  PROXY -->|"configures once"| LOG["logback"]
-  CFG -->|"supplied"| SVC["Order Service"]
-  LOG -->|"overlaps"| CH["Chassis + Sidecar"]
-```
-
 ```java
 // MESH SIDE — credentials and network locations are injected by the mesh, and logging is configured once
 // PARTIES: PROXY = sidecar proxy · SVC = Order Service · BRK = message broker
@@ -433,11 +322,19 @@ _From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-syste
 
 Use a service mesh that mediates all communication in and out of each service.
 
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|"SELECT * FROM orders"| PROXY["Sidecar proxy"]
-  PROXY -->|"traced call"| DB["db:5432"]
-  PROXY -->|"attaches"| ID["trace id"]
+```java
+// MESH SIDE — a proxy intercepts every call out of a service, mediating all communication
+// PARTIES: SVC = Order Service · PROXY = its sidecar proxy · DB = PostgreSQL 16 @ orders-db-1
+// STATE (before):
+//    request : {}                       // the outbound call, not yet intercepted
+//    trace_id : null                    // no distributed-tracing id yet
+// DEF: intercept outbound call 1 to DB · CALLED BY: SVC sending a query
+// -> call : "SELECT * FROM orders" · -> target : "db:5432"
+//    step 1 · intercept   // request : {} -> {"call":"SELECT * FROM orders","to":"db:5432"}   BECAUSE the mesh mediates ALL traffic in and out
+//    step 2 · trace   // trace_id : null -> "trc-9f2a"   // the proxy assigns a unique id to the request
+//    step 3 · forward   // sent : 0 -> 1   // the proxy forwards the traced call to the DB
+// <- call : "SELECT * FROM orders" delivered to db:5432 · trace_id "trc-9f2a" attached
+//    alt inbound reply : reply : 0 -> 1   BECAUSE the same proxy also mediates the response back into SVC
 ```
 
 

@@ -10,31 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 5 · microservices
 
 > **Why this matters:** Synchronous calls tie the caller to the callee; sending an event over a channel decouples the two so the sender never waits.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Exchange messages over channels</b><br/>sender writes, consumer reads later"]:::start
-  n1["<b>2. OrderService writes the order locally</b><br/>orders empty becomes PO-2001 status CREATED"]:::step
-  n2["<b>3. Publish the domain event</b><br/>channel empty becomes Order Created PO-2001"]:::core
-  n3["<b>4a. Publisher side - send and forget</b><br/>reply NONE, the sender returns immediately"]:::step
-  n4["<b>4b. Consumer side - polls when ready</b><br/>channel drains, the message is received"]:::step
-  n5["<b>5. Kitchen starts cooking</b><br/>kitchen empty becomes PO-2001 COOKING"]:::step
-  n6["<b>6. Message consumed</b><br/>sender and consumer never run at the same instant"]:::stop
-  n7["<b>Notification expects no reply</b><br/>none is ever sent back to the sender"]:::warn
-  n0 -->|"1. local write"| n1
-  n1 -->|"2. publish event"| n2
-  n2 -->|"3a. publisher returns"| n3
-  n2 -->|"3b. consumer reads later"| n4
-  n3 -->|"4. work waits in channel"| n6
-  n4 -->|"5. start cooking"| n5
-  n5 -->|"6. done"| n6
-  n2 -->|"7. no reply expected"| n7
-```
-
 1. **Exchange messages over channels** — A sender writes a message to a channel and a consumer reads it later; the two never run at the same instant.
 
 2. **Publish the domain event** — OrderService publishes an **Order Created** event when it creates an Order, as in the FTGO example.
@@ -66,28 +41,6 @@ flowchart TD
 
 > **Why this matters:** Sometimes a caller needs an answer now; the request/response style sends a request and expects a prompt reply.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Send a request and wait for a reply</b><br/>the caller needs an answer now"]:::start
-  n1["<b>2. CLIENT sends the request</b><br/>id REQ-77, reply-to reply_channel, get price"]:::step
-  n2["<b>3. SVC receives and processes it</b><br/>request_channel drains"]:::step
-  n3["<b>4. SVC replies on the reply channel</b><br/>REQ-77 becomes 42.50"]:::core
-  n4["<b>5. CLIENT reads its reply</b><br/>id REQ-77 matches the request"]:::step
-  n5["<b>6. Reply delivered promptly</b><br/>42.50 back to the caller"]:::stop
-  n6["<b>No reply arrives</b><br/>CLIENT keeps waiting, both sides must be up"]:::warn
-  n0 -->|"1. request out"| n1
-  n1 -->|"2. process"| n2
-  n2 -->|"3. answer"| n3
-  n3 -->|"4. correlate by id"| n4
-  n4 -->|"5. prompt reply"| n5
-  n2 -->|"6. if it never answers"| n6
-```
-
 1. **Send a request message** — A service sends a request to a recipient and waits for a reply.
 
 2. **Correlate the reply** — A **reply-to** channel and a correlation id tie the reply back to its request.
@@ -116,29 +69,6 @@ flowchart TD
 
 > **Why this matters:** One event often matters to several services; publish/subscribe fans a message out to zero or more recipients.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Publish to a topic</b><br/>the publisher knows nothing of its recipients"]:::start
-  n1["<b>2. Publish once to the topic</b><br/>topic orders empty becomes Order Created PO-2001"]:::core
-  n2["<b>3a. Broker fans out to Billing</b><br/>inbox_billing receives a copy"]:::step
-  n3["<b>3b. Broker copies to Kitchen</b><br/>inbox_kitchen receives a copy"]:::step
-  n4["<b>4. The topic drains after fan-out</b><br/>topic orders becomes empty"]:::step
-  n5["<b>5. Two copies delivered</b><br/>zero subscribers would mean zero copies"]:::stop
-  n6["<b>Reader is down</b><br/>the broker holds its copy, buffering per subscriber"]:::warn
-  n0 -->|"1. publish"| n1
-  n1 -->|"2a. first subscriber"| n2
-  n1 -->|"2b. second subscriber"| n3
-  n2 -->|"3. both fanned"| n4
-  n3 -->|"3. both fanned"| n4
-  n4 -->|"4. delivery count"| n5
-  n2 -->|"5. if a reader is down"| n6
-```
-
 1. **Publish to a topic** — A publisher writes a message to a topic and knows nothing of its recipients.
 
 2. **Broker fans out** — The broker delivers a copy to each subscriber.
@@ -166,30 +96,6 @@ flowchart TD
 ### Availability through buffering
 
 > **Why this matters:** The broker holds messages until a consumer can process them, buying availability at the cost of running a broker.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Buffer while the consumer is down</b><br/>the broker queues until it can process"]:::start
-  n1["<b>2. CON goes down</b><br/>con_status UP becomes DOWN"]:::step
-  n2["<b>3. SVC publishes 5 orders</b><br/>queue empty becomes 1, 2, 3, 4, 5"]:::core
-  n3["<b>4. SVC is not blocked</b><br/>loose runtime coupling, neither blocks the other"]:::step
-  n4["<b>5. CON reconnects</b><br/>con_status DOWN becomes UP"]:::step
-  n5["<b>6. CON drains the queue</b><br/>queue becomes empty again"]:::step
-  n6["<b>7. Five messages delivered after reconnect</b><br/>availability bought with a broker"]:::stop
-  n7["<b>Pay the broker tax</b><br/>adds complexity, must itself be highly available"]:::warn
-  n0 -->|"1. consumer down"| n1
-  n1 -->|"2. publish anyway"| n2
-  n2 -->|"3. decoupled"| n3
-  n3 -->|"4. consumer returns"| n4
-  n4 -->|"5. drain"| n5
-  n5 -->|"6. delivered"| n6
-  n2 -->|"7. cost of the broker"| n7
-```
 
 1. **Buffer while the consumer is down** — The broker keeps messages queued until the consumer is able to process them.
 
@@ -260,12 +166,6 @@ flowchart TD
   R -->|"comprises"| P1["handles each message — starts cooking"]
 ```
 
-```mermaid
-flowchart LR
-  PUB["sender: Order Service"] -->|"publish message"| BRK["transport: RabbitMQ queue orders"]
-  BRK -->|"deliver copy"| CON["receiver: Kitchen consumer"]
-```
-
 ```java
 // SYSTEM DESIGN — messaging as a pipeline: sender/producer (builds the message, sends it) -> transport (RabbitMQ channel) -> receiver/consumer (subscribes, handles the message)
 // PARTIES: PUB = Order Service (producer/writer: builds the message and publishes it) · BRK = RabbitMQ broker (transport: the message channel) · CON = Kitchen consumer (reader: subscribes and handles messages)
@@ -299,13 +199,6 @@ A customer cancels an order. The Order Service must tell downstream services wit
 - Message channel
 - Consumer (reads later)
 - No reply expected
-
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|"publishes to"| BRK["channel"]
-  BRK -->|"delivers to"| CON["Refund consumer"]
-  SVC -. "returns immediately" .-> SVC
-```
 
 ```java
 // ORDER SERVICE SIDE — publish an OrderCancelled event to a channel; the consumer reads it later
@@ -348,14 +241,6 @@ A checkout flow needs the current item availability before it quotes a price, so
 - Correlation id
 - Prompt reply
 
-```mermaid
-flowchart LR
-  C["Checkout"] -->|"requests via"| RQ["request channel"]
-  RQ -->|"routes to"| P["Inventory service"]
-  P -->|"replies via"| RP["reply-to channel"]
-  RP -->|"returns to"| C
-```
-
 ```java
 // CONSUMER SERVICE SIDE — request/response: send a request, expect a prompt reply over a channel
 // PARTIES: CLIENT = Checkout · BRK = message broker · SVC = Inventory service
@@ -393,14 +278,6 @@ A payment succeeds, and three services — billing, shipping, and loyalty — al
 - Topic
 - Broker fan-out
 - Multiple subscribers
-
-```mermaid
-flowchart LR
-  PUB["Payment service"] -->|"publishes to"| TOP["topic: payments"]
-  TOP -->|"delivers to"| B["Billing"]
-  TOP -->|"delivers to"| S["Shipping"]
-  TOP -->|"delivers to"| L["Loyalty"]
-```
 
 ```java
 // BROKER SIDE — publish/subscribe: one publisher, three subscribers (zero or more recipients)
@@ -442,13 +319,6 @@ The notification consumer is down for maintenance, but orders keep arriving. The
 - Loose runtime coupling
 - Broker complexity
 
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|"publishes to"| Q["broker queue"]
-  Q -. "held while down" .-> CON["Consumer (DOWN)"]
-  Q -->|"replays to"| R["replays on reconnect"]
-```
-
 ```java
 // BROKER SIDE — buffering buys availability: consumer down, broker holds the queue until it returns
 // PARTIES: BRK = message broker · SVC = Order Service (publisher) · CON = Consumer
@@ -487,11 +357,25 @@ _From the 28 problems:_ 19-distributed-message-queue · 10-notification-system
 
 Services communicate by exchanging messages over messaging channels, asynchronously.
 
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|"publishes to"| BRK["channel"]
-  BRK -->|"delivers to"| CON["Refund consumer"]
-  SVC -. "returns immediately" .-> SVC
+```java
+// ORDER SERVICE SIDE — publish an OrderCancelled event to a channel; the consumer reads it later
+// PARTIES: SVC = Order Service · BRK = message broker · CON = Refund consumer
+// STATE (before):
+//    orders : {}
+//    channel : []
+//    refunds : {}
+// DEF: cancel_order · CALLED BY: U1 cancelling an order (a notification expects no reply)
+// -> order_id : "PO-7703" · -> event : "OrderCancelled"
+//    step 1 · SVC marks the order cancelled locally : orders : {} -> { "PO-7703": { status: "CANCELLED" } }
+//    step 2 · SVC publishes the event to BRK : channel : [] -> [ "OrderCancelled(PO-7703)" ]
+//    step 3 · SVC returns immediately : reply : "NONE"   BECAUSE a notification sends no reply
+// <- event : "OrderCancelled(PO-7703)" sits in the channel, waiting for CON
+//
+// DEF: consume · CALLED BY: CON polling BRK whenever it is ready
+// -> poll : channel = [ "OrderCancelled(PO-7703)" ]
+//    step 1 · CON receives the message : channel : [ "OrderCancelled(PO-7703)" ] -> []
+//    step 2 · CON starts the refund : refunds : {} -> { "PO-7703": "REFUNDING" }
+// <- message : "OrderCancelled(PO-7703)" consumed · SVC and CON never run at the same instant
 ```
 
 

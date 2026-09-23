@@ -10,28 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 34 · microservice
 
 > **Why this matters:** A service throws an exception the moment a request fails; unless something captures the error message and the stack trace right there, the failure is invisible across a fleet of machines. Capturing at the source is what makes every later step possible.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-n0["<b>1. Request fails</b><br/>GET /orders for REQ-2001"]:::start
-  n1["<b>2. Look up the customer</b><br/>returns null, req status OPEN becomes FAILED"]:::step
-  n2["<b>3. Throw</b><br/>NullPointerException, customer is null"]:::warn
-  n3["<b>4. Catch in the handler</b><br/>package message plus stack trace"]:::step
-  n4["<b>5. Report record formed</b><br/>msg customer is null, stack SVC.doGet line 42, ts 19"]:::core
-  n5["<b>6. Exception in hand</b><br/>1 captured exception"]:::stop
-  n6["<b>No catch in place</b><br/>the thread dies with no record, the error is invisible"]:::warn
-  n0 -->|"1. request fails"| n1
-  n1 -->|"2. error thrown"| n2
-  n2 -->|"3. handler catches"| n3
-  n3 -->|"4. package the record"| n4
-  n4 -->|"5. captured"| n5
-  n2 -->|"6. no catch - invisible"| n6
-```
-
 1. **Throw on failure** — A service instance handling a request throws an exception when an error occurs.
 
 2. **Carry message and stack trace** — The exception object holds an error message and a stack trace; both are the raw material for debugging.
@@ -56,28 +34,6 @@ n0["<b>1. Request fails</b><br/>GET /orders for REQ-2001"]:::start
 ### Report to a centralized tracker
 
 > **Why this matters:** One instance's log is not a place developers watch; a centralized exception tracking service is. Reporting every exception to that service is the whole point of the pattern.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-n0["<b>1. Exception caught</b><br/>report EX-1001 ready"]:::start
-  n1["<b>2. Serialize the report</b><br/>into the request body"]:::step
-  n2["<b>3. POST to the tracker</b><br/>POST /exceptions over HTTP"]:::step
-  n3["<b>4. Tracker stores it</b><br/>tracker holds EX-1001"]:::core
-  n4["<b>5. Ack returned</b><br/>tracker returns 200, SVC marks it sent"]:::step
-  n5["<b>6. Reported centrally</b><br/>the exception lives in the central tracker, not just the local service"]:::stop
-  n6["<b>Tracker unreachable</b><br/>SVC writes the same line to its local log file"]:::warn
-  n0 -->|"1. transmit the report"| n1
-  n1 -->|"2. send over HTTP"| n2
-  n2 -->|"3. stored"| n3
-  n3 -->|"4. ack returned"| n4
-  n4 -->|"5. reported"| n5
-  n2 -->|"6. unreachable - log locally"| n6
-```
 
 1. **Point at the tracking service** — The service sends each caught exception to the centralized exception tracking service.
 
@@ -106,32 +62,6 @@ n0["<b>1. Exception caught</b><br/>report EX-1001 ready"]:::start
 
 > **Why this matters:** The same bug can throw thousands of times across many instances. If each throw becomes a separate row, the noise buries the signal; de-duplication collapses repeats into one tracked issue.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-n0["<b>1. Report arrives</b><br/>EX-1001, msg customer is null"]:::start
-  n1["<b>2. Fingerprint the stack</b><br/>hash the stack trace becomes FP-77A3"]:::step
-  n2["<b>3. Look up the fingerprint</b><br/>is the FP-77A3 issue already present?"]:::core
-  n3["<b>4. First sighting</b><br/>not found, create the issue, count 1"]:::step
-  n4["<b>5. Repeat report</b><br/>SVC2 same bug, found, count 1 becomes 2"]:::step
-  n5["<b>6. One issue per bug</b><br/>issues holds FP-77A3 with count 2"]:::core
-  n6["<b>7. Noise collapses</b><br/>2 exceptions deduplicated into 1 issue"]:::stop
-  n7["<b>New fingerprint</b><br/>FP-1B20 not seen, a 2nd distinct issue"]:::warn
-  n0 -->|"1. hash the stack"| n1
-  n1 -->|"2. key on the fingerprint"| n2
-  n2 -->|"3. not found"| n3
-  n2 -->|"4. found"| n4
-  n3 -->|"5. new issue"| n5
-  n4 -->|"6. increment"| n5
-  n5 -->|"7. deduplicated"| n6
-  n2 -->|"8. unrelated bug"| n7
-  n7 -->|"9. separate issue"| n5
-```
-
 1. **Fingerprint by stack trace** — The tracker keys each exception on a fingerprint of its stack trace.
 
 2. **Create the issue on first sight** — The first report with a new fingerprint creates a new tracked issue.
@@ -157,29 +87,6 @@ n0["<b>1. Report arrives</b><br/>EX-1001, msg customer is null"]:::start
 ### Notify developers and resolve
 
 > **Why this matters:** Aggregation alone does not fix anything; a human has to investigate and close the issue. Notifying developers and recording resolution turns a pile of exceptions into a fixed product.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-n0["<b>1. Issue crosses threshold</b><br/>FP-77A3 count 2, state OPEN, threshold 1"]:::start
-  n1["<b>2. Notify the developer</b><br/>alert FP-77A3 goes to DEV"]:::step
-  n2["<b>3. Investigate</b><br/>DEV finds the null-customer path"]:::step
-  n3["<b>4. Fix the cause</b><br/>commit 9f2c lands"]:::step
-  n4["<b>5. Mark resolved</b><br/>state OPEN becomes RESOLVED"]:::core
-  n5["<b>6. Issue closed</b><br/>the cause is fixed, not just the symptom"]:::stop
-  n6["<b>Bug reappears</b><br/>new report, count 2 becomes 3, state RESOLVED becomes OPEN"]:::warn
-  n0 -->|"1. threshold crossed"| n1
-  n1 -->|"2. developer reads the trace"| n2
-  n2 -->|"3. root cause found"| n3
-  n3 -->|"4. fix committed"| n4
-  n4 -->|"5. closed"| n5
-  n5 -->|"6. later report"| n6
-  n6 -->|"7. reopens and re-notifies"| n1
-```
 
 1. **Notify on the issue** — The tracking service notifies developers when an issue needs attention.
 
@@ -242,13 +149,6 @@ flowchart TD
   R -->|"comprises"| P1["triages the issue FP-77A3 against a threshold of 1"]
 ```
 
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|"throw EX-1001"| TRK["Exception tracking service"]
-  TRK -->|"fold into fingerprint FP-77A3"| DB["PostgreSQL 16 @ exc-db-1"]
-  DB -->|"issue count 2"| DEV["Developer reader"]
-```
-
 ```java
 // SYSTEM DESIGN — exception tracking: service -> exception tracker (collect/dedup/aggregate) -> developer reader
 // PARTIES: SVC = Order Service (source service) · TRK = exception tracking service (collector + dedup aggregator) · DB = PostgreSQL 16 @ exc-db-1 (the exception store) · DEV = developer (reader)
@@ -281,13 +181,6 @@ Your order service runs as many instances across many machines, and one instance
 - Exception object — error message + stack trace
 - Handler catch block — packages the record
 - Report record — msg + stack + timestamp
-
-```mermaid
-flowchart LR
-  U1["User calls GET /orders REQ-7001"] -->|"throws"| E["Exception: customer is null"]
-  E -->|"caught"| H["Handler catch block"]
-  H -->|"packages"| R["Report msg + stack + ts"]
-```
 
 ```java
 // ORDER SERVICE SIDE — one request throws, and the handler captures the message plus stack trace before the thread dies
@@ -323,13 +216,6 @@ A single instance's log file is not where your developers look, so you stand up 
 - Exception tracking service — the receiver
 - HTTP POST /exceptions — the transport
 - Local log file — the secondary copy
-
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|"POST /exceptions"| TRK["Exception tracking service"]
-  TRK -->|"200 stored"| SVC
-  SVC -->|"also writes"| LOG["Local log file"]
-```
 
 ```java
 // ORDER SERVICE SIDE — the captured exception is POSTed to the centralized tracker and also written to the local log
@@ -368,13 +254,6 @@ The same null-customer bug is firing across hundreds of instances, and if every 
 - First sighting — creates the issue
 - Repeat — increments the count
 
-```mermaid
-flowchart LR
-  SVC1["Instance 1 report"] -->|"fp FP-77A3"| TRK["Tracker issues map"]
-  SVC2["Instance 2 report"] -->|"fp FP-77A3"| TRK
-  TRK -->|"create then increment"| I["Issue FP-77A3 count 2"]
-```
-
 ```java
 // TRACKER SIDE — two instances of the same bug collapse into one tracked issue keyed on the stack-trace fingerprint
 // PARTIES: SVC1 = Order Service instance 1 · SVC2 = Order Service instance 2 · TRK = exception tracking service
@@ -409,13 +288,6 @@ An aggregated issue is still not fixed until a human sees it. Your tracker shoul
 - Investigation — reads msg + stack trace
 - Resolution state — OPEN to RESOLVED
 
-```mermaid
-flowchart LR
-  TRK["Tracker issue count 2"] -->|"crosses threshold 1"| DEV["On-call developer"]
-  DEV -->|"commits fix"| FIX["commit-9f2c"]
-  FIX -->|"marks"| RES["state RESOLVED"]
-```
-
 ```java
 // TRACKER SIDE — an issue whose count crosses the threshold notifies the developer, who fixes and resolves it
 // PARTIES: TRK = exception tracking service · DEV = the on-call developer
@@ -448,11 +320,19 @@ _From the 28 problems:_ 20-metrics-monitoring
 
 Report all exceptions to a centralized exception tracking service that aggregates and tracks them and notifies developers.
 
-```mermaid
-flowchart LR
-  U1["User calls GET /orders REQ-7001"] -->|"throws"| E["Exception: customer is null"]
-  E -->|"caught"| H["Handler catch block"]
-  H -->|"packages"| R["Report msg + stack + ts"]
+```java
+// ORDER SERVICE SIDE — one request throws, and the handler captures the message plus stack trace before the thread dies
+// PARTIES: SVC = Order Service instance · U1 = the user calling the service · DB = PostgreSQL 16 @ orders-db-1 (the table returns no row)
+// STATE (before):
+//    req : { id:"REQ-7001", path:"/orders", status:"OPEN" }
+//    report : {}
+// DEF: handle_request · CALLED BY: U1 submitting GET /orders with id REQ-7001
+// -> req_id : "REQ-7001"
+//    step 1 · query the customer row for REQ-7001 -> none   // lookup : "pending" -> null   BECAUSE DB holds no row for REQ-7001
+//    step 2 · throw NullPointerException("customer is null")   // err : null -> "customer is null"
+//    step 3 · catch in the handler, capture message + stack trace   // report : {} -> {msg:"customer is null", stack:"SVC.doGet line 42", ts:19}
+// <- captured : report = {msg:"customer is null", stack:"SVC.doGet line 42", ts:19} · 1 exception now held for reporting
+//    alt no catch block : the thread dies, report stays {} -> the failure is invisible to every later step
 ```
 
 

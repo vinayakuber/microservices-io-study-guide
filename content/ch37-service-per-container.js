@@ -101,11 +101,7 @@ registerChapter({
       q: 'How does the Service per Container pattern turn source code into a deployable image?',
       solution: 'A Dockerfile wraps the service code plus its runtime into a self-contained image; docker build produces the image, a version tag is pinned, and the image is pushed to a registry the cluster pulls from.',
       components: ['Dockerfile — wraps code plus runtime', 'docker build — produces the image', 'Version tag — pins a release', 'Registry — holds the image for the cluster'],
-      diagram: `flowchart LR
-  BLD["Build pipeline"] -->|"docker build"| IMG["inv:2.0.1 image"]
-  IMG -->|"docker tag"| TAG["tag 2.0.1"]
-  TAG -->|"docker push"| REG["Registry"]
-  REG -->|"cluster pulls"| CL["Cluster"]`,
+      
       code: `// BUILD SIDE — one inventory service is packaged into a container image so any language deploys the same way
 // PARTIES: BLD = build pipeline · REG = container registry
 // STATE (before):
@@ -127,11 +123,7 @@ registerChapter({
       q: 'How do you scale a containerized service, and why is no rebuild required?',
       solution: 'A host pulls the shared image once and the replica count is changed; Kubernetes launches more containers from the same image, and a load balancer spreads traffic across the replicas.',
       components: ['Shared image — pulled once', 'Replica count — the scaling knob', 'Kubernetes — schedules the containers', 'Load balancer — spreads traffic'],
-      diagram: `flowchart LR
-  CL["Cluster"] -->|"replicas 3 -> 7"| SCH["Scheduler"]
-  SCH -->|"launch 4 more"| IMG["inv:2.0.1 image"]
-  IMG -->|"same image"| R["7 replicas"]
-  LB["Load balancer"] -->|"spread"| R`,
+      
       code: `// RUNTIME SIDE — scale the inventory service from 3 to 7 replicas using the same image, no rebuild
 // PARTIES: SVC = inventory-service · CL = the Kubernetes cluster
 // STATE (before):
@@ -153,11 +145,7 @@ registerChapter({
       q: 'How does the container enforce CPU and memory limits, and what keeps one container from starving the others?',
       solution: 'The pod spec declares a CPU and memory cap before the container runs; the runtime throttles consumption above the cap, and each container keeps its own separate cap so neighbors are isolated.',
       components: ['Pod spec — declares the cap', 'Container runtime — enforces it', 'Throttle — blocks excess', 'Per-container cap — isolates neighbors'],
-      diagram: `flowchart LR
-  SPEC["Pod spec"] -->|"cpu 0.4, mem 512"| RT["Runtime"]
-  RT -->|"usage 0.9 -> 0.4"| SVC1["SVC1 capped"]
-  RT -->|"own separate cap"| SVC2["SVC2 capped"]
-  SVC1 -->|"cannot starve"| SVC2`,
+      
       code: `// RUNTIME SIDE — cap one container's CPU and memory so a noisy neighbor cannot starve the others
 // PARTIES: SVC1 = inventory-service · SVC2 = payment-service · HOST = the machine running both
 // STATE (before):
@@ -179,11 +167,7 @@ registerChapter({
       q: 'How fast do containers build and start compared to VMs, and what is the tradeoff?',
       solution: 'A container starts only the application process, so it boots much faster than a VM, and packaging is about 100x faster than an AMI; the tradeoff is that container deployment infrastructure is not as rich as the mature VM-based IaaS ecosystem.',
       components: ['Container — starts only the app process', 'VM — boots an entire OS', '~100x packaging — container vs AMI', 'Tradeoff — thinner infrastructure'],
-      diagram: `flowchart LR
-  CNT["Container start"] -->|"2 s"| CMP["Compare"]
-  VM["VM start"] -->|"25 s"| CMP
-  CMP -->|"12.5x faster"| WIN["Container wins speed"]
-  CMP -->|"loses"| MAT["Infra maturity: VM richer"]`,
+      
       code: `// TRADEOFF SIDE — one payment service, two packaging choices, measured start times
 // PARTIES: CNT = container path · VMACH = virtual-machine path
 // STATE (before):
@@ -229,7 +213,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  BLD[\"Build pipeline\"] -->|\"push rsvc:1.4.2\"| REG[\"Container registry\"]\n  REG -->|\"serve image\"| K8S[\"Kubernetes cluster\"]\n  K8S -->|\"schedule container\"| SVC[\"restaurant-service\"]\n  SVC -->|\"replicas 2 to 4\"| POD[\"running containers\"]",
+    
     program: `// SYSTEM DESIGN — service per container: build pipeline -> registry -> cluster -> container
 // PARTIES: BLD = build pipeline (builder) · REG = container registry (image repository) · K8S = Kubernetes cluster (scheduler) · SVC = restaurant-service (the service instance)
 // DEF: image — a built container artifact; here rsvc:1.4.2 for restaurant-service and inv:2.0.1 for inventory-service

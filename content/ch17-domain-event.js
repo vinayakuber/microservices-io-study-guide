@@ -89,10 +89,7 @@ registerChapter({
         "Choreography saga — needs the event to advance",
         "Publish step — missing without the pattern"
       ],
-      diagram: `flowchart LR
-  SVC["Order Service"] -->|state NEW to PLACED| DB[("Own data")]
-  DB -.->|no event| VIEW["CQRS view stays stale"]
-  DB -.->|no event| SAGA["Saga never advances"]`,
+      
       code: `// ORDER SERVICE SIDE — the problem the pattern solves: data changes, but the consumers that need to know are never told
 // PARTIES: SVC = Order Service (writes) · VIEW = a CQRS read model · SAGA = a choreography-based saga coordinated via events
 // STATE (before):
@@ -119,11 +116,7 @@ registerChapter({
         "Broker — carries the event",
         "Consumer handler — updates the read model"
       ],
-      diagram: `flowchart LR
-  AG["Order aggregate"] -->|state NEW to PLACED| EVT["OrderPlaced"]
-  EVT -->|publish| BRK[("Broker")]
-  BRK -->|deliver| CNS["Consumer handler"]
-  CNS -->|order_count 0 to 1| VIEW[("Read model")]`,
+      
       code: `// ORDER SERVICE SIDE — an aggregate emits a domain event when it changes, and a consumer reacts to it
 // PARTIES: AG = Order aggregate (in Order Service) · BRK = message broker · CSVC = the consuming service (a CQRS view updater)
 // STATE (before):
@@ -154,11 +147,7 @@ registerChapter({
         "Relay — publishes after commit",
         "Broker — receives the event"
       ],
-      diagram: `flowchart LR
-  SVC["Order Service"] -->|UPDATE order| DB[("Database")]
-  SVC -->|INSERT outbox row| DB
-  DB -->|COMMIT both| OK["Event durable with data"]
-  OK -->|relay| BRK[("Broker")]`,
+      
       code: `// ORDER SERVICE SIDE — publishing reliably: the event is written to the outbox in the SAME transaction as the data change
 // PARTIES: SVC = Order Service · DB = PostgreSQL 16 @ orders-db-1 · BRK = the message broker
 // STATE (before):
@@ -186,11 +175,7 @@ registerChapter({
         "Consumer handler — updates the view later",
         "Read side — briefly stale"
       ],
-      diagram: `flowchart LR
-  WRITE["Order placed"] -->|OrderPlaced| BRK[("Broker")]
-  BRK -->|delayed delivery| CNS["Consumer"]
-  CNS -->|count 0 to 1| VIEW[("Read model")]
-  VIEW -.->|stale until delivered| READER["Reader sees old count"]`,
+      
       code: `// CONSUMER SIDE — the read model catches up asynchronously, so it is briefly stale after the event is emitted
 // PARTIES: SVC = Order Service · BRK = message broker · CNS = view-updating consumer
 // STATE (before):
@@ -243,7 +228,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  AG[\"Order aggregate (publisher)\"] -->|\"emit OrderPlaced\"| OB[(\"Transactional outbox (PostgreSQL 16 @ orders-db-1)\")]\n  OB -->|\"relay publishes after commit\"| BRK[\"message broker (transport)\"]\n  BRK -->|\"deliver\"| SUB[\"subscriber: CQRS view updater\"]\n  SUB -->|\"order_count 0 -> 1\"| V[(\"read model\")]",
+    
     program: `// SYSTEM DESIGN — domain event as a pipeline: aggregate (publisher) -> event broker (transport) -> subscriber (consumer)
 // PARTIES: AG = Order aggregate (publisher, inside Order Service) · DB = PostgreSQL 16 @ orders-db-1 (holds the outbox table) · BRK = message broker (event transport) · SUB = CQRS view updater (subscriber/consumer)
 // DEF: DomainEvent — the fact the aggregate emits when created or updated; here {type:"OrderPlaced", order_id:"PO-2001"}

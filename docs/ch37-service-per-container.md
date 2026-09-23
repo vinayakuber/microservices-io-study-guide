@@ -10,29 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns p.393 · microservices
 
 > **Why this matters:** Without a uniform package, every service needs its own build and start procedure. A container image gives every service the same shape regardless of the language, framework, or version it was built with.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-n0["<b>1. Source commit lands</b><br/>restaurant-service, version 1.4.2"]:::start
-  n1["<b>2. Docker build</b><br/>image becomes rsvc:1.4.2, wraps the JAR plus its JVM"]:::step
-  n2["<b>3. Docker tag</b><br/>tag latest becomes 1.4.2, pinning the release"]:::step
-  n3["<b>4. Docker push</b><br/>REG now holds one copy the cluster can pull"]:::step
-  n4["<b>5. Image in the registry</b><br/>rsvc:1.4.2 ready to run"]:::core
-  n5["<b>6. Deployable everywhere</b><br/>1 image runs as N containers"]:::stop
-  n6["<b>Next commit</b><br/>version 1.4.2 becomes 1.4.3, a fresh tag"]:::warn
-  n0 -->|"1. build from the Dockerfile"| n1
-  n1 -->|"2. pin a version tag"| n2
-  n2 -->|"3. push to the registry"| n3
-  n3 -->|"4. stored and pullable"| n4
-  n4 -->|"5. ready to run"| n5
-  n5 -->|"6. next commit"| n0
-  n0 -->|"7. newer version"| n6
-```
-
 1. **Write a Dockerfile** — A Dockerfile wraps the service code plus its runtime so the image is self-contained.
 
 2. **Build the image** — **docker build** turns the source into an image the cluster can run.
@@ -60,27 +37,6 @@ n0["<b>1. Source commit lands</b><br/>restaurant-service, version 1.4.2"]:::star
 
 > **Why this matters:** Each service runs as multiple instances for throughput and availability. Deploying each instance as a container makes scaling a matter of changing a count.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-n0["<b>1. Load rises</b><br/>CLUSTER decides to scale"]:::start
-  n1["<b>2. Set the replica count</b><br/>replicas 2 becomes 4"]:::step
-  n2["<b>3. Schedule the new containers</b><br/>2 more land on healthy hosts"]:::step
-  n3["<b>4. Spread traffic</b><br/>load balancer routes over 4"]:::core
-  n4["<b>5. Scaled without a rebuild</b><br/>4 instances, same image rsvc:1.4.2, zero rebuilds"]:::stop
-  n5["<b>Load drops</b><br/>replicas 4 becomes 1, terminate 3 containers"]:::warn
-  n0 -->|"1. change the count"| n1
-  n1 -->|"2. start 2 more from the same image"| n2
-  n2 -->|"3. route over 4"| n3
-  n3 -->|"4. scaled without a rebuild"| n4
-  n4 -->|"5. load drops"| n5
-  n5 -->|"6. scale back down"| n1
-```
-
 1. **Pull the image** — A host pulls the shared image once, then launches as many containers as needed from it.
 
 2. **Set the replica count** — Scaling up or down means changing the number of container instances, with no rebuild.
@@ -106,26 +62,6 @@ n0["<b>1. Load rises</b><br/>CLUSTER decides to scale"]:::start
 
 > **Why this matters:** A service must not consume unbounded resources. The container is the boundary where CPU and memory limits are imposed, and where each instance stays isolated from its neighbors.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-n0["<b>1. Pod spec declares the cap</b><br/>cpu limit 0.5, set at deploy time"]:::start
-  n1["<b>2. Apply the cap</b><br/>caps holds cpu 0.5"]:::step
-  n2["<b>3. Throttle the excess</b><br/>usage 0.9 becomes 0.5, the excess blocked"]:::step
-  n3["<b>4. Isolate neighbors</b><br/>each container keeps its own separate cap"]:::core
-  n4["<b>5. Bounded consumption</b><br/>one container cannot consume another's share"]:::stop
-  n5["<b>No cap declared</b><br/>usage climbs back to 0.9, grabs the idle CPU"]:::warn
-  n0 -->|"1. record the limit before run"| n1
-  n1 -->|"2. block the excess"| n2
-  n2 -->|"3. neighbors isolated"| n3
-  n3 -->|"4. bounded consumption"| n4
-  n1 -->|"5. limit omitted"| n5
-```
-
 1. **Declare the limit** — The pod spec names the CPU and memory cap before the container runs.
 
 2. **Throttle beyond the cap** — The container runtime blocks any consumption above the declared limit.
@@ -150,29 +86,6 @@ n0["<b>1. Pod spec declares the cap</b><br/>cpu limit 0.5, set at deploy time"]:
 ### Fast to build and start, thinner infrastructure
 
 > **Why this matters:** Containers are extremely fast to build and start, but the tooling around them is not as mature as the tooling for virtual machines. Choosing containers means trading infrastructure richness for speed.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-n0["<b>1. Deploy test times the service</b><br/>same service 1.4.2, two packaging paths"]:::start
-  n1["<b>2. Container path</b><br/>only the app process starts, 3 s"]:::step
-  n2["<b>3. VM path</b><br/>an entire OS boots first, 30 s"]:::step
-  n3["<b>4. Compare the start</b><br/>30 s divided by 3 s, 10x faster container start"]:::core
-  n4["<b>5. Compare packaging</b><br/>a Docker image in seconds vs an AMI in minutes, about 100x"]:::step
-  n5["<b>6. The tradeoff</b><br/>container infra is thinner than the mature VM IaaS ecosystem"]:::warn
-  n6["<b>7. Verdict</b><br/>container wins on speed, loses on infrastructure maturity"]:::stop
-  n0 -->|"1. container path"| n1
-  n0 -->|"2. VM path"| n2
-  n1 -->|"3. measure the start"| n3
-  n2 -->|"4. measure the start"| n3
-  n3 -->|"5. packaging comparison"| n4
-  n4 -->|"6. the tradeoff"| n5
-  n5 -->|"7. final verdict"| n6
-```
 
 1. **Start only the app process** — A container starts the application process, not an entire OS, so it boots much faster than a VM.
 
@@ -234,14 +147,6 @@ flowchart TD
   R -->|"comprises"| P1["scales replicas from 2 to 4, cpu cap 0.5"]
 ```
 
-```mermaid
-flowchart LR
-  BLD["Build pipeline"] -->|"push rsvc:1.4.2"| REG["Container registry"]
-  REG -->|"serve image"| K8S["Kubernetes cluster"]
-  K8S -->|"schedule container"| SVC["restaurant-service"]
-  SVC -->|"replicas 2 to 4"| POD["running containers"]
-```
-
 ```java
 // SYSTEM DESIGN — service per container: build pipeline -> registry -> cluster -> container
 // PARTIES: BLD = build pipeline (builder) · REG = container registry (image repository) · K8S = Kubernetes cluster (scheduler) · SVC = restaurant-service (the service instance)
@@ -273,14 +178,6 @@ Your team ships three services in three languages, and each one currently needs 
 - docker build — produces the image
 - Version tag — pins a release
 - Registry — holds the image for the cluster
-
-```mermaid
-flowchart LR
-  BLD["Build pipeline"] -->|"docker build"| IMG["inv:2.0.1 image"]
-  IMG -->|"docker tag"| TAG["tag 2.0.1"]
-  TAG -->|"docker push"| REG["Registry"]
-  REG -->|"cluster pulls"| CL["Cluster"]
-```
 
 ```java
 // BUILD SIDE — one inventory service is packaged into a container image so any language deploys the same way
@@ -317,14 +214,6 @@ Load on your inventory service just spiked and you need double the capacity in t
 - Kubernetes — schedules the containers
 - Load balancer — spreads traffic
 
-```mermaid
-flowchart LR
-  CL["Cluster"] -->|"replicas 3 -> 7"| SCH["Scheduler"]
-  SCH -->|"launch 4 more"| IMG["inv:2.0.1 image"]
-  IMG -->|"same image"| R["7 replicas"]
-  LB["Load balancer"] -->|"spread"| R
-```
-
 ```java
 // RUNTIME SIDE — scale the inventory service from 3 to 7 replicas using the same image, no rebuild
 // PARTIES: SVC = inventory-service · CL = the Kubernetes cluster
@@ -359,14 +248,6 @@ One noisy container is eating 90% of a shared host's CPU and starving its neighb
 - Container runtime — enforces it
 - Throttle — blocks excess
 - Per-container cap — isolates neighbors
-
-```mermaid
-flowchart LR
-  SPEC["Pod spec"] -->|"cpu 0.4, mem 512"| RT["Runtime"]
-  RT -->|"usage 0.9 -> 0.4"| SVC1["SVC1 capped"]
-  RT -->|"own separate cap"| SVC2["SVC2 capped"]
-  SVC1 -->|"cannot starve"| SVC2
-```
 
 ```java
 // RUNTIME SIDE — cap one container's CPU and memory so a noisy neighbor cannot starve the others
@@ -403,14 +284,6 @@ You are choosing between packaging your service as a container and as a VM image
 - ~100x packaging — container vs AMI
 - Tradeoff — thinner infrastructure
 
-```mermaid
-flowchart LR
-  CNT["Container start"] -->|"2 s"| CMP["Compare"]
-  VM["VM start"] -->|"25 s"| CMP
-  CMP -->|"12.5x faster"| WIN["Container wins speed"]
-  CMP -->|"loses"| MAT["Infra maturity: VM richer"]
-```
-
 ```java
 // TRADEOFF SIDE — one payment service, two packaging choices, measured start times
 // PARTIES: CNT = container path · VMACH = virtual-machine path
@@ -442,12 +315,19 @@ _From the 28 problems:_ 01-scale-from-zero-to-millions
 
 Package the service as a Docker container image and deploy each service instance as a container; the container encapsulates the technology used to build the service.
 
-```mermaid
-flowchart LR
-  BLD["Build pipeline"] -->|"docker build"| IMG["inv:2.0.1 image"]
-  IMG -->|"docker tag"| TAG["tag 2.0.1"]
-  TAG -->|"docker push"| REG["Registry"]
-  REG -->|"cluster pulls"| CL["Cluster"]
+```java
+// BUILD SIDE — one inventory service is packaged into a container image so any language deploys the same way
+// PARTIES: BLD = build pipeline · REG = container registry
+// STATE (before):
+//    image : null                       // nothing built yet
+//    tag : "latest"                     // default tag before versioning
+// DEF: package version 2.0.1 · CALLED BY: BLD on the release commit
+// -> service : "inventory-service" · -> version : "2.0.1"
+//    step 1 · docker build wraps the code plus its runtime   // image : null -> "inv:2.0.1"   BECAUSE the Dockerfile makes the image self-contained
+//    step 2 · pin the version tag   // tag : "latest" -> "2.0.1"   // the cluster can now select this exact release
+//    step 3 · push to the registry   // copies : 0 -> 1   BECAUSE REG holds one copy the cluster can pull
+// <- image : "inv:2.0.1" in REG · one image, ready to run as N containers
+//    alt next commit : version : "2.0.1" -> "2.0.2"   BECAUSE a new commit builds a fresh image tag
 ```
 
 

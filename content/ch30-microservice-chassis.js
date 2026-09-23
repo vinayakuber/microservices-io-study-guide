@@ -110,7 +110,7 @@ registerChapter({
       q: "What is the per-service setup tax, and how does a chassis change the arithmetic?",
       solution: "Every service needs build logic and cross-cutting concerns (security, config, logging, health check, metrics, tracing) plus registration/discovery and circuit breakers; wiring them once in a chassis turns N services times 6 concerns into 6 wirings, not 6N.",
       components: ["Order Service", "Customer Service", "Kitchen Service", "shared chassis"],
-      diagram: "flowchart LR\n  C[\"Chassis\"] -->|\"wires 6 concerns once\"| W[\"concern wiring\"]\n  W -->|\"wires\"| O[\"Order Service\"]\n  W -->|\"wires\"| U[\"Customer Service\"]\n  W -->|\"wires\"| K[\"Kitchen Service\"]\n  M[\"Manual: 3 x 6 = 18 wirings\"] -.->|\"vs\"| W",
+      
       code: "// TEAM SIDE — wiring six cross-cutting concerns once per service versus once in a chassis\n// PARTIES: SVC1 = Order Service · SVC2 = Customer Service · SVC3 = Kitchen Service\n// DEF: wiring — the act of connecting a cross-cutting concern to a service; here 3 services x 6 concerns = 18 wirings\n// STATE (before):\n//    manual_wiring : { SVC1: 0, SVC2: 0, SVC3: 0 }       // concerns wired by hand, per service\n//    chassis_wiring : { chassis: 0 }                     // concerns wired once, inside the chassis\n// DEF: setup · CALLED BY: a team standing up 3 new services\n// -> concern_count : 6   // = security + config + logging + health + metrics + tracing\n// -> service_count : 3\n//    step 1 · wire SVC1 by hand    manual_wiring.SVC1 : 0 -> 6   BECAUSE each service re-implements the 6 concerns\n//    step 2 · wire SVC2 by hand    manual_wiring.SVC2 : 0 -> 6\n//    step 3 · wire SVC3 by hand    manual_wiring.SVC3 : 0 -> 6\n//    step 4 · total by hand = 3 services x 6 concerns = 18 wirings\n// <- outcome : manual_wiring : { SVC1: 6, SVC2: 6, SVC3: 6 } = 18 wirings total\n//    alt chassis : wire once -> chassis_wiring.chassis : 0 -> 6, then SVC1/SVC2/SVC3 inherit = 6 wirings, not 18",
       tieback: "This is the chapter's setup-tax problem: one or two days per service is unaffordable across many services, and the chassis centralizes the wiring.",
       refs: ["The setup tax"],
@@ -121,7 +121,7 @@ registerChapter({
       q: "What does the chassis implement, and what happens when a new service adopts it?",
       solution: "The chassis provides reusable build logic (e.g. Gradle plugins) and mechanisms for cross-cutting concerns; adopting it lets the service inherit the wiring instead of re-implementing it.",
       components: ["Order Service", "chassis framework 2.4.0", "Gradle plugin", "service registry"],
-      diagram: "flowchart LR\n  D[\"Developer\"] -->|\"scaffolds\"| S[\"Order Service\"]\n  S -->|\"adopts\"| C[\"chassis 2.4.0\"]\n  C -->|\"wires\"| B[\"build\"]\n  C -->|\"wires\"| T[\"security / metrics / tracing\"]\n  C -->|\"registers\"| R[\"service registry\"]",
+      
       code: "// ORDER SERVICE SIDE — a new service adopts the chassis and inherits the cross-cutting wiring\n// PARTIES: SVC = Order Service · CHS = chassis framework 2.4.0 · REG = service registry\n// STATE (before):\n//    svc : { build: \"none\", security: \"none\", metrics: \"none\", tracing: \"none\", registered: false }\n// DEF: adopt_chassis · CALLED BY: a developer scaffolding SVC\n// -> chassis_version : \"2.4.0\"\n//    step 1 · add the chassis Gradle plugin          svc.build : \"none\" -> \"gradle-plugin:2.4.0\"\n//    step 2 · chassis wires access-token security    svc.security : \"none\" -> \"access-token-check\"\n//    step 3 · chassis wires metrics                  svc.metrics : \"none\" -> \"counter:orders_created\"\n//    step 4 · chassis wires tracing                  svc.tracing : \"none\" -> \"trace-id-filter\"\n//    step 5 · chassis self-registers SVC with REG    svc.registered : false -> true\n// <- outcome : svc : { build:\"gradle-plugin:2.4.0\", security:\"access-token-check\", metrics:\"counter:orders_created\", tracing:\"trace-id-filter\", registered:true }",
       tieback: "This is the chapter's what-the-chassis-implements step: reusable build logic plus cross-cutting mechanisms, inherited on adoption.",
       refs: ["What the chassis implements"],
@@ -132,7 +132,7 @@ registerChapter({
       q: "How do services receive updates to build logic and cross-cutting concerns under the chassis pattern?",
       solution: "The team releases one new chassis version and bumps each service to it — the fix reaches every service through a version bump, versus copy/paste programming where a Service Template must be edited per service.",
       components: ["Order Service", "Customer Service", "Kitchen Service", "chassis release"],
-      diagram: "flowchart LR\n  R[\"Release chassis 2.4.0\"] -->|\"bump\"| O[\"Order Service\"]\n  R -->|\"bump\"| U[\"Customer Service\"]\n  R -->|\"bump\"| K[\"Kitchen Service\"]\n  O -->|\"2.3.0 -> 2.4.0\"| V[\"fix delivered\"]",
+      
       code: "// TEAM SIDE — a chassis upgrade delivers one fix to every service via a version bump\n// PARTIES: SVC1 = Order Service · SVC2 = Customer Service · SVC3 = Kitchen Service\n// STATE (before):\n//    deps : { SVC1: \"chassis:2.3.0\", SVC2: \"chassis:2.3.0\", SVC3: \"chassis:2.3.0\" }\n// DEF: upgrade · CALLED BY: the team releasing chassis 2.4.0 (a logging fix)\n// -> new_version : \"2.4.0\"\n//    step 1 · release the chassis once at \"2.4.0\"\n//    step 2 · SVC1 bumps its dependency     deps.SVC1 : \"chassis:2.3.0\" -> \"chassis:2.4.0\"\n//    step 3 · SVC2 bumps its dependency     deps.SVC2 : \"chassis:2.3.0\" -> \"chassis:2.4.0\"\n//    step 4 · SVC3 bumps its dependency     deps.SVC3 : \"chassis:2.3.0\" -> \"chassis:2.4.0\"\n// <- outcome : deps : { SVC1: \"chassis:2.4.0\", SVC2: \"chassis:2.4.0\", SVC3: \"chassis:2.4.0\" } · the fix reaches all 3 services\n//    alt service template : the fix is copied-and-pasted into 3 separate codebases, one edit per service",
       tieback: "This is the chapter's version-bump benefit: release once, bump each service, versus copy/paste per codebase.",
       refs: ["Updating via version bumps"],
@@ -143,7 +143,7 @@ registerChapter({
       q: "What is the main issue of the Microservice Chassis pattern when a new language enters the picture?",
       solution: "A chassis is tied to a programming language and framework, so each new language needs its own chassis — building a second chassis re-implements the same concerns and can be an obstacle to adopting the new language.",
       components: ["Java chassis", "Go chassis", "Gizmo/Micro/Go kit", "second chassis"],
-      diagram: "flowchart LR\n  J[\"Java services\"] -->|\"use\"| JC[\"chassis-java:2.4.0\"]\n  G[\"Go service\"] -.->|\"cannot use\"| JC\n  G -->|\"builds\"| GC[\"chassis-go:1.0.0\"]\n  GC -->|\"re-wires 6 concerns\"| X[\"duplicated work\"]",
+      
       code: "// TEAM SIDE — a second language forces a second chassis, so upkeep doubles\n// PARTIES: JVM = Java services · GO = Go services\n// STATE (before):\n//    chassis : { JVM: \"chassis-java:2.4.0\", GO: \"none\" }\n//    chassis_count : 1\n//    concerns_in_go : 0\n// DEF: adopt_go · CALLED BY: the team adding its first Go service\n// -> new_language : \"Go\"\n//    step 1 · the JVM chassis cannot run Go, build a second one   chassis_count : 1 -> 2\n//    step 2 · build chassis-go on a Go framework base               chassis.GO : \"none\" -> \"chassis-go:1.0.0\"   BECAUSE Gizmo/Micro/Go kit serve Go, not Java\n//    step 3 · re-implement the same concerns in Go                  concerns_in_go : 0 -> 6   BECAUSE security+config+logging+health+metrics+tracing all repeat\n// <- outcome : chassis : { JVM: \"chassis-java:2.4.0\", GO: \"chassis-go:1.0.0\" } · concerns_in_go : 6 · 2 chassis to keep current\n//    alt single-language : only 1 chassis to maintain, but Go adoption stays blocked",
       tieback: "This is the chapter's one-chassis-per-language issue: adopting a new language means rebuilding the chassis and its concerns.",
       refs: ["One chassis per language"],
@@ -179,7 +179,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  SVC[\"Order Service\"] -->|\"adopts\"| CHS[\"chassis framework 2.4.0\"]\n  CHS -->|\"wires\"| CFG[\"externalized config\"]\n  CHS -->|\"wires\"| LOG[\"logging + health check\"]\n  CHS -->|\"wires\"| MET[\"metrics counter: orders_created\"]\n  CHS -->|\"wires\"| TRC[\"tracing\"]\n  CHS -->|\"registers\"| REG[\"service registry\"]",
+    
     program: `// SYSTEM DESIGN — microservice chassis: service (Order Service) -> chassis framework (shared libraries) -> cross-cutting concerns (security, config, logging, health, metrics, tracing)
 // PARTIES: SVC = Order Service (adopts the chassis) · CHS = chassis framework 2.4.0 (shared libraries) · REG = service registry (registration target)
 // DEF: concern — one cross-cutting capability the chassis wires; here 6 concerns = security + config + logging + health + metrics + tracing

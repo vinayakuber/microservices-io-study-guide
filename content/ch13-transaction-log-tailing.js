@@ -101,11 +101,7 @@ registerChapter({
         "Outbox insert — the log entry to recognize",
         "Message broker — receives each published message"
       ],
-      diagram: `flowchart LR
-  SVC["Order Service commits"] -->|outbox insert| DB[("PostgreSQL")]
-  DB -->|WAL entry| WAL[("Write-ahead log")]
-  WAL -->|read at position| TLR["Log tailer"]
-  TLR -->|publish OrderCreated| BRK[("Message broker")]`,
+      
       code: `// TAILER SIDE — the relay reads the WAL and publishes each committed outbox insert
 // PARTIES: SVC = Order Service · DB = PostgreSQL 16 @ orders-db-1 · WAL = write-ahead log · TLR = log tailer · BRK = message broker
 // STATE (before):
@@ -138,11 +134,7 @@ registerChapter({
         "Tailer — publishes only what the log shows committed",
         "Broker — never enlisted, so no 2PC"
       ],
-      diagram: `flowchart LR
-  TX1["Commit OrderCreated"] -->|binlog write| LOG[("Binlog")]
-  TX2["Rollback OrderShipped"] -->|no committed write| LOG
-  LOG -->|only committed rows| TLR["Publishes OrderCreated only"]
-  TLR -->|"publishes to"| BRK[("Broker, never enlisted")]`,
+      
       code: `// TAILER SIDE — the log carries only committed writes, so a rolled-back event is never published
 // PARTIES: SVC = Order Service · DB = MySQL 8 @ orders-db-1 · LOG = binlog · TLR = log tailer · BRK = message broker
 // STATE (before):
@@ -174,12 +166,7 @@ registerChapter({
         "Re-read entry — published twice",
         "Consumer dedupe — processed-message table"
       ],
-      diagram: `flowchart LR
-  TLR["Tailer reads seq 70"] -->|publish OrderCreated| BRK[("Broker")]
-  TLR -->|crash before save| P["position stays 69"]
-  P -->|restart, re-read seq 70| TLR2["Tailer re-publishes"]
-  TLR2 -->|"publishes to"| BRK
-  BRK -->|OrderCreated x2| CNS["Consumer dedupes to once"]`,
+      
       code: `// TAILER SIDE — a crash between publish and position-save re-reads an entry, so consumers dedupe
 // PARTIES: TLR = log tailer · DB = MySQL 8 @ orders-db-1 · BRK = message broker · CNS = consumer service
 // STATE (before):
@@ -212,11 +199,7 @@ registerChapter({
         "DynamoDB streams — a third mechanism",
         "Tailer — written per database"
       ],
-      diagram: `flowchart LR
-  MY[("MySQL binlog")] -->|reader A| TLR["Tailer"]
-  PG[("Postgres WAL")] -->|reader B| TLR
-  DD[("DynamoDB streams")] -->|reader C| TLR
-  TLR -->|"publishes to"| BRK[("Broker")]`,
+      
       code: `// TAILER SIDE — each database logs commits in its own format, so the tailer needs a database-specific reader
 // PARTIES: TLR = log tailer · BRK = message broker
 // DEF: mysql_binlog — MySQL's log entry = { "seq":80, "op":"write", "table":"outbox", "row":(80,"OrderCreated") }
@@ -277,7 +260,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  DB[(\"source database: transaction log\")] -->|\"tail binlog/WAL\"| TLR[\"log tailer / miner\"]\n  TLR -->|\"publish OrderCreated\"| BRK[(\"message broker RabbitMQ\")]\n  BRK -->|\"consume\"| CNS[\"subscriber\"]",
+    
     program: `// SYSTEM DESIGN — transaction log tailing as a pipeline: database transaction log -> log tailer/miner -> message broker -> subscriber (consumer)
 // PARTIES: DB = MySQL 8 @ orders-db-1 (source database) · TLR = log tailer (transaction log miner) · BRK = message broker (RabbitMQ) · CNS = subscriber (consumer)
 // DEF: binlog — the source database's transaction log; here [ (tx 91, "INSERT orders PO-77"), (tx 92, "UPDATE orders") ]

@@ -10,26 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 44 · microservice
 
 > **Why this matters:** You have a working legacy monolith and want a microservice architecture, but the monolith cannot be rebuilt in one step. The answer is to migrate incrementally, building the new system gradually around the old one.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. You have a working monolith</b><br/>mono_features : catalog, orders, accounts all true"]:::start
-  n1["<b>2. You want microservices</b><br/>the monolith cannot be rebuilt in a single step"]:::warn
-  n2["<b>3. Incremental replacement</b><br/>new_features : empty becomes catalog true, one piece at a time"]:::step
-  n3["<b>4. Cut the piece over</b><br/>mono_features.catalog : true becomes false, traffic moves to the new service"]:::core
-  n4["<b>5. Monolith shrinks</b><br/>mono_features : orders, accounts remain, one feature moved"]:::stop
-  n5["<b>Big-bang rewrite instead</b><br/>rebuild the whole monolith at once, high risk"]:::warn
-  n0 -->|"1. legacy runs the business"| n1
-  n1 -->|"2. migrate gradually"| n2
-  n2 -->|"3. re-implement one feature"| n3
-  n3 -->|"4. cut over that feature"| n4
-  n1 -->|"5. the one-shot rewrite"| n5
-```
-
 1. **You have a working monolith** — The legacy application runs the business today and cannot simply be switched off.
 
 2. **You want microservices** — The team wants a microservice architecture, but the monolith cannot be rebuilt in a single step.
@@ -54,25 +34,6 @@ flowchart TD
 ### The strangler routes requests
 
 > **Why this matters:** The strangler application fronts both the new services and the legacy monolith, deciding per request which system handles it. Functionality already migrated is served by a microservice; everything else still falls back to the monolith.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. A router fronts both systems</b><br/>route_table : /catalog NEW, /orders MONO"]:::start
-  n1["<b>2. Migrated paths go to new services</b><br/>look up /catalog, matched : empty becomes NEW"]:::step
-  n2["<b>3. Unmigrated paths fall back</b><br/>path /orders, matched : NEW becomes MONO, the monolith still serves it"]:::warn
-  n3["<b>4. The strangler grows</b><br/>target : empty becomes NEW, /catalog served by the new service"]:::core
-  n4["<b>5. Monolith never sees it</b><br/>catalog items come from NEW, unchanged paths stay on MONO"]:::stop
-  n0 -->|"1. every request is decided"| n1
-  n1 -->|"2. the migrated path"| n3
-  n3 -->|"3. served by the new service"| n4
-  n0 -->|"4. the unmigrated path falls back"| n2
-  n2 -->|"5. monolith unchanged"| n4
-```
 
 1. **A router fronts both systems** — The strangler receives every request and decides which system handles it.
 
@@ -100,24 +61,6 @@ flowchart TD
 ### Two kinds of service
 
 > **Why this matters:** The strangler application consists of two types of services: ones that re-implement functionality that previously lived in the monolith, and ones that add brand-new features. The new-feature services are useful because they demonstrate the value of microservices to the business.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Re-implement monolith features</b><br/>new_features : catalog true, taken over from the monolith"]:::start
-  n1["<b>2. Add brand-new features</b><br/>brand_new : empty becomes recommendations true, no monolith twin"]:::step
-  n2["<b>3. Demonstrate the value</b><br/>route_table : /catalog NEW becomes /catalog NEW, /recommendations NEW"]:::core
-  n3["<b>4. Keep strangling</b><br/>new_features : catalog, recommendations, the monolith keeps shrinking"]:::stop
-  n4["<b>Feature already in the monolith</b><br/>it must be re-implemented and cut over, not just added"]:::warn
-  n0 -->|"1. take over old features"| n1
-  n1 -->|"2. ship net-new features"| n2
-  n2 -->|"3. show the business the value"| n3
-  n1 -->|"4. feature has a monolith twin"| n4
-```
 
 1. **Re-implement monolith features** — Services that take over functionality that previously resided in the monolith.
 
@@ -185,15 +128,6 @@ flowchart TD
   R -->|"comprises"| P1["New features — recommendations, wishlist with no monolith twin"]
 ```
 
-```mermaid
-flowchart LR
-  RTR["strangler router"] -->|"path /catalog"| NEW["new microservices"]
-  RTR -->|"path /orders (fall back)"| MONO["legacy monolith"]
-  RTR -->|"lookup"| T[("route_table")]
-  NEW -->|"serves"| RSP["catalog items"]
-  MONO -->|"serves"| RSP2["checkout + accounts"]
-```
-
 ```java
 // SYSTEM DESIGN — strangler application: legacy monolith -> strangler façade/router -> new microservices
 // PARTIES: RTR = strangler router (façade: looks up each request path in the path-to-backend map) · NEW = new microservices (serve the migrated paths) · MONO = legacy monolith (serves the unmigrated paths)
@@ -230,13 +164,6 @@ Your team wants microservices but starts with a working monolith that runs the b
 - One feature at a time — the increment
 - Monolith shrinks — as features move
 
-```mermaid
-flowchart LR
-  MONO["Monolith"] -->|"re-implement search"| NEW["New system"]
-  NEW -->|"search served"| NEW
-  MONO -->|"keeps"| REST["checkout + accounts"]
-```
-
 ```java
 // MONOLITH SIDE — the strangler grows by moving one feature at a time out of the monolith
 // PARTIES: MONO = legacy monolith · NEW = new strangler application · U1 = user
@@ -271,13 +198,6 @@ The strangler now fronts both the new services and the monolith. A request arriv
 - Migrated paths — new services
 - Unmigrated paths — fall back to the monolith
 
-```mermaid
-flowchart LR
-  RTR["Strangler router"] -->|"/search"| NEW["New search service"]
-  RTR -->|"/checkout"| MONO["Monolith"]
-  RTR -->|"lookup"| T["route_table"]
-```
-
 ```java
 // STRANGLER SIDE — a request for an unmigrated path falls back to the monolith, unchanged
 // PARTIES: RTR = strangler router · NEW = new microservice · MONO = legacy monolith · U1 = user
@@ -311,13 +231,6 @@ The strangler is more than re-hosting old features. You want to add a feature th
 - Brand-new features — no monolith twin
 - Value demonstration — the new features' role
 - Ongoing strangling — until the monolith retires
-
-```mermaid
-flowchart LR
-  NEW["New system"] -->|"re-implemented"| CHECKOUT["checkout"]
-  NEW -->|"brand-new"| WISH["wishlist"]
-  WISH -->|"demonstrates"| VALUE["value to business"]
-```
 
 ```java
 // STRANGLER SIDE — a brand-new feature lands in the new app, showing the business what microservices enable
@@ -356,14 +269,6 @@ The migration is only half done, so the monolith and the strangler are both live
 - Two deploys — per release
 - The cost lasts — until the monolith retires
 
-```mermaid
-flowchart LR
-  RELEASE["Release"] -->|"deploy"| MONO["Monolith"]
-  RELEASE -->|"deploy"| NEW["Strangler"]
-  MONO -->|"until retired"| COST["two systems to run"]
-  NEW -->|"until retired"| COST
-```
-
 ```java
 // OPS SIDE — one release must deploy both systems, so the migration cost is two systems side by side
 // PARTIES: MONO = legacy monolith · NEW = new strangler application · OPS = operations team
@@ -396,11 +301,18 @@ _From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-syste
 
 Modernize by incrementally developing a new (strangler) application around the legacy application; the strangler has a microservice architecture.
 
-```mermaid
-flowchart LR
-  MONO["Monolith"] -->|"re-implement search"| NEW["New system"]
-  NEW -->|"search served"| NEW
-  MONO -->|"keeps"| REST["checkout + accounts"]
+```java
+// MONOLITH SIDE — the strangler grows by moving one feature at a time out of the monolith
+// PARTIES: MONO = legacy monolith · NEW = new strangler application · U1 = user
+// STATE (before):
+//    mono_features : { "search": true, "checkout": true, "accounts": true }
+//    new_features  : {}
+// DEF: migrate · CALLED BY: the team for each feature, one at a time
+// -> feature : "search"
+//    step 1 · re-implement "search" as a microservice in NEW   // new_features : {} -> { "search": true }
+//    step 2 · cut "search" traffic over to the new service   // mono_features.search : true -> false
+//    step 3 · the monolith keeps only the remaining features   // mono_features : { "search": true, "checkout": true, "accounts": true } -> { "checkout": true, "accounts": true }
+// <- state : mono_features = { "checkout": true, "accounts": true } · new_features = { "search": true } — one piece moved, not the whole monolith at once
 ```
 
 

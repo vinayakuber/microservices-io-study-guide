@@ -10,29 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 31 (p.373) · micr
 
 > **Why this matters:** The pattern's answer to "how do we understand application behavior and troubleshoot problems?" is to instrument a service to gather statistics about individual operations. A counter increments on each completed operation with minimal runtime overhead.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Instrument the operation</b><br/>SVC collects statistics on create_order"]:::start
-  n1["<b>2. First completion</b><br/>counters.orders_created : 0 becomes 1, PO-2001 done"]:::step
-  n2["<b>3. Second completion</b><br/>counters.orders_created : 1 becomes 2, PO-2002 done"]:::step
-  n3["<b>4. Third completion</b><br/>counters.orders_created : 2 becomes 3, PO-2003 done"]:::step
-  n4["<b>5. Minimal overhead</b><br/>one in-memory add per call, no per-request network hop"]:::core
-  n5["<b>6. Counter ready to report</b><br/>orders_created : 3 gathered"]:::stop
-  n6["<b>7. Per-request network hop</b><br/>pushing every call would break the overhead force"]:::warn
-  n0 -->|"1. counter starts at zero"| n1
-  n1 -->|"2. next request"| n2
-  n2 -->|"3. next request"| n3
-  n3 -->|"4. each new request increments again"| n3
-  n3 -->|"5. increment is cheap"| n4
-  n4 -->|"6. aggregate later"| n5
-  n3 -->|"7. network call per request - too costly"| n6
-```
-
 1. **Gather statistics** — Instrument the service to collect statistics about individual operations.
 
 2. **Count completions** — A counter increments each time an operation such as create_order completes.
@@ -57,27 +34,6 @@ flowchart TD
 ### Aggregating: push and pull
 
 > **Why this matters:** Individual counters are useful only when aggregated in a centralized metrics service that provides reporting and alerting. The reference describes two aggregation models: push and pull.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Central metrics service</b><br/>MS provides reporting and alerting"]:::start
-  n1["<b>2. Push the counter</b><br/>SVC POSTs orders_created 3, MS.view.orders_created : 0 becomes 3"]:::core
-  n2["<b>3. Push the sum</b><br/>SVC POSTs request_ms_sum 123, MS.view.request_ms_sum : 0 becomes 123"]:::step
-  n3["<b>4. Pull model</b><br/>MS GETs /metrics, body orders_created 3 request_ms_sum 123"]:::core
-  n4["<b>5. Both values aggregated</b><br/>MS.view : orders_created 3, request_ms_sum 123"]:::stop
-  n5["<b>6. Aggregation services</b><br/>Prometheus or AWS CloudWatch"]:::core
-  n0 -->|"1. service pushes metrics"| n1
-  n1 -->|"2. second value pushed"| n2
-  n2 -->|"3. converge on the view"| n4
-  n0 -->|"4. metrics service scrapes the service"| n3
-  n3 -->|"5. converge on the view"| n4
-  n4 -->|"6. report and alert"| n5
-```
 
 1. **Central metrics service** — Aggregate metrics in a centralized metrics service that provides reporting and alerting.
 
@@ -104,29 +60,6 @@ flowchart TD
 ### What it costs
 
 > **Why this matters:** Metrics give deep insight, but they are not free: the metric code is intertwined with business logic, making it more complicated, and aggregating metrics can require significant infrastructure.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Deep insight</b><br/>metrics reveal application behavior"]:::start
-  n1["<b>2. First observe</b><br/>hist.request_ms : empty becomes 41, 141-100 equals 41"]:::step
-  n2["<b>3. Second observe</b><br/>hist.request_ms becomes 41,37, 237-200 equals 37"]:::step
-  n3["<b>4. Third observe</b><br/>hist.request_ms becomes 41,37,48, 348-300 equals 48"]:::step
-  n4["<b>5. Intertwined code</b><br/>observe calls woven between the save calls"]:::core
-  n5["<b>6. Business logic obscured</b><br/>reading the flow means reading past metric lines"]:::warn
-  n6["<b>7. Infrastructure cost</b><br/>aggregating metrics requires significant infrastructure"]:::stop
-  n0 -->|"1. benefit of the pattern"| n1
-  n1 -->|"2. next request"| n2
-  n2 -->|"3. next request"| n3
-  n3 -->|"4. metrics sit inside the method"| n4
-  n4 -->|"5. the drawback"| n5
-  n5 -->|"6. plus the aggregation cost"| n6
-  n4 -->|"7. each request observed again"| n2
-```
 
 1. **Deep insight** — The benefit is deep insight into application behavior.
 
@@ -213,15 +146,6 @@ flowchart TD
   R -->|"comprises"| P1["renders the counts and latencies"]
 ```
 
-```mermaid
-flowchart LR
-  SVC["Order Service (writer)"] -->|"push POST metrics"| TR["push/pull transport"]
-  TR -->|"pull GET /metrics"| SVC
-  TR -->|"delivers"| COL["Prometheus (collector)"]
-  COL -->|"stores"| STO[("time-series registry (aggregator)")]
-  STO -->|"queries"| DSH["dashboard (reader)"]
-```
-
 ```java
 // SYSTEM DESIGN — application metrics pipeline: writer (Order Service, instrumented) -> transport (push/pull) -> collector (Prometheus metrics service) -> aggregator (time-series registry) -> reader (dashboard)
 // PARTIES: SVC = Order Service (writer, instrumented) · MS = Prometheus (collector, metrics service) · STO = time-series registry (aggregator, holds each series) · DSH = dashboard (reader)
@@ -255,13 +179,6 @@ The team cannot tell how many orders are being created, because the service is a
 - counter (orders_created)
 - metrics service
 - create_order operation
-
-```mermaid
-flowchart LR
-  C["Client"] -->|"POST orders"| S["Order Service"]
-  S -->|"increment"| N["counter: orders_created"]
-  N -->|"0 -> 3"| M["central metrics service"]
-```
 
 ```java
 // ORDER SERVICE SIDE — a counter gathers statistics about one operation, with minimal overhead
@@ -298,13 +215,6 @@ The counters on each service are only useful once collected somewhere central. T
 - push model
 - pull model
 
-```mermaid
-flowchart LR
-  S["Order Service"] -->|"push: POST metrics"| M["metrics service"]
-  M -->|"pull: GET /metrics"| S
-  M -->|"reports + alerts"| R["dashboards"]
-```
-
 ```java
 // AGGREGATION SIDE — the central metrics service receives two values via push or via pull
 // PARTIES: SVC = Order Service · MS = metrics service
@@ -338,13 +248,6 @@ A code review finds observe() calls for the request-duration histogram woven bet
 - histogram (request_ms)
 - observe() calls
 - save() calls
-
-```mermaid
-flowchart LR
-  B["create_order method"] -->|"save()"| S["business logic"]
-  B -->|"observe()"| H["histogram"]
-  H -.->|"intertwined with"| S
-```
 
 ```java
 // ORDER SERVICE SIDE — the histogram increment sits inline in business logic, tangling the code
@@ -380,14 +283,6 @@ The metrics service must hold many series and run somewhere, and the team wants 
 - Prometheus / AWS CloudWatch
 - many time series
 
-```mermaid
-flowchart LR
-  S["Services"] -->|"push/pull"| M["central metrics service"]
-  M -->|"holds"| T["many series"]
-  M -->|"adds ops cost"| C["infrastructure"]
-  S -.->|"per-request stays cheap"| X["in-memory add"]
-```
-
 ```java
 // METRICS SERVICE SIDE — the central service holds many series, so aggregation costs real infrastructure
 // PARTIES: SVC = Order Service · MS = metrics service (Prometheus)
@@ -421,11 +316,19 @@ _From the 28 problems:_ 20-metrics-monitoring
 
 Instrument a service to gather statistics about individual operations and aggregate them in a centralized metrics service that provides reporting and alerting.
 
-```mermaid
-flowchart LR
-  C["Client"] -->|"POST orders"| S["Order Service"]
-  S -->|"increment"| N["counter: orders_created"]
-  N -->|"0 -> 3"| M["central metrics service"]
+```java
+// ORDER SERVICE SIDE — a counter gathers statistics about one operation, with minimal overhead
+// PARTIES: SVC = Order Service · MS = metrics service (Prometheus)
+// STATE (before):
+//    counters : { orders_created: 0 }
+// DEF: create_order · CALLED BY: client requests arriving at SVC
+// -> request1 : "PO-2001"
+//    step 1 · handle request1, increment the counter    counters.orders_created : 0 -> 1   BECAUSE one create_order completed
+// -> request2 : "PO-2002"
+//    step 2 · handle request2, increment                counters.orders_created : 1 -> 2
+// -> request3 : "PO-2003"
+//    step 3 · handle request3, increment                counters.orders_created : 2 -> 3
+// <- outcome : counters : { orders_created: 3 } · the increment is one in-memory add per call, not a per-request network hop
 ```
 
 

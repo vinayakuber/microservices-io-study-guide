@@ -10,29 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns · microservices.io /p
 
 > **Why this matters:** A command that must update the database and publish an event cannot do both atomically with 2PC, yet letting them drift corrupts the data. Appending one event makes the state change and its publishable event the same single write.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Append, do not update in place</b><br/>each change adds an event instead of rewriting a row"]:::start
-  n1["<b>2. Build the event from the command</b><br/>E1 OrderCreated with customer C-100 total 125.00"]:::step
-  n2["<b>3. Append to the event store</b><br/>events gains E1, one atomic write"]:::core
-  n3["<b>4. Apply to in-memory state</b><br/>orderState CREATED, customerId C-100"]:::step
-  n4["<b>5. Next command appends E2</b><br/>OrderApproved C-100, state CREATED becomes APPROVED"]:::step
-  n5["<b>6. History is the source of truth</b><br/>no current-state row anywhere"]:::stop
-  n6["<b>In-place update instead</b><br/>rewriting a row loses the publishable event"]:::warn
-  n0 -->|"1. change becomes an event"| n1
-  n1 -->|"2. command folded to an event"| n2
-  n2 -->|"3. apply to memory"| n3
-  n2 -->|"4. next change appends again"| n2
-  n3 -->|"5. E1 then E2 build the history"| n4
-  n4 -->|"6. the store holds events only"| n5
-  n0 -->|"7. avoided - update in place loses the event"| n6
-```
-
 1. **Append, do not update in place** — Instead of rewriting a current-state row, each change appends a new event to the list of events for that entity.
 
 2. **Store the events in an event store** — A database of events with an API for adding and retrieving the events of an entity.
@@ -64,27 +41,6 @@ flowchart TD
 
 > **Why this matters:** Because the store holds history instead of a ready-to-read row, the application must fold the events back into current state. Replay order is the write order, so the reconstructed state is deterministic.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Read the full event list</b><br/>E1 OrderCreated C-100 and E2 OrderApproved C-100"]:::start
-  n1["<b>2. Apply events in order</b><br/>fold each event through its apply method"]:::step
-  n2["<b>3. E1 sets state and id</b><br/>orderState CREATED, customerId C-100"]:::core
-  n3["<b>4. E2 advances state</b><br/>orderState CREATED becomes APPROVED"]:::core
-  n4["<b>5. Last fold is current state</b><br/>rebuilt from 2 events, no current-state table"]:::stop
-  n5["<b>Reordered replay</b><br/>E2 before E1 leaves orderState CREATED"]:::warn
-  n0 -->|"1. retrieve the history"| n1
-  n1 -->|"2. next event folds in"| n1
-  n1 -->|"3. E1 sets state and id"| n2
-  n2 -->|"4. E2 advances state"| n3
-  n3 -->|"5. last fold is current state"| n4
-  n1 -->|"6. wrong order - wrong state"| n5
-```
-
 1. **Read the full event list** — The application retrieves the full sequence of events for the aggregate.
 
 2. **Apply each event in order** — An apply() method per event type folds it into state — OrderCreated sets CREATED and the customer id.
@@ -110,28 +66,6 @@ flowchart TD
 
 > **Why this matters:** Entities such as a Customer accumulate many events, so replaying everything is wasteful. A periodic snapshot of current state means only the events since that snapshot need to be folded.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Save a periodic snapshot</b><br/>current state stored as of event 3, balance 100.00"]:::start
-  n1["<b>2. Load the newest snapshot</b><br/>start from balance 100.00, not empty"]:::step
-  n2["<b>3. Replay only events after it</b><br/>fold E4 Debit 25.00"]:::core
-  n3["<b>4. Fold the tail</b><br/>balance 100.00 becomes 75.00"]:::step
-  n4["<b>5. Count the replay</b><br/>replayed 4 becomes 1"]:::step
-  n5["<b>6. Rebuild is shorter</b><br/>one event instead of four"]:::stop
-  n6["<b>Stale snapshot</b><br/>events before the snapshot never replayed, snapshot must stay current"]:::warn
-  n0 -->|"1. capture state as of seq 3"| n1
-  n1 -->|"2. load from the snapshot"| n2
-  n2 -->|"3. only the tail events"| n3
-  n3 -->|"4. fold the debit"| n4
-  n4 -->|"5. fewer events to fold"| n5
-  n0 -->|"6. snapshot lags - replay drifts"| n6
-```
-
 1. **Save a snapshot of current state** — Periodically persist the current state of the entity as of some event.
 
 2. **Load the newest snapshot** — To reconstruct, find the most recent snapshot instead of starting empty.
@@ -155,28 +89,6 @@ flowchart TD
 ### Let the event store deliver to subscribers
 
 > **Why this matters:** The reliable-publish problem dissolves because the store itself behaves like a message broker: a subscriber receives each saved event, so publishing is a by-product of persisting.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Subscribe to entity events</b><br/>CustomerService registers reserveCredit on OrderCreated"]:::start
-  n1["<b>2. Store delivers on save</b><br/>saving an event hands it to each subscriber"]:::step
-  n2["<b>3. Handler reads the payload</b><br/>customerId C-100, orderTotal 125.00"]:::step
-  n3["<b>4. Update own aggregate</b><br/>balance 200.00 becomes 75.00, reserve PO-100 125.00"]:::core
-  n4["<b>5. Publishing is a by-product</b><br/>the store behaves like a broker, no outbox needed"]:::step
-  n5["<b>6. Subscriber state follows the event</b><br/>Customer updated from the Order event"]:::stop
-  n6["<b>Subscriber misses the event</b><br/>no delivery, no reservation, credit never reserved"]:::warn
-  n0 -->|"1. handler registered"| n1
-  n1 -->|"2. event delivered on save"| n2
-  n2 -->|"3. unpack the event"| n3
-  n3 -->|"4. own state updated"| n4
-  n4 -->|"5. no separate publisher"| n5
-  n1 -->|"6. delivery missed - no reservation"| n6
-```
 
 1. **Subscribe to entity events** — A service registers a handler such as CustomerService.reserveCredit on OrderCreatedEvent.
 
@@ -250,14 +162,6 @@ flowchart TD
   R -->|"comprises"| P1["no replay at query time"]
 ```
 
-```mermaid
-flowchart LR
-  CMD["command: approve_order"] -->|"append E2"| ES[("event store: EventStoreDB 24 @ orders-events-1")]
-  ES -->|"deliver event"| PH["projector / event handler"]
-  PH -->|"fold into read model"| RM[("read model DB: PostgreSQL 16 @ orders-view-1")]
-  RM -->|"query current state"| QR["query side / reader"]
-```
-
 ```java
 // SYSTEM DESIGN — event sourcing as a pipeline: command -> event store (append) -> projector/event handler -> read model -> query
 // PARTIES: CMD = Order Service command side (writer) · ES = EventStoreDB 24 @ orders-events-1 (append-only event store) · PH = projector/event handler (consumer) · RM = read model database (PostgreSQL 16 @ orders-view-1) · QR = query side (reader)
@@ -291,13 +195,6 @@ Your order state is stored as the current row only, so you cannot answer how the
 - Event record — one state change
 - OrderCreated — first event
 - OrderApproved — a later event
-
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|append events| EVT[("Event store")]
-  EVT -->|E1| A["OrderCreated PO-77 125.00"]
-  EVT -->|E2| B["OrderApproved PO-77"]
-```
 
 ```java
 // ORDER SERVICE SIDE — persist state as a sequence of events instead of the current row
@@ -333,13 +230,6 @@ You have an event store full of order events, and you need the current state of 
 - apply — folds each event into state
 - Replay — reads events in order
 
-```mermaid
-flowchart LR
-  STORE[("Event store")] -->|E1 OrderCreated| AGG["Order aggregate"]
-  STORE -->|E2 OrderApproved| AGG
-  AGG -->|apply E1 then E2| NOW["state APPROVED"]
-```
-
 ```java
 // ORDER SERVICE SIDE — rebuild current state by replaying the aggregate's events in order
 // PARTIES: SVC = Order Service · STORE = EventStoreDB 24 @ orders-events-1 · AGG = the Order aggregate being rebuilt
@@ -373,12 +263,6 @@ Replaying a million events to load an account balance is too slow. You want to l
 - Events after the snapshot — the tail
 - Replay — only the tail
 - Current state — snapshot plus tail
-
-```mermaid
-flowchart LR
-  SNAP["Snapshot balance 100.00 seq 3"] -->|replay E4| BAL["balance 75.00"]
-  E4["E4 Debit -25.00"] -->|apply| BAL
-```
 
 ```java
 // ACCOUNT SERVICE SIDE — shorten replay with a snapshot: load the snapshot, replay only the events after it
@@ -415,12 +299,6 @@ A customer service wants to track reservations the moment an order reserves cred
 - OrderPlaced event — a change to deliver
 - reserved map — built by the subscriber
 
-```mermaid
-flowchart LR
-  STORE[("Event store")] -->|publish OrderPlaced| SUB["Subscriber"]
-  SUB -->|reserveCredit 125.00| RES[("reserved map")]
-```
-
 ```java
 // ACCOUNT SERVICE SIDE — the event store delivers new events to subscribers, who build their own state
 // PARTIES: STORE = EventStoreDB 24 @ orders-events-1 · SUB = the subscriber in Account Service · BAL = the account balance
@@ -453,11 +331,18 @@ _From the 28 problems:_ 26-payment-system · 28-stock-exchange
 
 Event sourcing persists a business entity (an Order or a Customer) as a sequence of state-changing events; whenever state changes a new event is appended, and current state is rebuilt by replaying them.
 
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|append events| EVT[("Event store")]
-  EVT -->|E1| A["OrderCreated PO-77 125.00"]
-  EVT -->|E2| B["OrderApproved PO-77"]
+```java
+// ORDER SERVICE SIDE — persist state as a sequence of events instead of the current row
+// PARTIES: SVC = Order Service · STORE = EventStoreDB 24 @ orders-events-1
+// STATE (before):
+//    events : []
+//    current_state : {}   // nothing stored as a row
+// DEF: append_event · CALLED BY: SVC on each state change
+// -> event : { order_id:"C-55", type:"OrderCreated", total:125.00 }
+//    step 1 · append the first event : events : [] -> [{ seq:1, order_id:"C-55", type:"OrderCreated", total:125.00 }]
+//    step 2 · append the next event after approval : events : [{seq:1}] -> [{seq:1},{ seq:2, order_id:"C-55", type:"OrderApproved" }]
+//    step 3 · state is derived by replaying events : current_state : {} -> { status:"APPROVED", total:125.00 }   BECAUSE E1 then E2 rebuild it
+// <- outcome : events : [E1 OrderCreated(125.00), E2 OrderApproved] · the full history is stored, not just the current APPROVED state
 ```
 
 

@@ -111,10 +111,7 @@ registerChapter({
         "Line items — data passed into the factory",
         "Total — computed by the factory"
       ],
-      diagram: `flowchart LR
-  SVC["Order Service"] -->|Order.create| F["Order.create"]
-  F -->|new Order| ORD["Order PO-77"]
-  ORD -->|total 120.00| TOT["computed by the factory"]`,
+      
       code: `// ORDER SERVICE SIDE — the domain model uses a factory method to construct a valid order, instead of an ad-hoc script
 // PARTIES: SVC = Order Service · ORD = the Order domain object · LN = a line item passed to the factory
 // DEF: item — one line supplied to the factory = { sku:"B-9", qty:3, unit_price:40.00 }
@@ -140,9 +137,7 @@ registerChapter({
         "total — recomputed by the method",
         "Caller — passes only the new values"
       ],
-      diagram: `flowchart LR
-  SVC["Order Service"] -->|revise qty 3 to 5| ORD["Order PO-77"]
-  ORD -->|recompute total 120.00 to 200.00| TOT["encapsulated in the method"]`,
+      
       code: `// ORDER SERVICE SIDE — behavior and state live together: revise mutates the order and recomputes its total
 // PARTIES: SVC = Order Service (caller) · ORD = Order domain object
 // STATE (before):
@@ -167,11 +162,7 @@ registerChapter({
         "Throw — on an illegal transition",
         "State — transitions to CANCELLED"
       ],
-      diagram: `flowchart LR
-  SVC["Order Service"] -->|cancel| ORD["Order PO-77"]
-  ORD -->|state CREATED?| CHK["check"]
-  CHK -->|yes| CAN["state to CANCELLED"]
-  CHK -->|no, SHIPPED| ERR["throw"]`,
+      
       code: `// ORDER SERVICE SIDE — the domain method guards the life-cycle transition so the object cannot reach an invalid state
 // PARTIES: SVC = Order Service (caller) · ORD = Order domain object
 // DEF: legal_state — the only state a cancel is allowed from = "CREATED"
@@ -201,10 +192,7 @@ registerChapter({
         "DeliveryInformation — state-only value object",
         "findOrderById — behavior on the repository"
       ],
-      diagram: `flowchart LR
-  SVC["Order Service"] -->|findOrderById| REPO["OrderRepository"]
-  REPO -->|returns| ORD["Order entity: state + behavior"]
-  ORD -->|holds| DLVRY["DeliveryInformation: state only"]`,
+      
       code: `// ORDER SERVICE SIDE — the three kinds of classes in a domain model: behavior-only, state-only, and a mix of both
 // PARTIES: SVC = Order Service · REPO = OrderRepository · ORD = Order entity · DLVRY = DeliveryInformation
 // STATE (before):
@@ -259,7 +247,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  C[\"client\"] -->|\"createOrder()\"| SVC[\"OrderService (domain service)\"]\n  SVC -->|\"delegate\"| ORD[\"Order aggregate: create()/revise()/cancel()\"]\n  ORD -->|\"holds\"| VO[\"DeliveryInformation (value object)\"]\n  SVC -->|\"findOrderById / save\"| REPO[\"OrderRepository\"]\n  REPO -->|\"SQL\"| DB[(\"PostgreSQL 16 @ orders-db-1\")]",
+    
     program: `// SYSTEM DESIGN — domain model as a pipeline: client -> domain service (OrderService) -> entities/value objects (Order + DeliveryInformation) -> repository (OrderRepository) -> database (PostgreSQL 16 @ orders-db-1)
 // PARTIES: CLI = client · SVC = OrderService (domain service: behavior only) · ORD = Order aggregate (entity: state + behavior) · VO = DeliveryInformation (state-only value object) · REPO = OrderRepository (repository) · DB = PostgreSQL 16 @ orders-db-1
 // DEF: entity — a class with both state and behavior; here Order holds orderId "PO-100" + lineItems and methods create()/revise()/cancel()

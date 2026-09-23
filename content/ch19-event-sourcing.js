@@ -110,10 +110,7 @@ registerChapter({
         "OrderCreated — first event",
         "OrderApproved — a later event"
       ],
-      diagram: `flowchart LR
-  SVC["Order Service"] -->|append events| EVT[("Event store")]
-  EVT -->|E1| A["OrderCreated PO-77 125.00"]
-  EVT -->|E2| B["OrderApproved PO-77"]`,
+      
       code: `// ORDER SERVICE SIDE — persist state as a sequence of events instead of the current row
 // PARTIES: SVC = Order Service · STORE = EventStoreDB 24 @ orders-events-1
 // STATE (before):
@@ -139,10 +136,7 @@ registerChapter({
         "apply — folds each event into state",
         "Replay — reads events in order"
       ],
-      diagram: `flowchart LR
-  STORE[("Event store")] -->|E1 OrderCreated| AGG["Order aggregate"]
-  STORE -->|E2 OrderApproved| AGG
-  AGG -->|apply E1 then E2| NOW["state APPROVED"]`,
+      
       code: `// ORDER SERVICE SIDE — rebuild current state by replaying the aggregate's events in order
 // PARTIES: SVC = Order Service · STORE = EventStoreDB 24 @ orders-events-1 · AGG = the Order aggregate being rebuilt
 // STATE (before):
@@ -168,9 +162,7 @@ registerChapter({
         "Replay — only the tail",
         "Current state — snapshot plus tail"
       ],
-      diagram: `flowchart LR
-  SNAP["Snapshot balance 100.00 seq 3"] -->|replay E4| BAL["balance 75.00"]
-  E4["E4 Debit -25.00"] -->|apply| BAL`,
+      
       code: `// ACCOUNT SERVICE SIDE — shorten replay with a snapshot: load the snapshot, replay only the events after it
 // PARTIES: SVC = Account Service · STORE = EventStoreDB 24 @ orders-events-1 · ACC = the Account aggregate
 // STATE (before):
@@ -197,9 +189,7 @@ registerChapter({
         "OrderPlaced event — a change to deliver",
         "reserved map — built by the subscriber"
       ],
-      diagram: `flowchart LR
-  STORE[("Event store")] -->|publish OrderPlaced| SUB["Subscriber"]
-  SUB -->|reserveCredit 125.00| RES[("reserved map")]`,
+      
       code: `// ACCOUNT SERVICE SIDE — the event store delivers new events to subscribers, who build their own state
 // PARTIES: STORE = EventStoreDB 24 @ orders-events-1 · SUB = the subscriber in Account Service · BAL = the account balance
 // STATE (before):
@@ -255,7 +245,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  CMD[\"command: approve_order\"] -->|\"append E2\"| ES[(\"event store: EventStoreDB 24 @ orders-events-1\")]\n  ES -->|\"deliver event\"| PH[\"projector / event handler\"]\n  PH -->|\"fold into read model\"| RM[(\"read model DB: PostgreSQL 16 @ orders-view-1\")]\n  RM -->|\"query current state\"| QR[\"query side / reader\"]",
+    
     program: `// SYSTEM DESIGN — event sourcing as a pipeline: command -> event store (append) -> projector/event handler -> read model -> query
 // PARTIES: CMD = Order Service command side (writer) · ES = EventStoreDB 24 @ orders-events-1 (append-only event store) · PH = projector/event handler (consumer) · RM = read model database (PostgreSQL 16 @ orders-view-1) · QR = query side (reader)
 // DEF: event — one state-changing fact appended to the store; here E2 = OrderApprovedEvent("C-100")

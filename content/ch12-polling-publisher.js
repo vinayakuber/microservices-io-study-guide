@@ -94,11 +94,7 @@ registerChapter({
         "Mark-sent update — sets sent=true per published row",
         "Message broker — receives the published events"
       ],
-      diagram: `flowchart LR
-  T["Timer 250ms tick"] -->|poll| DB[("Outbox table")]
-  DB -->|2 unsent rows| RLY["Relay"]
-  RLY -->|publish each| BRK[("Message broker")]
-  RLY -->|mark sent=true| DB`,
+      
       code: `// RELAY SIDE — one poll cycle drains two unsent outbox rows into the broker
 // PARTIES: RLY = relay process · DB = PostgreSQL 16 @ orders-db-1 (outbox table) · BRK = message broker
 // DEF: outbox — the table of stored events awaiting publication = [ (10, "OrderCreated", sent=false), (11, "PaymentAuthorized", sent=false) ]
@@ -127,11 +123,7 @@ registerChapter({
         "Ordered query — SELECT ... ORDER BY id ASC",
         "Message broker — receives events in publish order"
       ],
-      diagram: `flowchart LR
-  DB[("Outbox table")] -->|unordered query| BAD["Publishes id 21 first"]
-  BAD -->|"publishes to"| BRK[("Broker: OrderApproved then OrderCreated")]
-  DB -->|ORDER BY id ASC| GOOD["Publishes id 20 first"]
-  GOOD -->|"publishes to"| BRK2[("Broker: OrderCreated then OrderApproved")]`,
+      
       code: `// RELAY SIDE — ordering: the same order's two events must reach the broker in commit order
 // PARTIES: RLY = relay · DB = MySQL 8 @ orders-db-1 (outbox table) · BRK = message broker
 // DEF: outbox — the table of stored events = [ (20, "OrderCreated", sent=false), (21, "OrderApproved", sent=false) ]
@@ -162,10 +154,7 @@ registerChapter({
         "Unsent-row query — cannot be expressed in the NoSQL store",
         "Transaction log tailing — the alternative relay"
       ],
-      diagram: `flowchart LR
-  SQL[("MySQL outbox table")] -->|SELECT sent=false| RLY["Relay publishes the row"]
-  NOSQL[("NoSQL doc store")] -->|no unsent-row query| NONE["Relay finds 0 rows"]
-  NONE -->|"forces"| TLT["Use transaction log tailing instead"]`,
+      
       code: `// RELAY SIDE — polling needs a queryable outbox: any SQL database has it, some NoSQL stores do not
 // PARTIES: RLY = relay · SQLDB = MySQL 8 @ orders-db-1 · NOSQL = MongoDB 7 @ orders-nosql-1 · BRK = message broker
 // DEF: outbox_sql — the queryable table = [ (30, "OrderCreated", sent=false) ]
@@ -197,12 +186,7 @@ registerChapter({
         "Poll 2 — selects only sent=false rows",
         "Broker — receives no duplicate from the relay"
       ],
-      diagram: `flowchart LR
-  P1["Poll 1"] -->|SELECT sent=false| DB[("Outbox table")]
-  P1 -->|publish OrderCreated| BRK[("Broker")]
-  P1 -->|UPDATE sent=true| DB
-  P2["Poll 2"] -->|SELECT sent=false| DB
-  P2 -->|0 rows match| BRK`,
+      
       code: `// RELAY SIDE — two consecutive polls: after a row is marked sent, the next poll skips it
 // PARTIES: RLY = relay · DB = MySQL 8 @ orders-db-1 (outbox table) · BRK = message broker
 // DEF: outbox — the table of stored events = [ (40, "OrderCreated", sent=false) ]
@@ -260,7 +244,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  DB[(\"source database: outbox table\")] -->|\"SELECT sent=false ORDER BY id\"| RLY[\"polling publisher relay\"]\n  RLY -->|\"publish OrderCreated\"| BRK[(\"message broker RabbitMQ\")]\n  RLY -->|\"mark sent=true\"| DB\n  BRK -->|\"consume\"| SUB[\"subscriber\"]",
+    
     program: `// SYSTEM DESIGN — polling publisher as a pipeline: source database (outbox table) -> polling publisher relay -> message broker -> subscriber (consumer)
 // PARTIES: DB = PostgreSQL 16 @ orders-db-1 (outbox table) · RLY = polling publisher relay (polls, publishes, marks) · BRK = message broker (RabbitMQ) · SUB = subscriber (consumer)
 // DEF: outbox — the table of events awaiting publication; here [ (10, "OrderCreated", sent=false), (11, "PaymentAuthorized", sent=false) ]

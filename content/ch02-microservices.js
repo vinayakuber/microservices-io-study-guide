@@ -115,10 +115,7 @@ registerChapter({
       q: "How does the microservice architecture assign subdomains to services, and which single subdomain is allowed to be shared across services?",
       solution: "Each service owns one or more subdomains, each subdomain belongs to exactly one service, and only a shared-library subdomain may be used by many.",
       components: ["Service — one or more subdomains", "Subdomain — belongs to a single service", "Shared-library subdomain — the one allowed exception", "Team ownership — follows the non-library subdomains"],
-      diagram: `flowchart LR
-  SUB["ProductCatalog, Inventory, Order"] -->|"becomes"| SV["one service each"]
-  LIB["CommonLib"] -->|shared| SV
-  LIB -->|shared| SV2["other services"]`,
+      
       code: `// DESIGN SIDE — assign each subdomain to exactly one service; a shared library is the lone exception
 // PARTIES: ARC = architect applying the microservice pattern
 // STATE (before):
@@ -140,11 +137,7 @@ registerChapter({
       q: "What makes a service independently deployable, and how does that let one team ship without waiting on another?",
       solution: "Each service gets its own source repository and its own build-test-deploy pipeline, so a team ships its service alone.",
       components: ["Own source repository per service", "Own deployment pipeline", "Per-service tests", "Independent release"],
-      diagram: `flowchart LR
-  TO["Team Orders fix"] -->|"touches"| P1["order pipeline"]
-  P1 -->|"deploys"| D1["deploy order v2.3"]
-  TP["Team Payment refactor"] -.own pipeline.-> P2["payment pipeline"]
-  P2 -.untouched.-> D2["payment still v2.2"]`,
+      
       code: `// DEPLOY SIDE — a team ships its service alone through its own repository and pipeline
 // PARTIES: TO = Team Orders · TP = Team Payment · P1 = order pipeline · P2 = payment pipeline
 // STATE (before):
@@ -169,11 +162,7 @@ registerChapter({
       q: "Why can't one ACID transaction span services, and how is a distributed command implemented instead?",
       solution: "Loose coupling requires a database per service, so a distributed command becomes a saga — a series of local transactions, eventually consistent.",
       components: ["Database per service", "Local transaction — confined to one service", "Saga — series of local transactions", "API gateway — the entry point"],
-      diagram: `flowchart LR
-  API["API gateway"] -->|"routes to"| OSV["order: T1"]
-  API -->|"routes to"| PSV["payment: T2"]
-  API -->|"routes to"| SSV["shipping: T3"]
-  OSV -->|"each commits its own DB"| SAGA["eventually consistent saga"]`,
+      
       code: `// ORDER SIDE — a distributed command spans three services, each committing to its own database
 // PARTIES: API = API gateway · OSV = order service · PSV = payment service · SSV = shipping service
 // DEF: local — a transaction confined to one service and its own database; here local txn "T1" = {service:"order", state:"NEW"}
@@ -196,12 +185,7 @@ registerChapter({
       q: "What are the four service collaboration patterns, and which ones implement a distributed query as a series of local queries?",
       solution: "Saga and Command-side replica serve distributed commands; API composition and CQRS serve distributed queries as local queries; all rely on Transaction Outbox for messaging.",
       components: ["Saga — distributed command", "Command-side replica — replicated read data", "API composition + CQRS — distributed query", "Transaction Outbox — atomic publish"],
-      diagram: `flowchart LR
-  Q["getHomeFeed"] -->|"calls"| API["API composition"]
-  API -->|"queries"| S1["catalog"]
-  API -->|"queries"| S2["watchlist"]
-  API -->|"queries"| S3["profile"]
-  API -->|"6 local queries -> 1 page"| P["composed page"]`,
+      
       code: `// GATEWAY SIDE — one distributed query becomes a series of local queries (API composition)
 // PARTIES: GW = API gateway · SVC1..SVC6 = six backend services, each with its own DB
 // STATE (before):
@@ -260,7 +244,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  CLI[\"Client\"] -->|\"GET /orders/PO-2001\"| GW[\"API gateway\"]\n  GW -->|\"route\"| SVC[\"order service\"]\n  SVC -->|\"own business logic\"| BL[\"business logic\"]\n  BL -->|\"write / read\"| DB[(\"PostgreSQL 16 @ order-db-1\")]\n  DB -->|\"rows back\"| BL\n  GW -->|\"compose one page\"| CLI",
+    
     program: `// SYSTEM DESIGN — microservices: client -> API gateway -> microservices (own business logic + own database) -> service databases; a distributed command becomes a saga of local transactions
 // PARTIES: CLI = customer client · GW = API gateway (the entry point, routes and composes) · SVC = order service (owns the Order subdomain) · DB = PostgreSQL 16 @ order-db-1 (the order service's own database)
 // DEF: service — an independently deployable, loosely coupled unit owning one or more subdomains; here "order" owns the Order subdomain

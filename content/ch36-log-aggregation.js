@@ -97,11 +97,7 @@ registerChapter({
       q: 'What must each service instance write to its log file in the Log aggregation pattern, and why is the request id baked into every line?',
       solution: 'Each instance writes to a log file in a standardized format with a severity, and every line carries the external request id so the lines of one request can be joined.',
       components: ['Log file — one per instance', 'Standardized format — same shape', 'Severity — error/warning/info/debug', 'External request id — the join key'],
-      diagram: `flowchart LR
-  SVC1["Order Service"] -->|"INFO ... REQ-3001"| F1["logfile 1"]
-  SVC2["Customer Service"] -->|"INFO ... REQ-3001"| F2["logfile 2"]
-  F1 -->|"same id"| J["Join key REQ-3001"]
-  F2 -->|"same id"| J`,
+      
       code: `// ORDER SERVICE SIDE — a request crossing two services writes a line in each, all tagged with the same request id
 // PARTIES: SVC1 = Order Service · SVC2 = Customer Service · U1 = the user whose request this is
 // STATE (before):
@@ -124,11 +120,7 @@ registerChapter({
       q: 'How do log lines get from each instance into the centralized service, and how does the service index them?',
       solution: 'Each instance ships its own log lines to the centralized logging service as they are written, and the service indexes the lines so one request id gathers its lines.',
       components: ['Centralized logging service', 'Log shipper — per instance', 'Request-id index', 'One key — one request'],
-      diagram: `flowchart LR
-  SVC["Order Service"] -->|"line1"| LOG["Central logging service"]
-  SVC -->|"line2"| LOG
-  SVC -->|"line3"| LOG
-  LOG -->|"files under"| IDX["index by request id"]`,
+      
       code: `// AGGREGATOR SIDE — one instance ships three lines as they are written, and the central service files them under two request ids
 // PARTIES: SVC = Order Service · LOG = central logging service
 // STATE (before):
@@ -149,10 +141,7 @@ registerChapter({
       q: 'What does a search of the aggregated logs return, and how is the request path reconstructed?',
       solution: 'A query by the external request id returns matching lines from all the services that handled it, sorted by timestamp to reconstruct the path.',
       components: ['Search UI — the query entry', 'Request-id query', 'Hit set — lines from all instances', 'Time sort — rebuilds the path'],
-      diagram: `flowchart LR
-  DEV["Developer"] -->|"query REQ-3001"| LOG["Central logging service"]
-  LOG -->|"3 hits"| SORT["Sort by timestamp"]
-  SORT -->|"ordered path"| VIEW["order -> customer -> payment"]`,
+      
       code: `// DEVELOPER SIDE — one request-id query pulls hits from three instances and returns them in time order
 // PARTIES: DEV = developer searching · LOG = central logging service
 // STATE (before):
@@ -173,10 +162,7 @@ registerChapter({
       q: 'How do alerts fire in the Log aggregation pattern, and what is the cost of a large log volume?',
       solution: 'Users configure alerts that fire when a message matches a pattern; handling a large volume of logs requires substantial infrastructure.',
       components: ['Configured alert rules', 'Pattern match on each line', 'Notification to on-call', 'Growing index volume'],
-      diagram: `flowchart LR
-  LOG["Central logging service"] -->|"line ERROR ..."| RULE["rule ERROR threshold 1"]
-  RULE -->|"match fires"| DEV["On-call developer"]
-  LOG -->|"each line adds"| VOL["index volume 400001"]`,
+      
       code: `// LOG SERVICE SIDE — an alert fires on a configured message, and each new line adds to the volume that demands infrastructure
 // PARTIES: LOG = central logging service · DEV = on-call developer
 // STATE (before):
@@ -224,7 +210,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  SVC1[\"Order Service\"] -->|\"ship log\"| LOG[\"Central logging service\"]\n  SVC2[\"Customer Service\"] -->|\"ship log\"| LOG\n  SVC3[\"Payment Service\"] -->|\"ship log\"| LOG\n  LOG -->|\"index by request id\"| IDX[\"aggregated index REQ-3001\"]\n  IDX -->|\"search\"| DEV[\"Developer reader\"]",
+    
     program: `// SYSTEM DESIGN — log aggregation: writer -> transport -> collector -> aggregator/store -> reader
 // PARTIES: SVC1 = Order Service (writer) · SVC2 = Customer Service (writer) · SVC3 = Payment Service (writer) · LOG = central logging service (collector + aggregator) · DEV = developer (reader)
 // DEF: log — one service log line; here { "request_id":"REQ-3001", "level":"ERROR" }

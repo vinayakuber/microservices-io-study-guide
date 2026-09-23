@@ -101,10 +101,7 @@ registerChapter({
       q: 'What is the language-specific package for a Java service, and how does the pipeline ship it?',
       solution: 'A Spring Boot Java service builds to an executable JAR file or a WAR file; the deployment pipeline builds the JAR or WAR and invokes the production environment\'s service management interface.',
       components: ['Executable JAR — the Java artifact', 'WAR — the web-container variant', 'Deployment pipeline — builds it', 'Service management interface — the handoff'],
-      diagram: `flowchart LR
-  SRC["Spring Boot source"] -->|"compile"| JAR["restaurant-service-3.1.0.jar"]
-  JAR -->|"hand off"| PIPE["Pipeline"]
-  PIPE -->|"invokes"| SMI["Service management interface"]`,
+      
       code: `// BUILD SIDE — package the service in its language's native format so the pipeline can ship one artifact
 // PARTIES: BLD = deployment pipeline · SVC = Restaurant Service
 // STATE (before):
@@ -126,11 +123,7 @@ registerChapter({
       q: 'What must be installed and done before a Java package runs, and how does the service start?',
       solution: 'For a Java service you install the JDK first, and a WAR additionally needs Apache Tomcat; then you copy the package to the machine and start it, so each service instance runs as a JVM process.',
       components: ['JDK — the required runtime', 'Apache Tomcat — for a WAR', 'Package copy — onto the machine', 'JVM process — the running instance'],
-      diagram: `flowchart LR
-  MACH["Production machine"] -->|"install"| JDK["JDK 17"]
-  MACH -->|"install"| TC["Tomcat 10"]
-  MACH -->|"copy"| JAR["restaurant-service-3.1.0.jar"]
-  JAR -->|"start"| JVM["jvm-8121"]`,
+      
       code: `// RUNTIME SIDE — configure a machine, copy the package, and start it as a JVM process
 // PARTIES: MACH = the production machine · SVC = Restaurant Service
 // STATE (before):
@@ -152,13 +145,7 @@ registerChapter({
       q: 'How do several instances of a Java service run on one machine, and what does each bind?',
       solution: 'Each JVM runs a single service instance and a machine can host several JVMs; each instance binds its own port on the shared machine, and a Node.js service may spawn multiple worker processes instead.',
       components: ['Multiple JVMs — one per instance', 'One machine — the shared host', 'Separate ports — per instance', 'Node.js workers — the process alternative'],
-      diagram: `flowchart LR
-  MACH["Production machine"] -->|"launch"| J1["jvm-1 :8081"]
-  MACH -->|"launch"| J2["jvm-2 :8082"]
-  MACH -->|"launch"| J3["jvm-3 :8083"]
-  J1 -->|"own port"| P["ports 3"]
-  J2 -->|"own port"| P
-  J3 -->|"own port"| P`,
+      
       code: `// RUNTIME SIDE — run three service instances on one machine, one JVM per instance, each on its own port
 // PARTIES: MACH = the production machine · SVC = Restaurant Service
 // STATE (before):
@@ -180,11 +167,7 @@ registerChapter({
       q: 'Why does this pattern\'s drawback motivate the VM and container options?',
       solution: 'The package does not carry its technology stack, so the machine must be configured with the JDK and Tomcat by hand; the VM and container patterns fix this by encapsulating the stack in the image.',
       components: ['Hand-configured machine — the manual step', 'No encapsulated stack — the gap', 'VM image — encapsulates the stack', 'Container image — the lighter alternative'],
-      diagram: `flowchart LR
-  PKG["JAR package"] -->|"no runtime inside"| HAND["install JDK + Tomcat by hand"]
-  HAND -->|"fragile"| GAP["stack not encapsulated"]
-  GAP -->|"motivates"| VM["VM image"]
-  GAP -->|"motivates"| CNT["Container image"]`,
+      
       code: `// TRADEOFF SIDE — the package runs on a shared, hand-configured runtime, which motivates VM and container packaging
 // PARTIES: MACH = the machine · SVC = Restaurant Service
 // STATE (before):
@@ -231,7 +214,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  BLD[\"Deployment pipeline\"] -->|\"build JAR\"| PKG[\"restaurant-service-3.1.0.jar\"]\n  PKG -->|\"deploy\"| MACH[\"machine: JDK 17 + Tomcat 10\"]\n  MACH -->|\"launch\"| JVM[\"JVM process jvm-8121\"]",
+    
     program: `// SYSTEM DESIGN — language-specific packaging: build pipeline -> package -> machine (runtime) -> JVM process
 // PARTIES: BLD = deployment pipeline (builder) · PKG = restaurant-service-3.1.0.jar (the package) · MACH = machine (server host) · JVM = JVM process jvm-8121 (the runtime)
 // DEF: package — the language-specific artifact; here restaurant-service-3.1.0.jar (a JAR)

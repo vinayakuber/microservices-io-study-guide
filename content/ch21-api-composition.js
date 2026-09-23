@@ -113,11 +113,7 @@ registerChapter({
         "API Composer — orchestrates the query",
         "In-memory join — done by the composer"
       ],
-      diagram: `flowchart LR
-  CLIENT["Client"] -->|get order PO-77| AC["API Composer"]
-  AC -->|fetch order| ORD["Order Service"]
-  AC -->|fetch customer| CUST["Customer Service"]
-  AC -->|join in memory| OUT["Order + customer name"]`,
+      
       code: `// API COMPOSER SIDE — the problem: a query spans two services, so the composer joins their results in memory
 // PARTIES: CLIENT = the caller · AC = the API Composer · ORD = Order Service · CUST = Customer Service
 // STATE (before):
@@ -144,12 +140,7 @@ registerChapter({
         "Customer Service — provider 2",
         "Payment Service — provider 3"
       ],
-      diagram: `flowchart LR
-  CLIENT["Client"] -->|get order PO-77| AC["API Composer"]
-  AC -->|call 1| ORD["Order Service"]
-  AC -->|call 2| CUST["Customer Service"]
-  AC -->|call 3| PAY["Payment Service"]
-  AC -->|combine| OUT["one response"]`,
+      
       code: `// API COMPOSER SIDE — fan out to three providers and combine their results into one response
 // PARTIES: CLIENT = the caller · AC = the API Composer · ORD = Order Service · CUST = Customer Service · PAY = Payment Service
 // STATE (before):
@@ -176,10 +167,7 @@ registerChapter({
         "Composer — does the lookup",
         "Result — merged on the key"
       ],
-      diagram: `flowchart LR
-  AC["API Composer"] -->|fetch| ORD["Order PO-77 customer_id CUST-7"]
-  AC -->|fetch| CUST["Customer list"]
-  AC -->|match CUST-7 == id| OUT["Order + customer name"]`,
+      
       code: `// API COMPOSER SIDE — the in-memory join matches rows on a shared key instead of a SQL join
 // PARTIES: AC = the API Composer · ORD = Order Service · CUST = Customer Service
 // STATE (before):
@@ -206,11 +194,7 @@ registerChapter({
         "In-memory join — the bottleneck",
         "CQRS — the alternative at scale"
       ],
-      diagram: `flowchart LR
-  AC["API Composer"] -->|pull 900000 orders| DB1[("Order DB")]
-  AC -->|pull 120000 customers| DB2[("Customer DB")]
-  AC -->|join in memory| SLOW["inefficient"]
-  SLOW -->|switch| CQRS["CQRS materialized view"]`,
+      
       code: `// API COMPOSER SIDE — the pattern degrades at scale: joining huge result sets in memory, where CQRS is the better fit
 // PARTIES: AC = the API Composer · DB1 = PostgreSQL 16 @ orders-db-1 · DB2 = PostgreSQL 16 @ customers-db-1
 // STATE (before):
@@ -258,7 +242,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  CLI[\"client\"] -->|\"get order O-101\"| CMP[\"API Composer\"]\n  CMP -->|\"fetch order\"| ORD[\"Order Service\"]\n  CMP -->|\"fetch customer\"| CUST[\"Customer Service\"]\n  ORD -->|\"reads\"| ORDDB[(\"PostgreSQL 16 @ orders-db-1\")]\n  CUST -->|\"reads\"| CUSTDB[(\"PostgreSQL 16 @ customers-db-1\")]\n  CMP -->|\"join in memory\"| OUT[\"order + customer name\"]",
+    
     program: `// SYSTEM DESIGN — API composition as a pipeline: client -> API composer -> provider services -> their databases
 // PARTIES: CLI = client · CMP = API Composer (query orchestrator) · ORD = Order Service (provider service) · CUST = Customer Service (provider service) · ORDDB = PostgreSQL 16 @ orders-db-1 · CUSTDB = PostgreSQL 16 @ customers-db-1
 // DEF: fragment — one partial result a provider returns, keyed by a shared id; here the order fragment { order_id:"O-101", cust_id:"C-77", total:120.00 }

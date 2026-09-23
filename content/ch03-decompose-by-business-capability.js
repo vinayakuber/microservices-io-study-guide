@@ -115,10 +115,7 @@ registerChapter({
       q: "How do the Single Responsibility Principle and the Common Closure Principle guide decomposition so that one change touches one service?",
       solution: "SRP gives a service one reason to change; CCP packages code that changes for the same reason together, so a rule change stays in one service.",
       components: ["SRP — one reason to change", "CCP — change together, package together", "Single-service change", "One-team coordination"],
-      diagram: `flowchart LR
-  R["discount_rule change"] -->|"owned by"| OWN["owner = order service"]
-  OWN -->|"touches"| ONE["1 service touched"]
-  OWN -->|"coordinates"| ONE_T["1 team coordinates"]`,
+      
       code: `// CHANGE SIDE — one business rule change must touch one service (CCP), not many
 // PARTIES: DEV = developer · SVC_O = order service · SVC_B = billing service · SVC_D = delivery service
 // DEF: impact — the footprint of a change, i.e. which services it touches; here impact = { "SVC_O":0, "SVC_B":0, "SVC_D":0 }
@@ -141,10 +138,7 @@ registerChapter({
       q: "What is a business capability, how does it map to a business object, and how does that produce one service per capability?",
       solution: "A business capability is something the business does to generate value; it often corresponds to a business object, and each capability becomes a service.",
       components: ["Business capability — generates value", "Business object — Product, Order, Stock", "Capability hierarchy — multi-level", "One service per capability"],
-      diagram: `flowchart LR
-  CAP["catalog, inventory, order, billing"] -->|"groups into"| OBJ["each owns a business object"]
-  OBJ -->|"becomes"| SVC["one service per capability"]
-  SVC -->|"delivers"| H["Product/Service delivery"]`,
+      
       code: `// DECOMPOSITION SIDE — each business capability becomes one service
 // PARTIES: ARC = architect · CAP = business-capability model
 // STATE (before):
@@ -167,11 +161,7 @@ registerChapter({
       q: "What four forces must a decomposition satisfy, and why do a 6-10 person team and an API matter?",
       solution: "The architecture must be stable, cohesive, loosely coupled via an API, and small enough for a two-pizza team to test and own.",
       components: ["Stable + cohesive services", "CCP conformity", "API-encapsulated implementation", "Two-pizza team (6-10)"],
-      diagram: `flowchart LR
-  SVC["proposed service"] -->|"has"| SIZE["6-10 members"]
-  SVC -->|"exposes"| API["exposed API"]
-  API -->|"keeps"| LC["loosely coupled"]
-  SIZE -->|"enables"| TE["testable"]`,
+      
       code: `// SIZING SIDE — a service must fit a two-pizza team (6-10 people) and hide its implementation behind an API
 // PARTIES: ORG = engineering org
 // DEF: api — the interface a service exposes so clients call it without seeing its implementation; here api = { exposed: 0 }
@@ -195,11 +185,7 @@ registerChapter({
       q: "What two starting points help identify business capabilities, and why is the process iterative?",
       solution: "Start from the organization structure and the high-level domain model, then refine the boundaries iteratively.",
       components: ["Organization structure", "High-level domain model", "Areas of expertise", "Iterative refinement"],
-      diagram: `flowchart LR
-  ORG["org groups"] -->|"informs"| CAP1["capability"]
-  DM["domain model"] -->|"informs"| CAP2["capability"]
-  CAP1 -->|"refined by"| IT["iterate"]
-  CAP2 -->|"refined by"| IT`,
+      
       code: `// IDENTIFICATION SIDE — find capabilities from the org structure and the domain model
 // PARTIES: ARC = architect analyzing the organization
 // DEF: domain — the high-level domain model, a map of the business's key objects; here domain = { "Product":{}, "Order":{} }
@@ -250,7 +236,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  CAP[\"business capability: product catalog\"] -->|\"maps to\"| SVC[\"catalog service\"]\n  SVC -->|\"owns\"| DB[(\"PostgreSQL 16 @ catalog-db-1\")]\n  SVC -->|\"run by\"| TEAM[\"two-pizza team (6-10)\"]\n  DB -->|\"query result\"| SVC",
+    
     program: `// SYSTEM DESIGN — decompose by business capability: business capability (Product) -> service (catalog, owns its data) -> autonomous two-pizza team (owns the service)
 // PARTIES: CAP = business capability (Product — what the business does to generate value) · SVC = catalog service (owns the Product data) · DB = PostgreSQL 16 @ catalog-db-1 (the catalog service's own database) · TEAM = autonomous two-pizza team (6-10 people owning the service)
 // DEF: capability — something the business does to generate value; here "product catalog" manages business object "Product"

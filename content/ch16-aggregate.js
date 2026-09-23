@@ -100,11 +100,7 @@ registerChapter({
         "Total — recomputed from the lines",
         "Root — the single entry point"
       ],
-      diagram: `flowchart LR
-  SVC["Order Service"] -->|"aggregates via"| ROOT["Order root"]
-  ROOT -->|owns| A["Line item BOOK-1"]
-  ROOT -->|owns| B["Line item BOOK-2"]
-  ROOT -->|recomputes| TOT["total 35.00"]`,
+      
       code: `// ORDER AGGREGATE SIDE — from DDD: a graph of objects can be treated as a unit, reached by one root
 // PARTIES: SVC = Order Service · AG = the Order aggregate (root Order entity + its line-item value objects)
 // DEF: item — a line-item object the aggregate root owns and sums into the total = { product:"BOOK-1", price:30.00 }
@@ -132,11 +128,7 @@ registerChapter({
         "Recompute — total from line items",
         "Refusal — rejecting a violating change"
       ],
-      diagram: `flowchart LR
-  SVC["Order Service"] -->|add_line_item| ROOT["Order root"]
-  ROOT -->|recompute total| TOT["total 60.00 then 110.00"]
-  TOT -->|check total <= 100.00| CHK["second add violates"]
-  CHK -->|refuse| NO["no change, total back to 60.00"]`,
+      
       code: `// ORDER AGGREGATE SIDE — the root re-checks invariants after each mutation and refuses a violating change
 // PARTIES: SVC = Order Service (sole owner) · AG = Order aggregate
 // DEF: cap — the maximum order total the root enforces = 100.00
@@ -169,10 +161,7 @@ registerChapter({
         "Domain event — emitted on update",
         "One transaction — one aggregate"
       ],
-      diagram: `flowchart LR
-  SVC["Order Service"] -->|place_order| AG["Order aggregate"]
-  AG -->|emit OrderPlaced| EVT["Domain event"]
-  SVC -.->|untouched| CUST["Customer aggregate"]`,
+      
       code: `// ORDER SERVICE SIDE — the business logic is a collection of aggregates, and an aggregate emits a domain event when it changes
 // PARTIES: SVC = Order Service · AG = Order aggregate · EVT = the domain event the aggregate emits
 // STATE (before):
@@ -198,10 +187,7 @@ registerChapter({
         "Invariant — enforced only at the root",
         "Sizing — one operation, one aggregate"
       ],
-      diagram: `flowchart LR
-  OUT["External code"] -->|OK| ROOT["Order root"]
-  OUT -.->|blocked| CHILD["Line item child"]
-  ROOT -->|enforces invariants| CHILD`,
+      
       code: `// ORDER AGGREGATE SIDE — every mutation must go through the root; reaching a child directly is refused
 // PARTIES: SVC = Order Service · AG = Order aggregate
 // DEF: child — a line item owned by the root = order.items[0] = { product:"BOOK-1", qty:2, unit:25.00 }
@@ -258,7 +244,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  CLI[\"client\"] -->|\"add CHAIR-1 to PO-77\"| AG[\"order aggregate root\"]\n  AG -->|\"load / save\"| REPO[\"repository\"]\n  REPO -->|\"SELECT / UPDATE\"| DB[(\"PostgreSQL 16 @ orders-db-1\")]",
+    
     program: `// SYSTEM DESIGN — aggregate as a pipeline: client -> aggregate root (domain objects) -> repository -> database (one unit of consistency per command)
 // PARTIES: CLI = client (calls the aggregate) · AG = order aggregate root (order + line items) · REPO = repository · DB = PostgreSQL 16 @ orders-db-1
 // DEF: orders — the aggregate's stored form; here ("PO-77", total 35.00), ("PO-2001", total 125.00)

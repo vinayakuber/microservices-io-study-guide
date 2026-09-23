@@ -10,26 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 24 · microservice
 
 > **Why this matters:** A single one-size-fits-all API serves every client the same payload, even though each client needs different data over a different network.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Two clients, different needs</b><br/>WEB wants an elaborate page, MOB wants a lean one"]:::start
-  n1["<b>2. Shared gateway sends the full shape</b><br/>fields becomes title, author, price, reviews, buying_options, 5 fields"]:::step
-  n2["<b>3. Mobile renders only two</b><br/>needed becomes title and price"]:::step
-  n3["<b>4. Count the waste</b><br/>extra becomes 3, the gateway sent 5 fields, mobile uses 2"]:::core
-  n4["<b>5. Waste travels the slowest link</b><br/>3 fields ride a slow mobile network for nothing"]:::stop
-  n5["<b>Alt - a dedicated mobile gateway</b><br/>fields becomes title and price only, extra stays 0"]:::warn
-  n0 -->|"1. one API serves all"| n1
-  n1 -->|"2. mobile uses less"| n2
-  n2 -->|"3. tally the extra"| n3
-  n3 -->|"4. paid on mobile"| n4
-  n3 -->|"5. alt - per-client shape"| n5
-```
-
 1. **Clients have different needs** — A desktop page is more elaborate than a mobile page, so each wants different data.
 
 2. **One API must serve all** — A single shared gateway returns the same shape to every client that calls it.
@@ -55,27 +35,6 @@ flowchart TD
 ### One gateway per client
 
 > **Why this matters:** Backends for frontends defines a separate API gateway for each type of client, so each client gets an API shaped exactly for its needs.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Each client type gets its own gateway</b><br/>GW-W owned by the public API team, GW-M owned by the mobile team"]:::start
-  n1["<b>2. WEB hits GW-W</b><br/>gw_web hits 0 becomes 1, payload gets title POJOs in Action, author Chris Richardson, price 39.99, reviews 12"]:::step
-  n2["<b>3. MOB hits GW-M</b><br/>gw_mobile hits 0 becomes 1, payload gets title POJOs in Action and price 39.99"]:::step
-  n3["<b>4. Each API shaped for its owner</b><br/>GW-W returns 4 fields, GW-M returns 2 fields"]:::core
-  n4["<b>5. Each client gets exactly its own API</b><br/>no compromise shape"]:::stop
-  n5["<b>Alt - a single shared gateway</b><br/>both requests hit one process returning one compromise shape"]:::warn
-  n0 -->|"1. fork by client type"| n1
-  n0 -->|"2. fork by client type"| n2
-  n1 -->|"3. web response"| n3
-  n2 -->|"4. mobile response"| n3
-  n3 -->|"5. done"| n4
-  n3 -->|"6. alt - shared process"| n5
-```
 
 1. **Give each client type its own gateway** — The web, mobile, and third-party clients each get their own API gateway.
 
@@ -105,26 +64,6 @@ flowchart TD
 
 > **Why this matters:** Because each API module is its own standalone process, one misbehaving API cannot easily impact the others — and each can be observed and scaled independently.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Separate processes per API</b><br/>GW-M and GW-W run as their own isolated processes"]:::start
-  n1["<b>2. GW-M hits an out-of-memory fault</b><br/>gw_mobile status running becomes crashed"]:::warn
-  n2["<b>3. Error count rises</b><br/>gw_mobile errors 0 becomes 1"]:::step
-  n3["<b>4. GW-W still serves</b><br/>gw_web hits 0 becomes 1, the web gateway never saw the fault"]:::core
-  n4["<b>5. Crash stays contained</b><br/>GW-W returns a page while GW-M is down, the fault isolated to one process"]:::stop
-  n5["<b>Alt - one shared process</b><br/>the same fault crashes the single gateway, every client loses its API at once"]:::warn
-  n0 -->|"1. fault hits mobile"| n1
-  n1 -->|"2. record the fault"| n2
-  n2 -->|"3. web unaffected"| n3
-  n3 -->|"4. contained"| n4
-  n0 -->|"5. alt - shared process"| n5
-```
-
 1. **Separate processes per API** — Each API module runs as its own process, isolated from the others.
 
 2. **A fault stays contained** — One misbehaving API cannot easily impact other APIs.
@@ -149,28 +88,6 @@ flowchart TD
 ### The duplication and bottleneck risks
 
 > **Why this matters:** Separate gateways risk duplicating common functionality and becoming a development bottleneck, so the common code should be a shared library and the update process lightweight.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Both gateways need the same function</b><br/>verify_access_token, a common edge function"]:::start
-  n1["<b>2. GW-M implements it</b><br/>edge_fn owner becomes mobile team"]:::warn
-  n2["<b>3. GW-W copies it</b><br/>edge_fn owner becomes web team, code is a copy 2, a duplicate"]:::warn
-  n3["<b>4. Refactor into the shared library</b><br/>edge_fn owner becomes shared library"]:::step
-  n4["<b>5. One shared implementation</b><br/>the duplicate is removed, both gateways use LIB"]:::core
-  n5["<b>6. Bottleneck avoided</b><br/>lightweight shared code, no developer waiting in line"]:::stop
-  n6["<b>Alt - two different stacks</b><br/>the code cannot be shared, the function stays duplicated in two places"]:::warn
-  n0 -->|"1. first team writes it"| n1
-  n1 -->|"2. second team copies it"| n2
-  n2 -->|"3. deduplicate"| n3
-  n3 -->|"4. shared once"| n4
-  n4 -->|"5. updates stay light"| n5
-  n2 -->|"6. alt - stacks differ"| n6
-```
 
 1. **Common code can be duplicated** — Different gateways may each re-implement common functionality such as edge functions.
 
@@ -234,16 +151,6 @@ flowchart TD
   R -->|"comprises"| P1["LIB — shared library with verify_access_token"]
 ```
 
-```mermaid
-flowchart LR
-  WEB["WEB desktop client"] -->|"calls"| GWW["GW-W web gateway"]
-  MOB["MOB mobile client"] -->|"calls"| GWM["GW-M mobile gateway"]
-  GWW -->|"calls"| PROD["Product service"]
-  GWM -->|"calls"| PROD
-  GWW -->|"uses"| LIB["Shared library verify_access_token"]
-  GWM -->|"uses"| LIB
-```
-
 ```java
 // SYSTEM DESIGN — BFF: client -> per-client gateway -> upstream services, one product fetched for two devices
 // PARTIES: WEB = the desktop client · MOB = the mobile client · GWW = web gateway (public API team) · GWM = mobile gateway (mobile team) · PROD = Product service
@@ -273,13 +180,6 @@ A single shared gateway serves the product page to both the desktop web client a
 - Desktop web client
 - Mobile client
 - wasted-fields counter
-
-```mermaid
-flowchart LR
-  G["Shared gateway"] -->|"5 fields"| W["Desktop client (renders 5)"]
-  G -->|"5 fields"| M["Mobile client (renders 2)"]
-  M -->|"3 unused fields"| X["wasted on slow network"]
-```
 
 ```java
 // GATEWAY SIDE — one shared gateway sends both clients the same shape, wasting the slowest link
@@ -316,14 +216,6 @@ The web team wants the full product payload, while the mobile team wants only ti
 - Mobile gateway (mobile team)
 - Desktop web client
 - Mobile client
-
-```mermaid
-flowchart LR
-  W["Web client"] -->|"GET /web/product/P-9"| GW["GW-W (public API team)"]
-  M["Mobile client"] -->|"GET /mobile/product/P-9"| GM["GW-M (mobile team)"]
-  GW -->|"4 fields"| W
-  GM -->|"2 fields"| M
-```
 
 ```java
 // GATEWAY SIDE — two clients hit two different gateways, each shaped for its owner
@@ -362,14 +254,6 @@ The mobile gateway hits an out-of-memory fault in production. The team needs to 
 - Web gateway process
 - out-of-memory fault
 
-```mermaid
-flowchart LR
-  F["OOM fault"] -->|"crashes"| GM["GW-M process"]
-  GM -->|"status crashed"| X["errors 1"]
-  GW["GW-W process"] -->|"still serves"| W["Web client"]
-  GM -.->|"does not affect"| GW
-```
-
 ```java
 // GATEWAY SIDE — one misbehaving module cannot take down the others
 // PARTIES: GWM = Mobile gateway · GWW = Web gateway
@@ -405,15 +289,6 @@ The web and mobile gateways each hand-write an auth edge function, and the two c
 - shared edge-function library
 - verify_access_token
 
-```mermaid
-flowchart LR
-  GM["GW-M"] -->|needs| F["verify_access_token"]
-  GW["GW-W"] -->|needs| F
-  F -->|moved into| LIB["shared library"]
-  LIB -->|"used by"| GM
-  LIB -->|"used by"| GW
-```
-
 ```java
 // GATEWAY SIDE — two stacks would duplicate a common edge function unless it is shared
 // PARTIES: GWM = Mobile gateway · GWW = Web gateway · LIB = shared edge-function library
@@ -446,11 +321,20 @@ _From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-syste
 
 Implement a separate API gateway for each type of client, owned and operated by a single client team.
 
-```mermaid
-flowchart LR
-  G["Shared gateway"] -->|"5 fields"| W["Desktop client (renders 5)"]
-  G -->|"5 fields"| M["Mobile client (renders 2)"]
-  M -->|"3 unused fields"| X["wasted on slow network"]
+```java
+// GATEWAY SIDE — one shared gateway sends both clients the same shape, wasting the slowest link
+// PARTIES: GW = shared gateway · WEB = desktop web client · MOB = mobile client
+// STATE (before):
+//    fields : []                              // the fields the shared gateway returns
+//    needed : []                              // the fields the requesting client actually renders
+//    extra : 0                                // fields sent but not needed
+// DEF: serve_product_page · CALLED BY: GW answering a mobile request
+// -> request : {"client":"MOB","product":"P-9"}    // the mobile client asks for the product page
+//    step 1 · gateway sends the full desktop shape    fields : [] -> ["title","author","price","reviews","buying_options"]
+//    step 2 · mobile renders only two of them    needed : [] -> ["title","price"]
+//    step 3 · count the waste    extra : 0 -> 3  BECAUSE the gateway sent 5 fields and the mobile client uses only 2
+// <- extra : 3 · fields = 5, needed = 2, so 3 fields travel a slow mobile network for nothing
+//    alt a dedicated mobile gateway existed : fields : ["title","author","price","reviews","buying_options"] -> ["title","price"] -> extra : 0 -> 0
 ```
 
 

@@ -10,26 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. · microservices.i
 
 > **Why this matters:** Every contract has two sides; this pattern puts the client under test and asks whether it can still talk to the service it depends on.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. The client is the subject</b><br/>OrderServiceProxy is under test, not the service"]:::start
-  n1["<b>2. Form the request</b><br/>GET /orders/ORD-4007, the service expected method and path"]:::step
-  n2["<b>3. Send and receive</b><br/>response status 200, the service answers the well-formed request"]:::step
-  n3["<b>4. Parse the body</b><br/>body orderId ORD-4007 state CREATED"]:::step
-  n4["<b>5. Verdict pass</b><br/>the client sent a valid request and consumed the reply"]:::stop
-  n5["<b>Client cannot communicate</b><br/>a malformed path yields status 500, verdict fail"]:::warn
-  n0 -->|"1. exercise the client"| n1
-  n1 -->|"2. valid path"| n2
-  n2 -->|"3. read the reply"| n3
-  n3 -->|"4. consumed correctly"| n4
-  n1 -->|"5. malformed path - fail"| n5
-```
-
 1. **The client is the subject** — The client is the service's caller — the side that forms requests and reads replies — and it is what the test verifies.
 
 2. **Communicate means two directions** — Communication means sending a well-formed request and consuming the service's reply, so the test checks both.
@@ -55,26 +35,6 @@ flowchart TD
 ### Forming the outgoing request
 
 > **Why this matters:** The first half of "can communicate" is the request: the client must send the method, path, and headers the service expects, or nothing downstream works.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Build the outgoing request</b><br/>the client must form what the service expects"]:::start
-  n1["<b>2. Set the method</b><br/>GET, per the contract"]:::step
-  n2["<b>3. Substitute into the path</b><br/>/orders/ORD-4007, the order id filled into the template"]:::step
-  n3["<b>4. Advertise the headers</b><br/>Accept application/json"]:::step
-  n4["<b>5. Request well-formed</b><br/>method, path, and headers all match the contract"]:::stop
-  n5["<b>Wrong path</b><br/>/order/ORD-4007 drops the plural, the service expects /orders, verdict fail"]:::warn
-  n0 -->|"1. method first"| n1
-  n1 -->|"2. path next"| n2
-  n2 -->|"3. headers last"| n3
-  n3 -->|"4. all match"| n4
-  n2 -->|"5. typo - fail"| n5
-```
 
 1. **Method** — The client must use the HTTP method the service's contract specifies, such as GET.
 
@@ -102,26 +62,6 @@ flowchart TD
 
 > **Why this matters:** The second half is the reply: the client must read the status, headers, and body correctly, or it will misparse a healthy service.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. The reply arrives</b><br/>raw_reply status 200, Content-Type application/json, body orderId ORD-4007 state CREATED"]:::start
-  n1["<b>2. Read the status</b><br/>received status becomes 200, the call succeeded before parsing"]:::step
-  n2["<b>3. Read the headers</b><br/>Content-Type application/json, the body is JSON before decoding"]:::step
-  n3["<b>4. Decode the body</b><br/>parsed orderId becomes ORD-4007, state becomes CREATED"]:::core
-  n4["<b>5. Response consumed correctly</b><br/>the client fields match the service reply"]:::stop
-  n5["<b>Unexpected body</b><br/>an error shape not found, parsed orderId stays empty, no field to decode"]:::warn
-  n0 -->|"1. status before parse"| n1
-  n1 -->|"2. type before decode"| n2
-  n2 -->|"3. JSON body"| n3
-  n3 -->|"4. fields extracted"| n4
-  n2 -->|"5. error body - misparse"| n5
-```
-
 1. **Read the status** — The client must confirm the call succeeded before trying to parse anything.
 
 2. **Read the headers** — The client must check the content type so it decodes the body the right way.
@@ -147,26 +87,6 @@ flowchart TD
 ### The client is the thing under test
 
 > **Why this matters:** Placing the test on the client side means a client regression is caught where it is written, before it ships to every service it calls.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. The client is the subject</b><br/>the test asserts what the client sends and reads, not provider internals"]:::start
-  n1["<b>2. Check outgoing</b><br/>cli_behavior sends GET /orders/ORD-4007"]:::step
-  n2["<b>3. Check incoming</b><br/>cli_behavior reads orderId and state"]:::step
-  n3["<b>4. Both assertions hold</b><br/>checks 0 becomes 2, request and response both pass"]:::core
-  n4["<b>5. Client can communicate</b><br/>failures stays 0"]:::stop
-  n5["<b>Wrong path fails fast</b><br/>sends GET /order/ORD-4007, failures 0 becomes 1, endpoint unreachable"]:::warn
-  n0 -->|"1. assert the send"| n1
-  n1 -->|"2. correct path"| n2
-  n2 -->|"3. assert the read"| n3
-  n3 -->|"4. both pass"| n4
-  n1 -->|"5. wrong path - fail"| n5
-```
 
 1. **Assert on the client's own behavior** — The test checks what the client sends and what it reads, not the provider's internals.
 
@@ -232,13 +152,6 @@ flowchart TD
   R -->|"comprises"| P1["answers the well-formed request in production"]
 ```
 
-```mermaid
-flowchart LR
-  CLI["OrderServiceProxy (consumer under test)"] -->|"sends GET /orders/ORD-4007"| STUB["mock provider stub (contract)"]
-  STUB -->|"canned reply 200 + JSON body"| CLI
-  CLI -->|"same request in production"| SVC["Order Service (real provider)"]
-```
-
 ```java
 // SYSTEM DESIGN — consumer-side contract test: consumer (OrderServiceProxy) -> mock provider (contract stub) -> provider service (real Order Service)
 // PARTIES: CLI = OrderServiceProxy (consumer under test) · STUB = mock provider stub (contract double) · SVC = Order Service (the real provider service)
@@ -272,13 +185,6 @@ Order Service changed its endpoint, and the OrderServiceProxy stopped talking to
 - Order Service
 - client-side test
 - request + reply assertions
-
-```mermaid
-flowchart LR
-  T["Client-side test"] -->|"asserts"| S["sends GET /orders/ORD-4007"]
-  T -->|"asserts"| R["reads status + JSON body"]
-  T -->|"subjects"| C["OrderServiceProxy"]
-```
 
 ```java
 // CLIENT SIDE — verify the client can communicate with the service (the client's half of the contract)
@@ -314,14 +220,6 @@ A developer typos the path template in OrderServiceProxy, changing /orders to /o
 - OrderServiceProxy
 - Order Service
 - method/path/headers builder
-
-```mermaid
-flowchart LR
-  C["OrderServiceProxy"] -->|"method GET"| R["outbound request"]
-  C -->|"path /orders/ORD-4007"| R
-  C -->|"Accept header"| R
-  R -->|"hits endpoint"| S["Order Service"]
-```
 
 ```java
 // CLIENT SIDE — the outgoing request: the client must form the service's expected method, path, and headers
@@ -360,14 +258,6 @@ The service now returns a Content-Type header and a JSON body, and the proxy mus
 - header check
 - body decoder
 
-```mermaid
-flowchart LR
-  S["Order Service"] -->|"200 + JSON body"| C["OrderServiceProxy"]
-  C -->|"read status"| A["received.status"]
-  C -->|"read Content-Type"| B["received.headers"]
-  C -->|"decode"| D["parsed: orderId, state"]
-```
-
 ```java
 // CLIENT SIDE — the incoming response: the client must read the service's status, headers, and body correctly
 // PARTIES: CLI = OrderServiceProxy · SVC = Order Service
@@ -404,13 +294,6 @@ The team debates where to put the test: on the provider (consumer-driven) or on 
 - request assertion
 - response assertion
 
-```mermaid
-flowchart LR
-  T["Consumer-side test"] -->|"checks sends"| S["GET /orders/ORD-4007"]
-  T -->|"checks reads"| R["orderId, state"]
-  T -.->|"complements"| D["consumer-driven (provider side)"]
-```
-
 ```java
 // CLIENT SIDE — the client is the subject under test, not the provider
 // PARTIES: CLI = OrderServiceProxy (subject) · SVC = Order Service (the service it talks to)
@@ -446,11 +329,20 @@ _From the 28 problems:_ 03-framework-for-system-design-interviews
 
 Verify that the client of a service can communicate with the service.
 
-```mermaid
-flowchart LR
-  T["Client-side test"] -->|"asserts"| S["sends GET /orders/ORD-4007"]
-  T -->|"asserts"| R["reads status + JSON body"]
-  T -->|"subjects"| C["OrderServiceProxy"]
+```java
+// CLIENT SIDE — verify the client can communicate with the service (the client's half of the contract)
+// PARTIES: CLI = OrderServiceProxy (the client) · SVC = Order Service (the service) · TST = the client-side test
+// STATE (before):
+//    request : { method:"", path:"", headers:{} }
+//    response : { status:0, body:{} }
+// DEF: call_get_order · CALLED BY: TST exercising the client against the service contract
+// -> order_id : "ORD-4007"
+//    step 1 · form the request : request.method : "" -> "GET" · request.path : "" -> "/orders/ORD-4007"  BECAUSE the client must send the service's expected method and path
+//    step 2 · send and receive : response.status : 0 -> 200  BECAUSE the service answers the well-formed request
+//    step 3 · parse the body : response.body : {} -> {"orderId":"ORD-4007","state":"CREATED"}  BECAUSE the client reads the order's JSON from the reply
+// <- verdict : "pass" · response.status : 200  BECAUSE the client sent a valid request and consumed the reply
+//    alt client cannot communicate : response.status : 200 -> 500  BECAUSE the client sent a malformed path
+//       verdict : "pass" -> "fail"  BECAUSE the client no longer reaches the service's contract
 ```
 
 

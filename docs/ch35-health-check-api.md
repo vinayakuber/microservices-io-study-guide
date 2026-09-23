@@ -10,28 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 35 · microservice
 
 > **Why this matters:** A service instance can be running yet unable to handle requests; without an endpoint that reports its health, nothing outside the instance can tell the difference. Exposing /health is the entry point for both alerting and routing.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-n0["<b>1. Monitor polls</b><br/>MON calls GET /health every 30 s"]:::start
-  n1["<b>2. Probe the DB pool</b><br/>connection pool open, db UNKNOWN becomes UP"]:::step
-  n2["<b>3. Combine the checks</b><br/>into one verdict"]:::step
-  n3["<b>4. Verdict formed</b><br/>health db UP, status UP"]:::core
-  n4["<b>5. Respond with the body</b><br/>body becomes status UP"]:::step
-  n5["<b>6. Instance marked healthy</b><br/>MON records the instance as UP"]:::stop
-  n6["<b>DB pool exhausted</b><br/>probe closed, status DOWN, body status DOWN"]:::warn
-  n0 -->|"1. poll arrives"| n1
-  n1 -->|"2. checks combined"| n2
-  n2 -->|"3. verdict formed"| n3
-  n3 -->|"4. respond"| n4
-  n4 -->|"5. healthy"| n5
-  n1 -->|"6. pool exhausted"| n6
-```
-
 1. **Add the endpoint** — The service exposes a health check API endpoint such as HTTP /health.
 
 2. **Return the health** — The endpoint returns the health of the service as its result.
@@ -55,30 +33,6 @@ n0["<b>1. Monitor polls</b><br/>MON calls GET /health every 30 s"]:::start
 ### Check the things that can fail
 
 > **Why this matters:** Health is not a boolean the process knows on its own; it is the result of probing real dependencies. A handler that checks connections, the host, and application logic can actually detect the running-but-broken state.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-n0["<b>1. One poll, three checks</b><br/>the /health handler runs on each poll"]:::start
-  n1["<b>2. Check infra connections</b><br/>DB open, db UP"]:::step
-  n2["<b>3. Check the host disk</b><br/>12 free above the 1 floor, disk UP"]:::step
-  n3["<b>4. Run application logic</b><br/>passes, app UP"]:::step
-  n4["<b>5. Combine the verdicts</b><br/>checks db UP, disk UP, app UP"]:::core
-  n5["<b>6. Healthy verdict</b><br/>healthy only if all three are UP"]:::stop
-  n6["<b>One check fails</b><br/>db DOWN, the whole instance reports DOWN"]:::warn
-  n0 -->|"1. check connections"| n1
-  n0 -->|"2. check host"| n2
-  n0 -->|"3. check app logic"| n3
-  n1 -->|"4. combine verdicts"| n4
-  n2 -->|"5. combine verdicts"| n4
-  n3 -->|"6. combine verdicts"| n4
-  n4 -->|"7. all UP"| n5
-  n1 -->|"8. a check fails"| n6
-```
 
 1. **Check infrastructure connections** — The handler checks the status of the connections to the infrastructure services the instance uses.
 
@@ -104,27 +58,6 @@ n0["<b>1. One poll, three checks</b><br/>the /health handler runs on each poll"]
 
 > **Why this matters:** A single health check is a snapshot; failures happen between snapshots. A client that polls on a fixed interval catches transitions from healthy to unhealthy over time.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-n0["<b>1. Next poll tick</b><br/>MON scheduler fires, every 30 s"]:::start
-  n1["<b>2. Poll SVC1</b><br/>GET /health returns UP, no change"]:::step
-  n2["<b>3. Poll SVC2</b><br/>GET /health returns DOWN, seen flips UP becomes DOWN"]:::step
-  n3["<b>4. Count healthy instances</b><br/>healthy 2 becomes 1"]:::core
-  n4["<b>5. Act on the flip</b><br/>MON alerts, SVC2 pulled from routing"]:::stop
-  n5["<b>Both UP this tick</b><br/>healthy stays 2, no alert, routing unchanged"]:::warn
-  n0 -->|"1. poll each instance"| n1
-  n1 -->|"2. next instance"| n2
-  n2 -->|"3. compare with previous"| n3
-  n3 -->|"4. flipped to DOWN"| n4
-  n4 -->|"5. next tick"| n0
-  n3 -->|"6. all still UP"| n5
-```
-
 1. **Choose a client** — A monitoring service, service registry, or load balancer acts as the health check client.
 
 2. **Poll on an interval** — The client periodically invokes the endpoint on each instance.
@@ -148,27 +81,6 @@ n0["<b>1. Next poll tick</b><br/>MON scheduler fires, every 30 s"]:::start
 ### Route and alert on the result
 
 > **Why this matters:** The value of a health check is what you do with the answer: keep traffic off broken instances and wake a human. Routing and alerting are the two actions that consume the endpoint's verdict.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-n0["<b>1. Health check reports failure</b><br/>SVC2 DOWN"]:::start
-  n1["<b>2. Stop routing to it</b><br/>LB removes SVC2 from its routing table"]:::step
-  n2["<b>3. Next request routes safely</b><br/>target null becomes SVC1"]:::step
-  n3["<b>4. Registry and alert</b><br/>REG drops SVC2, MON raises alert SVC2 DOWN at tick 2"]:::core
-  n4["<b>5. Traffic stays on working instances</b><br/>pool holds SVC1 only"]:::stop
-  n5["<b>SVC2 recovers</b><br/>health SVC2 UP, rejoins the pool"]:::warn
-  n0 -->|"1. failure detected"| n1
-  n1 -->|"2. traffic avoids the failure"| n2
-  n2 -->|"3. registry and alert"| n3
-  n3 -->|"4. only working instances"| n4
-  n4 -->|"5. instance recovers"| n5
-  n5 -->|"6. rejoin the pool"| n1
-```
 
 1. **Stop routing to failed instances** — The load balancer or service registry does not route requests to a failed instance.
 
@@ -230,14 +142,6 @@ flowchart TD
   R -->|"comprises"| P1["REG de-registers the unhealthy instance"]
 ```
 
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|"GET /health"| MON["Monitoring service"]
-  MON -->|"probe"| DB["PostgreSQL 16 @ orders-db-1"]
-  DB -->|"UP or DOWN"| MON
-  MON -->|"mark DOWN"| LB["Load balancer + service registry"]
-```
-
 ```java
 // SYSTEM DESIGN — health check: service instance -> /health endpoint -> health-check client -> routing/alert
 // PARTIES: SVC = Order Service (instance under check) · MON = monitoring service (health-check client) · DB = PostgreSQL 16 @ orders-db-1 (the checked database) · LB = load balancer (routing) · REG = service registry (registration)
@@ -269,14 +173,6 @@ Your order service is running but has quietly exhausted its database connection 
 - Dependency probe — checks the DB pool
 - Health verdict — UP or DOWN
 - Health check client — polls the endpoint
-
-```mermaid
-flowchart LR
-  MON["Monitoring service"] -->|"GET /health every 30 s"| SVC["Order Service /health"]
-  SVC -->|"probes"| DB["Database pool"]
-  DB -->|"exhausted"| SVC
-  SVC -->|"verdict"| R["status DOWN"]
-```
 
 ```java
 // ORDER SERVICE SIDE — the /health handler probes its database dependency and returns a verdict a client can read
@@ -312,16 +208,6 @@ Health is not a boolean the process knows on its own; it is the result of probin
 - Application-specific logic check
 - Combined verdict — all must pass
 
-```mermaid
-flowchart LR
-  H["/health handler"] -->|"checks"| DB["Infra connections"]
-  H -->|"checks"| DSK["Host disk space"]
-  H -->|"checks"| APP["App logic"]
-  DB -->|"UP"| V["Verdict"]
-  DSK -->|"UP"| V
-  APP -->|"DOWN"| V["Verdict DOWN"]
-```
-
 ```java
 // ORDER SERVICE SIDE — one handler runs three checks: infra connections, host disk, and application logic
 // PARTIES: SVC = Order Service instance · DB = PostgreSQL 16 @ orders-db-1 · HOST = the machine it runs on
@@ -355,14 +241,6 @@ A single health check is a snapshot, and failures happen between snapshots. Your
 - Fixed polling interval
 - Previous-result history
 - Flip detection — UP to DOWN
-
-```mermaid
-flowchart LR
-  MON["Monitoring service"] -->|"tick 3 poll"| SVC["Instance SVC"]
-  SVC -->|"DOWN"| MON
-  MON -->|"compares"| H["history UP,UP,DOWN"]
-  H -->|"flip detected"| A["Alert"]
-```
 
 ```java
 // MONITORING SERVICE SIDE — a health-check client polls one instance over three ticks and catches the UP -> DOWN flip
@@ -398,14 +276,6 @@ Your load balancer kept routing to an instance that was healthy a second ago and
 - Monitoring system — raises an alert
 - Recovery — instance returns to the pool
 
-```mermaid
-flowchart LR
-  LB["Load balancer"] -->|"SVC2 reports UP again"| CHK["Recheck verdict"]
-  CHK -->|"UP"| POOL["pool SVC1 + SVC2"]
-  CHK -->|"clear"| ALERT["alert cleared"]
-  POOL -->|"traffic resumes"| SVC2["SVC2 instance"]
-```
-
 ```java
 // LOAD BALANCER SIDE — a failed instance is pulled from routing, and when it recovers it is added back to the pool
 // PARTIES: LB = load balancer · SVC1 = healthy instance · SVC2 = recovering instance
@@ -437,12 +307,18 @@ _From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-syste
 
 A service has a health check API endpoint such as HTTP /health that returns the health of the service.
 
-```mermaid
-flowchart LR
-  MON["Monitoring service"] -->|"GET /health every 30 s"| SVC["Order Service /health"]
-  SVC -->|"probes"| DB["Database pool"]
-  DB -->|"exhausted"| SVC
-  SVC -->|"verdict"| R["status DOWN"]
+```java
+// ORDER SERVICE SIDE — the /health handler probes its database dependency and returns a verdict a client can read
+// PARTIES: SVC = Order Service instance · DB = PostgreSQL 16 @ orders-db-1 · MON = monitoring service
+// STATE (before):
+//    health : { db:"UNKNOWN", status:null }
+// DEF: health_check · CALLED BY: MON polling GET /health every 30 s
+// -> req : "GET /health"
+//    step 1 · probe the DB connection pool -> exhausted   // health.db : "UNKNOWN" -> "DOWN"   BECAUSE all 10 connections are busy
+//    step 2 · combine all checks into one verdict   // health.status : null -> "DOWN"
+//    step 3 · respond with the verdict as the body   // body : {} -> {"status":"DOWN"}
+// <- health : {"db":"DOWN","status":"DOWN"} · MON now marks the instance unhealthy even though the process is alive
+//    alt pool has a free connection : health.db : "UNKNOWN" -> "UP", status : null -> "UP", body : {"status":"UP"}
 ```
 
 

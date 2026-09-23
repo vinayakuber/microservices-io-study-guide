@@ -128,10 +128,7 @@ registerChapter({
         "Credit limit — the data the order write must check",
         "2PC — rejected for coupling and blocking"
       ],
-      diagram: `flowchart LR
-  ORD["Order Service"] -->|INSERT order| ORDDB[("Orders DB")]
-  ORD -->|check credit| CSDB[("Customers DB")]
-  CSDB -.->|no such table| X["Local tx cannot span"]`,
+      
       code: `// ORDER SERVICE SIDE — a local ACID transaction cannot reach the credit data that lives in another service
 // PARTIES: ORD = Order Service · ORDDB = PostgreSQL 16 @ orders-db-1 · CS = Customer Service · CSDB = PostgreSQL 16 @ customers-db-1
 // DEF: credit — the customer's spending limit owned by the Customer Service = 100.00 (the order total that must not exceed it)
@@ -160,13 +157,7 @@ registerChapter({
         "Compensating transactions — undo earlier steps",
         "Replies — each participant reports its outcome"
       ],
-      diagram: `flowchart LR
-  ORD["Orchestrator"] -->|create PENDING| ORDDB[("Order")]
-  ORD -->|ReserveCredit| CS["Customer Service"]
-  CS -->|credit_reserved| ORD
-  ORD -->|CreateTicket| KIT["Kitchen Service"]
-  KIT -->|ticket_rejected| ORD
-  ORD -->|ReleaseCredit| CS`,
+      
       code: `// ORDER SERVICE SIDE — an orchestrated create-order saga across three services, with a failure and full compensation
 // PARTIES: CLIENT = the user · ORD = Order Service (runs the orchestrator) · CS = Customer Service · KIT = Kitchen Service
 // DEF: credit — the customer's available balance a saga step reserves and releases = { "CUST-7" : 500.00 }
@@ -201,10 +192,7 @@ registerChapter({
         "Local transactions — one per event handler",
         "No orchestrator — the events are the coordination"
       ],
-      diagram: `flowchart LR
-  ORD["Order Service"] -->|OrderCreated| CS["Customer Service"]
-  CS -->|CreditReserved| ORD
-  ORD -->|approve| ORDDB[("Order APPROVED")]`,
+      
       code: `// ORDER SERVICE SIDE — choreography: each local transaction publishes a domain event that triggers the next local transaction
 // PARTIES: ORD = Order Service · CS = Customer Service · BRK = the events travelling between them
 // DEF: credit — the customer's available balance a saga step reserves = { "CUST-7" : 500.00 }
@@ -234,10 +222,7 @@ registerChapter({
         "Visible intermediate state — the reserved amount",
         "Countermeasures — implement isolation"
       ],
-      diagram: `flowchart LR
-  A["Saga A reserves 100.00"] -->|balance now 400.00| DB[("Customer credit")]
-  B["Saga B reads balance"] -->|sees 400.00| DB
-  B -->|reserves against uncommitted state| RISK["Anomaly"]`,
+      
       code: `// CUSTOMER SERVICE SIDE — no ACID isolation: a second saga reads a balance a first saga reserved but has not committed
 // PARTIES: A = saga A · B = saga B · CS = Customer Service
 // DEF: balance — the customer's credit balance both sagas touch = 500.00
@@ -297,7 +282,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  ORCH[\"saga orchestrator\"] -->|\"reserve credit 100.00\"| CS[\"customer service\"]\n  CS -->|\"CreditReserved\"| BRK[(\"message broker RabbitMQ\")]\n  BRK -->|\"step outcome\"| ORCH\n  ORCH -->|\"create ticket\"| KIT[\"kitchen service\"]\n  ORD[\"order service\"] -->|\"OrderCreated\"| ORCH",
+    
     program: `// SYSTEM DESIGN — saga (orchestrated) as a pipeline: orchestrator -> participant services -> event/message broker (each step executes + records state, compensations on failure)
 // PARTIES: ORCH = saga orchestrator (orders steps, tracks state, compensates) · ORD = order service (participant) · CS = customer service (participant) · KIT = kitchen service (participant) · BRK = message broker (RabbitMQ)
 // DEF: orders — ORD's datastore; here PostgreSQL 16 @ orders-db-1, row ("PO-77", "PENDING")

@@ -51,7 +51,6 @@ function collectBlocks() {
   for (const ch of CHAPTERS) {
     const sd = ch.systemDesign;
     if (sd) {
-      if (sd.wiring) push(sd.wiring, `${ch.id} systemDesign.wiring`);
       for (const d of (Array.isArray(sd.decomposition) ? sd.decomposition : [])) {
         // recompute the tree exactly as tools/to_markdown.js renders it
         let t = 'flowchart TD\n  R["' + mmEsc(d.box) + '"]\n';
@@ -59,13 +58,10 @@ function collectBlocks() {
         push(t, `${ch.id} decomposition: ${d.box}`);
       }
     }
-    for (const iq of (ch.interview || [])) {
-      if (iq.diagram) push(iq.diagram, `${ch.id} interview diagram`);
-    }
   }
 
   // authored raw mermaid sources
-  for (const fn of ['section-diagrams.json', 'card-diagrams.json']) {
+  for (const fn of ['card-diagrams.json']) {
     const p = path.join(ROOT, 'tools', fn);
     if (!fs.existsSync(p)) continue;
     let j; try { j = JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { continue; }

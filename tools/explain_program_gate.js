@@ -19,7 +19,7 @@
 //       section that names the pipeline roles (writer→transport→collector→
 //       aggregator→reader, or the chapter's declared equivalent), decomposes
 //       each major component into its internals, and draws the wiring as a
-//       mermaid diagram + an annotated program. Naming a component is not
+//       annotated execution trace (systemDesign.program). Naming a component is not
 //       defining it; defining it is not wiring it.
 //   R17 (chapter-level) every chapter with a systemDesign section must OPEN it
 //       with the interview question being solved — the problem, the use case,
@@ -262,8 +262,8 @@ for (const ch of CHAPTERS) {
 
   // R16: system-design decomposition (chapter-level) — a chapter with a program
   // must carry a systemDesign section that names the pipeline roles, decomposes
-  // each major component into its internals, draws the wiring as a mermaid
-  // diagram, and annotates the wiring with the explain-program markers. Naming
+  // each major component into its internals, annotates the wiring as an execution trace
+  // (systemDesign.program) with the explain-program markers. Naming
   // a component is not defining it; defining it is not wiring it.
   if ((ch.flow || []).some(s => s.program && String(s.program).trim())) {
     const sd = ch.systemDesign;
@@ -274,8 +274,6 @@ for (const ch of CHAPTERS) {
       if (!sd.pipeline) r16.push('R16 systemDesign.pipeline missing (name the writer→transport→collector→aggregator→reader roles)');
       const dec = Array.isArray(sd.decomposition) ? sd.decomposition : [];
       if (!dec.length || !dec.some(d => Array.isArray(d.parts) && d.parts.length >= 2)) r16.push('R16 no component decomposition into internals (>=2 parts)');
-      const w = String(sd.wiring || '');
-      if (!/(flowchart|graph)\b/i.test(w) || !/-->|---/.test(w)) r16.push('R16 no wiring mermaid diagram (a connected flowchart)');
       if (!sd.program || !String(sd.program).trim()) r16.push('R16 systemDesign.program missing (annotate the wiring)');
     }
     if (r16.length) failures.push({ id: ch.id, section: '(system design)', probs: r16 });

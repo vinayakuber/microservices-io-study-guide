@@ -84,10 +84,7 @@ registerChapter({
       q: 'How does the strangler application approach migrating a monolith?',
       solution: 'The migration proceeds by building the new system gradually around the old one, re-implementing one feature at a time, so the monolith keeps running while the new system takes over piece by piece.',
       components: ['Working monolith — runs the business', 'New system — built gradually', 'One feature at a time — the increment', 'Monolith shrinks — as features move'],
-      diagram: `flowchart LR
-  MONO["Monolith"] -->|"re-implement search"| NEW["New system"]
-  NEW -->|"search served"| NEW
-  MONO -->|"keeps"| REST["checkout + accounts"]`,
+      
       code: `// MONOLITH SIDE — the strangler grows by moving one feature at a time out of the monolith
 // PARTIES: MONO = legacy monolith · NEW = new strangler application · U1 = user
 // STATE (before):
@@ -108,10 +105,7 @@ registerChapter({
       q: 'How does the strangler decide which system handles each request?',
       solution: 'A router fronts both systems and looks up each request\'s path in a route table; migrated paths go to new services, and unmigrated paths fall back to the monolith so it keeps running as before.',
       components: ['Router — fronts both systems', 'Route table — path to backend', 'Migrated paths — new services', 'Unmigrated paths — fall back to the monolith'],
-      diagram: `flowchart LR
-  RTR["Strangler router"] -->|"/search"| NEW["New search service"]
-  RTR -->|"/checkout"| MONO["Monolith"]
-  RTR -->|"lookup"| T["route_table"]`,
+      
       code: `// STRANGLER SIDE — a request for an unmigrated path falls back to the monolith, unchanged
 // PARTIES: RTR = strangler router · NEW = new microservice · MONO = legacy monolith · U1 = user
 // STATE (before):
@@ -132,10 +126,7 @@ registerChapter({
       q: 'What two kinds of services make up the strangler application, and why are the new-feature services useful?',
       solution: 'One kind re-implements functionality that previously lived in the monolith, and the other implements brand-new features; the new-feature services are useful because they demonstrate to the business the value of using microservices.',
       components: ['Re-implemented features — take over monolith work', 'Brand-new features — no monolith twin', 'Value demonstration — the new features\' role', 'Ongoing strangling — until the monolith retires'],
-      diagram: `flowchart LR
-  NEW["New system"] -->|"re-implemented"| CHECKOUT["checkout"]
-  NEW -->|"brand-new"| WISH["wishlist"]
-  WISH -->|"demonstrates"| VALUE["value to business"]`,
+      
       code: `// STRANGLER SIDE — a brand-new feature lands in the new app, showing the business what microservices enable
 // PARTIES: NEW = new strangler application · MONO = legacy monolith · RTR = strangler router · U1 = user
 // DEF: brand — a brand-new feature with no monolith twin, added only to the new app; here "wishlist"
@@ -159,11 +150,7 @@ registerChapter({
       q: 'What is the cost of running the strangler alongside the monolith?',
       solution: 'During the migration the monolith and the strangler both run, and both must be operated and deployed, so you pay for two systems side by side for as long as the migration takes.',
       components: ['Monolith — still live', 'Strangler — also live', 'Two deploys — per release', 'The cost lasts — until the monolith retires'],
-      diagram: `flowchart LR
-  RELEASE["Release"] -->|"deploy"| MONO["Monolith"]
-  RELEASE -->|"deploy"| NEW["Strangler"]
-  MONO -->|"until retired"| COST["two systems to run"]
-  NEW -->|"until retired"| COST`,
+      
       code: `// OPS SIDE — one release must deploy both systems, so the migration cost is two systems side by side
 // PARTIES: MONO = legacy monolith · NEW = new strangler application · OPS = operations team
 // STATE (before):
@@ -210,7 +197,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  RTR[\"strangler router\"] -->|\"path /catalog\"| NEW[\"new microservices\"]\n  RTR -->|\"path /orders (fall back)\"| MONO[\"legacy monolith\"]\n  RTR -->|\"lookup\"| T[(\"route_table\")]\n  NEW -->|\"serves\"| RSP[\"catalog items\"]\n  MONO -->|\"serves\"| RSP2[\"checkout + accounts\"]",
+    
     program: `// SYSTEM DESIGN — strangler application: legacy monolith -> strangler façade/router -> new microservices
 // PARTIES: RTR = strangler router (façade: looks up each request path in the path-to-backend map) · NEW = new microservices (serve the migrated paths) · MONO = legacy monolith (serves the unmigrated paths)
 // DEF: route — one mapping from a request path to the system that serves it; here "/catalog" -> "NEW"

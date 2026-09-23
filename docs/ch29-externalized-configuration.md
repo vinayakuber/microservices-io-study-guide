@@ -10,26 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 29 · microservice
 
 > **Why this matters:** A service needs database credentials and network locations to connect to its dependencies. If those are compiled into the code, a build made for QA cannot talk to the production database; reading them from an external source at startup means the same artifact picks up whatever its environment supplies.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Service starts</b><br/>SVC needs DB credentials and network location to connect"]:::start
-  n1["<b>2. Read DB_URL</b><br/>config : empty becomes db_url jdbc:mysql://prod-db:3306/orders"]:::step
-  n2["<b>3. Read DB_PASSWORD</b><br/>config gains db_password prod-secret"]:::step
-  n3["<b>4. Open the connection</b><br/>connection : empty becomes open, URL and password accepted"]:::core
-  n4["<b>5. Connected</b><br/>SVC talks to the production database"]:::stop
-  n5["<b>6. Missing value</b><br/>DB_PASSWORD absent, connection : empty becomes failed"]:::warn
-  n0 -->|"1. startup needs config"| n1
-  n1 -->|"2. pull the URL from the environment"| n2
-  n2 -->|"3. pull the password"| n3
-  n3 -->|"4. values match what the DB expects"| n4
-  n2 -->|"5. password not supplied"| n5
-```
-
 1. **The service starts** — On startup, the service needs configuration telling it how to connect to external and third-party services.
 
 2. **It reads the values externally** — The service reads its configuration from an external source, e.g. OS environment variables, property files, or command-line arguments.
@@ -54,27 +34,6 @@ flowchart TD
 ### Run unchanged across environments
 
 > **Why this matters:** Dev, test, QA, staging, and production each run different instances of the same dependencies — a QA database versus the production database, a test credit-card account versus the production one. Externalizing configuration lets one build serve all of them without modification or recompilation.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. One artifact</b><br/>orders-service.jar, no modification or recompilation"]:::start
-  n1["<b>2. QA injects its values</b><br/>qa_config becomes jdbc:mysql://qa-db:3306/orders, qa-secret"]:::core
-  n2["<b>3. Production injects different values</b><br/>prod_config becomes jdbc:mysql://prod-db:3306/orders, prod-secret"]:::core
-  n3["<b>4. QA connects to its DB</b><br/>qa_connection : empty becomes qa-db"]:::step
-  n4["<b>5. Production connects to its DB</b><br/>prod_connection : empty becomes prod-db"]:::step
-  n5["<b>6. One build, two databases</b><br/>qa points at qa-db, prod at prod-db"]:::stop
-  n0 -->|"1. same jar deployed to QA"| n1
-  n0 -->|"2. same jar deployed to production"| n2
-  n1 -->|"3. QA dependency resolved"| n3
-  n2 -->|"4. production dependency resolved"| n4
-  n3 -->|"5. converge on one artifact"| n5
-  n4 -->|"6. converge on one artifact"| n5
-```
 
 1. **One artifact, many environments** — The same build is deployed to each environment with no modification or recompilation.
 
@@ -105,24 +64,6 @@ flowchart TD
 ### Resolve logical names via discovery
 
 > **Why this matters:** Configuration can name a dependency logically rather than pinning a network location. A logical name like REGISTRATION-SERVICE stays valid when instances move, because client-side discovery turns it into a real address at call time.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Logical name in config</b><br/>config holds user_registration_url http://REGISTRATION-SERVICE/user"]:::start
-  n1["<b>2. Resolve via discovery</b><br/>resolved_url : empty becomes http://10.0.0.7:8080/user"]:::step
-  n2["<b>3. Proxy calls the instance</b><br/>call_target : empty becomes http://10.0.0.7:8080/user"]:::step
-  n3["<b>4. Registration service reached</b><br/>RegistrationServiceProxy reaches REG"]:::stop
-  n4["<b>5. Name unresolved</b><br/>a logical name has no host and port to dial"]:::warn
-  n0 -->|"1. name is not a network location"| n1
-  n1 -->|"2. logical name becomes a real address"| n2
-  n2 -->|"3. invoke the dependency"| n3
-  n0 -->|"4. discovery unavailable - call has no address"| n4
-```
 
 1. **Config names the dependency logically** — The configuration holds a logical name (e.g. USER_REGISTRATION_URL: http://REGISTRATION-SERVICE/user), not a host and port.
 
@@ -189,13 +130,6 @@ flowchart TD
   R -->|"comprises"| P1["is the versioned source of truth"]
 ```
 
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|"pull at startup"| CS["config server"]
-  CS -->|"serves over HTTP"| SVC
-  CS -->|"reads"| GIT[("git repository (config source)")]
-```
-
 ```java
 // SYSTEM DESIGN — externalized configuration: service (Order Service) -> config server (Spring Cloud Config) -> config repository (git/VCS)
 // PARTIES: SVC = Order Service (config consumer, pulls at startup) · CS = Spring Cloud Config server (config server, serves over HTTP) · GIT = git repository (config repository, VCS source of truth)
@@ -228,14 +162,6 @@ Order Service needs a database URL and password to connect on startup. The team 
 - OS environment
 - database server
 - DB_URL / DB_PASSWORD
-
-```mermaid
-flowchart LR
-  S["Order Service"] -->|"startup read"| E["OS environment"]
-  E -->|"DB_URL"| C["config"]
-  E -->|"DB_PASSWORD"| C
-  C -->|"opens"| D["DB connection"]
-```
 
 ```java
 // ORDER SERVICE SIDE — on startup, read DB credentials and location from the environment, not the code
@@ -271,14 +197,6 @@ The release pipeline pushes one orders-service.jar to QA and production. QA must
 - QA environment
 - production environment
 - per-environment DB values
-
-```mermaid
-flowchart LR
-  A["orders-service.jar"] -->|"deployed"| Q["QA env"]
-  A -->|"deployed"| P["Production env"]
-  Q -->|"injects qa-db"| QD["QA database"]
-  P -->|"injects prod-db"| PD["Production database"]
-```
 
 ```java
 // DEPLOYMENT SIDE — the SAME build runs in QA and production because each environment supplies its own values
@@ -319,14 +237,6 @@ The web service's RegistrationServiceProxy is configured with a logical name REG
 - client-side discovery
 - USER_REGISTRATION_URL
 
-```mermaid
-flowchart LR
-  W["Web service"] -->|"binds"| U["USER_REGISTRATION_URL"]
-  U -->|"logical name"| D["client-side discovery"]
-  D -->|"resolves"| R["http://10.0.0.7:8080/user"]
-  W -->|"calls"| R
-```
-
 ```java
 // WEB SERVICE SIDE — config names the dependency logically; client-side discovery resolves the real location
 // PARTIES: WEB = web service (RegistrationServiceProxy) · REG = registration service · DISC = client-side discovery
@@ -363,14 +273,6 @@ A deployment ships with a missing DB_PASSWORD, or a wrong database URL. The code
 - supplied config
 - startup validation
 
-```mermaid
-flowchart LR
-  E["Environment"] -->|"supplies config"| S["Service"]
-  E -->|"missing DB_PASSWORD"| M["mismatch"]
-  S -->|"startup"| C["connection failed"]
-  M -->|"causes"| C
-```
-
 ```java
 // SERVICE SIDE — the environment supplied the wrong values, so the unchanged code fails to connect
 // PARTIES: SVC = order service · ENV = deployment environment · DB = MySQL 8 @ prod-db
@@ -405,12 +307,19 @@ _From the 28 problems:_ 01-scale-from-zero-to-millions
 
 Externalize all configuration, including database credentials and network location; on startup the service reads it from an external source such as OS environment variables.
 
-```mermaid
-flowchart LR
-  S["Order Service"] -->|"startup read"| E["OS environment"]
-  E -->|"DB_URL"| C["config"]
-  E -->|"DB_PASSWORD"| C
-  C -->|"opens"| D["DB connection"]
+```java
+// ORDER SERVICE SIDE — on startup, read DB credentials and location from the environment, not the code
+// PARTIES: SVC = order service · ENV = deployment environment (OS) · DB = MySQL 8 @ prod-db
+// STATE (before):
+//    config : {}                               // SVC holds no DB settings yet at launch
+//    connection : ""                           // no DB connection established yet
+// DEF: startup · CALLED BY: the runtime launching SVC
+// -> env : {"DB_URL":"jdbc:mysql://prod-db:3306/orders","DB_PASSWORD":"prod-secret"}
+//    step 1 · SVC reads DB_URL from the environment    config : {} -> {"db_url":"jdbc:mysql://prod-db:3306/orders"}
+//    step 2 · SVC reads DB_PASSWORD from the environment    config : {"db_url":"jdbc:mysql://prod-db:3306/orders"} -> {"db_url":"jdbc:mysql://prod-db:3306/orders","db_password":"prod-secret"}
+//    step 3 · SVC opens a connection using those values    connection : "" -> "open"  BECAUSE the config now holds a URL and a password the DB accepts
+// <- config : {"db_url":"jdbc:mysql://prod-db:3306/orders","db_password":"prod-secret"} · connection : "open"
+//    alt DB_PASSWORD missing from ENV : connection : "" -> "failed"  BECAUSE the supplied configuration does not match what the service expects
 ```
 
 

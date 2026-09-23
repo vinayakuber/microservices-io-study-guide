@@ -115,10 +115,7 @@ registerChapter({
       q: "How does RPI invoke a remote service with a request/reply protocol, and what does a 200 OK produce?",
       solution: "The client sends a request using a request/reply protocol such as REST, blocks until the reply arrives, and maps a 200 OK to the new id as Right(id).",
       components: ["Client (proxy)", "Request/reply protocol (REST)", "Remote service", "Right(id) result"],
-      diagram: `flowchart LR
-  C["Registration Service"] -->|"POST /register"| SVC["User Registration service"]
-  SVC -->|"200 OK"| C
-  C -->|"yields"| R["Right(user-14)"]`,
+      
       code: `// CLIENT SIDE — RPI: the client POSTs a request and waits for a reply, with no broker in between
 // PARTIES: CLIENT = Registration Service · SVC = User Registration service (remote)
 // STATE (before):
@@ -143,10 +140,7 @@ registerChapter({
       q: "How does RPI map a failed or duplicate call to a typed result instead of an unhandled exception?",
       solution: "The proxy inspects the HTTP status code: a 200 OK becomes Right(id), and an HttpClientErrorException with CONFLICT becomes Left(DuplicateRegistrationError).",
       components: ["Status-code inspection", "200 -> Right(id)", "409 CONFLICT -> Left(DuplicateRegistrationError)"],
-      diagram: `flowchart LR
-  C["Registration Service"] -->|"POST /register"| SVC["User Registration service"]
-  SVC -->|"409 CONFLICT"| C
-  C -->|"yields"| L["Left(DuplicateRegistrationError)"]`,
+      
       code: `// CLIENT SIDE — RPI error path: a duplicate sign-up maps a 409 CONFLICT to a typed error
 // PARTIES: CLIENT = Registration Service · SVC = User Registration service (remote)
 // STATE (before):
@@ -172,9 +166,7 @@ registerChapter({
       q: "Why does RPI reduce availability, and what happens to the caller thread while it waits?",
       solution: "Client and service must both be available for the whole interaction; the caller thread is held while it waits, so an unresponsive callee burns the caller's capacity.",
       components: ["Both sides available", "Blocked caller thread", "Timeout expiry", "No broker to buffer"],
-      diagram: `flowchart LR
-  C["Registration Service"] -->|"POST /register"| SVC["User Registration (down)"]
-  C -->|"blocks in"| T["thread WAITING -> timeout"]`,
+      
       code: `// CLIENT SIDE — RPI availability: client and service must both be available for the whole call
 // PARTIES: CLIENT = Registration Service · SVC = User Registration service (unresponsive)
 // STATE (before):
@@ -199,10 +191,7 @@ registerChapter({
       q: "What discovery and resilience wiring does an RPI client need to reach an instance safely?",
       solution: "The client discovers the instance's location via client-side or server-side discovery, resolves its URL from externalized configuration, and invokes behind a circuit breaker.",
       components: ["Service discovery", "Externalized config URL", "Circuit breaker wrapper"],
-      diagram: `flowchart LR
-  C["Registration Service"] -->|"queries"| DISC["service registry"]
-  DISC -->|"10.0.2.9:8080"| C
-  C -->|"behind breaker"| SVC["User Registration instance"]`,
+      
       code: `// CLIENT SIDE — RPI wiring: discover an instance, resolve its URL, then invoke behind a breaker
 // PARTIES: CLIENT = Registration Service · DISC = service registry · SVC = User Registration instance
 // STATE (before):
@@ -253,7 +242,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  CLIENT[\"caller: Registration Service\"] -->|\"call via stub\"| STUB[\"client proxy: RegistrationServiceProxy\"]\n  STUB -->|\"HTTP POST /register\"| SVC[\"server: User Registration\"]\n  SVC -->|\"reply user-14\"| CLIENT",
+    
     program: `// SYSTEM DESIGN — RPI as a pipeline: caller -> client stub/proxy -> transport (HTTP) -> server skeleton -> business logic -> reply
 // PARTIES: CLIENT = Registration Service (caller: builds the request and waits for the reply) · STUB = client proxy RegistrationServiceProxy (interface: hides the HTTP transport) · SVC = User Registration instance (server: runs the business logic and returns the reply)
 // DEF: request — the payload a caller sends over RPI; here { email: "bob@example.com" }

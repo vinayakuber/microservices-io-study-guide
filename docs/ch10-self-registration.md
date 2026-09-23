@@ -10,31 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 10 · microservice
 
 > **Why this matters:** The instance is the best source of its own location, so it can register its host and IP itself and make itself discoverable.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Service boots on host 10.0.1.7</b><br/>port 8080"]:::start
-  n1["<b>2. Register itself on startup</b><br/>registry order-service empty becomes 10.0.1.7:8080"]:::step
-  n2["<b>3. Mark itself available</b><br/>self_state DOWN becomes AVAILABLE"]:::core
-  n3["<b>4. Renew periodically</b><br/>heartbeat keeps the registry fresh"]:::step
-  n4["<b>5. Unregister on shutdown</b><br/>graceful stop removes the entry"]:::step
-  n5["<b>6. Chassis handles it</b><br/>a microservice chassis framework does the work"]:::step
-  n6["<b>7. Discoverable, removed on exit</b><br/>the registry reflects reality"]:::stop
-  n7["<b>Crash without shutdown</b><br/>no unregister runs, a stale entry stays"]:::warn
-  n0 -->|"1. the instance knows its own location"| n1
-  n1 -->|"2. now discoverable"| n2
-  n2 -->|"3. lease renews"| n3
-  n3 -->|"4. heartbeat cycle repeats"| n3
-  n3 -->|"5. graceful stop"| n4
-  n4 -->|"6. the chassis performs this"| n5
-  n5 -->|"7. done"| n6
-  n2 -->|"8. hard kill"| n7
-```
-
 1. **Register on startup** — The instance registers its host and IP address with the registry and makes itself available.
 
 2. **Renew periodically** — The client typically renews its registration so the registry knows it is still alive.
@@ -63,29 +38,6 @@ flowchart TD
 
 > **Why this matters:** Because instances die without notice, a lease that must be renewed is what lets the registry tell alive from dead.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Lease approaches expiry</b><br/>entry ttl 30"]:::start
-  n1["<b>2. Heartbeat timer fires</b><br/>renew_count 0 becomes 1"]:::step
-  n2["<b>3. Eureka in the example</b><br/>@EnableEurekaClient registers the instance"]:::step
-  n3["<b>4. Registry extends the entry</b><br/>ttl 30 becomes 60"]:::core
-  n4["<b>5. Entry stays alive</b><br/>as long as renewals keep arriving"]:::stop
-  n5["<b>Missed renewal</b><br/>no heartbeat, ttl 60 counts down"]:::warn
-  n6["<b>Eviction</b><br/>registry drops the entry, stops routing to it"]:::warn
-  n0 -->|"1. timer sends a heartbeat"| n1
-  n1 -->|"2. the Eureka client does this"| n2
-  n2 -->|"3. lease pushed out"| n3
-  n3 -->|"4. renewal cycle repeats"| n1
-  n3 -->|"5. renewals keep arriving"| n4
-  n3 -->|"6. a heartbeat is missed"| n5
-  n5 -->|"7. ttl reaches 0"| n6
-```
-
 1. **Heartbeat timer** — The instance renews its registration before the lease expires.
 
 2. **Registry stays fresh** — The registry keeps the entry alive for as long as renewals arrive.
@@ -111,30 +63,6 @@ flowchart TD
 ### A richer state model, with a blind spot
 
 > **Why this matters:** Self-registration gives a richer state model than UP/DOWN, but it fails exactly when an instance is too broken to notice it should leave.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Instance degrades internally</b><br/>dependency timeout"]:::start
-  n1["<b>2. Models its own state</b><br/>self_state AVAILABLE becomes STARTING"]:::step
-  n2["<b>3. Richer than UP/DOWN</b><br/>STARTING or AVAILABLE"]:::core
-  n3["<b>4. Rewrite its entry</b><br/>registry state AVAILABLE becomes STARTING"]:::step
-  n4["<b>5. Steer traffic away</b><br/>traffic_routed all becomes none"]:::step
-  n5["<b>6. Callers skip the instance</b><br/>registry row shows STARTING"]:::stop
-  n6["<b>No self-awareness</b><br/>running but broken, never unregisters, stale entry stays"]:::warn
-  n7["<b>Still coupled</b><br/>registry coupling plus per-language logic"]:::warn
-  n0 -->|"1. the instance knows its own state"| n1
-  n1 -->|"2. richer state model"| n2
-  n2 -->|"3. update the registry"| n3
-  n3 -->|"4. callers skip STARTING"| n4
-  n4 -->|"5. traffic steered away"| n5
-  n0 -->|"6. too broken to notice"| n6
-  n1 -->|"7. drawback"| n7
-```
 
 1. **Knows its own state** — The instance can model more than UP/DOWN, such as STARTING or AVAILABLE.
 
@@ -204,13 +132,6 @@ flowchart TD
   R -->|"comprises"| P1["Evicts entries whose lease lapses"]
 ```
 
-```mermaid
-flowchart LR
-  SVC["order-service instance 10.0.1.7"] -->|"register self"| REG[("service registry Eureka")]
-  SVC -->|"heartbeat: ttl 30 -> 60"| REG
-  REG -->|"serves the row back"| D["discovery lookup"]
-```
-
 ```java
 // SYSTEM DESIGN — self-registration as a pipeline: service instance -> self-registrar (startup register + heartbeat lease) -> service registry
 // PARTIES: SVC = order-service instance (registers itself and renews) · REG = service registry (Eureka)
@@ -244,12 +165,6 @@ An order-service instance boots at 10.0.3.7 and must become discoverable without
 - Instance self-registration
 - Host and IP address
 - Microservice chassis
-
-```mermaid
-flowchart LR
-  SVC["order-service 10.0.3.7"] -->|"register self"| REG["service registry"]
-  SVC -->|"unregister on shutdown"| REG
-```
 
 ```java
 // SERVICE SIDE — the instance registers its own host and IP on startup and unregisters on shutdown
@@ -285,13 +200,6 @@ An order-service instance has a lease on its registry entry, and its heartbeat t
 - Lease (ttl)
 - Registry eviction on missed renewal
 
-```mermaid
-flowchart LR
-  SVC["order-service"] -->|"heartbeat"| REG["registry"]
-  REG -->|"ttl extended"| SVC
-  SVC -. "missed renewal -> evict" .-> REG
-```
-
 ```java
 // SERVICE SIDE — the instance periodically renews its registration so the registry knows it is still alive
 // PARTIES: SVC = order-service instance · REG = service registry
@@ -324,13 +232,6 @@ An instance is starting up and wants to keep traffic away until it is truly read
 - Richer state model (STARTING/AVAILABLE)
 - Self-state rewrite
 - Traffic steering
-
-```mermaid
-flowchart LR
-  SVC["instance"] -->|"state STARTING"| REG["registry"]
-  REG -->|"skip STARTING"| T["traffic steered away"]
-  SVC -->|"state AVAILABLE"| REG
-```
 
 ```java
 // SERVICE SIDE — self-registration knows its own state: the instance walks STARTING to AVAILABLE, richer than UP/DOWN
@@ -369,13 +270,6 @@ The team's services are written in Java and Go, and both must register themselve
 - Coupling to the registry
 - Per-language registration logic
 
-```mermaid
-flowchart LR
-  J["Java service"] -->|"register logic"| REG["registry"]
-  G["Go service"] -->|"register logic (re-implemented)"| REG
-  BROKEN["broken instance"] -. "cannot unregister itself" .-> REG
-```
-
 ```java
 // SERVICE SIDE — self-registration couples the service to the registry and is re-implemented per language
 // PARTIES: SVC = order-service instance · REG = service registry
@@ -409,10 +303,19 @@ _From the 28 problems:_ 01-scale-from-zero-to-millions
 
 On startup the instance registers its host and IP, periodically renews the registration, and unregisters on shutdown.
 
-```mermaid
-flowchart LR
-  SVC["order-service 10.0.3.7"] -->|"register self"| REG["service registry"]
-  SVC -->|"unregister on shutdown"| REG
+```java
+// SERVICE SIDE — the instance registers its own host and IP on startup and unregisters on shutdown
+// PARTIES: SVC = order-service instance · REG = service registry
+// DEF: self — the instance's own registration state = self_state "DOWN", flipped to "AVAILABLE" after it registers
+// STATE (before):
+//    registry : {"order-service" -> []}
+//    self_state : "DOWN"
+// DEF: the service boots · CALLED BY: SVC startup on host 10.0.3.7
+// -> boot : {"host":"10.0.3.7","ip":"10.0.3.7","port":8080}
+//    step 1 · SVC registers itself : registry["order-service"] : [] -> [{"host":"10.0.3.7","ip":"10.0.3.7","port":8080}]
+//    step 2 · SVC marks itself available : self_state : "DOWN" -> "AVAILABLE"
+// <- registry row : "order-service" -> [{"host":"10.0.3.7","ip":"10.0.3.7","port":8080}]   (now discoverable)
+//    alt shutdown : SVC unregisters itself -> registry["order-service"] : [{"host":"10.0.3.7","ip":"10.0.3.7","port":8080}] -> []
 ```
 
 

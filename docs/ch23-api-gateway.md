@@ -10,28 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 23 · microservice
 
 > **Why this matters:** Microservices expose fine-grained APIs, so one page needs data from many services — and a slow mobile network can only afford a few round-trips.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. One page spans many services</b><br/>product P-9 data is spread over Product Info, Pricing, Inventory, and Review"]:::start
-  n1["<b>2. Call Product Info</b><br/>page gains title POJOs in Action, author Chris Richardson, roundtrips 0 becomes 1"]:::step
-  n2["<b>3. Call Pricing</b><br/>page gains price 39.99, roundtrips 1 becomes 2"]:::step
-  n3["<b>4. Call Inventory</b><br/>page gains stock 3, roundtrips 2 becomes 3"]:::step
-  n4["<b>5. Call Review</b><br/>page gains reviews 12, roundtrips 3 becomes 4"]:::step
-  n5["<b>6. Page assembled, expensively</b><br/>4 round-trips over a slow mobile network"]:::stop
-  n6["<b>Alt - a LAN client</b><br/>4 round-trips are cheap, a server-side web app can afford them"]:::warn
-  n0 -->|"1. client must call each"| n1
-  n1 -->|"2. next service"| n2
-  n2 -->|"3. next service"| n3
-  n3 -->|"4. next service"| n4
-  n4 -->|"5. mobile pays the price"| n5
-  n4 -->|"6. alt - fast network"| n6
-```
-
 1. **One page spans many services** — Product details data is spread over Product Info, Pricing, Order, Inventory, Review, and more.
 
 2. **Clients must call each service** — A client needing the details of one product must fetch data from numerous services.
@@ -57,26 +35,6 @@ flowchart TD
 ### Proxy a request to one service
 
 > **Why this matters:** The gateway handles a request in two ways: some are simply proxied or routed to the appropriate service, while others fan out.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Client hits the single entry point</b><br/>CLI sends GET /products/P-9 to the gateway"]:::start
-  n1["<b>2. Match the path</b><br/>route_table maps /products to PROD"]:::core
-  n2["<b>3. Forward to the service</b><br/>the gateway proxies the request to Product Info Service"]:::step
-  n3["<b>4. Response returns through the gateway</b><br/>response is title POJOs in Action, author Chris Richardson"]:::step
-  n4["<b>5. Client never learns the host</b><br/>the client got its answer without PROD host or port"]:::stop
-  n5["<b>Alt - route table changes</b><br/>/products now maps to PROD-v2, the client keeps sending to the gateway unchanged"]:::warn
-  n0 -->|"1. one request in"| n1
-  n1 -->|"2. lookup the URL"| n2
-  n2 -->|"3. proxy it"| n3
-  n3 -->|"4. answer out"| n4
-  n2 -->|"5. alt - route swap"| n5
-```
 
 1. **The client hits the single entry point** — Every client sends its request to the API gateway, not to individual services.
 
@@ -104,28 +62,6 @@ flowchart TD
 
 > **Why this matters:** For a page that needs several services, the gateway fans out to multiple services and returns one composed response, cutting the client down to a single round-trip.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. One request enters the gateway</b><br/>client sends GET /product/P-9, not four requests"]:::start
-  n1["<b>2. Fan out to Product Info</b><br/>response gains title POJOs in Action, author Chris Richardson"]:::step
-  n2["<b>3. Fan out to Pricing</b><br/>response gains price 39.99"]:::step
-  n3["<b>4. Fan out to Review</b><br/>response gains reviews 12"]:::step
-  n4["<b>5. Compose the page</b><br/>the gateway merges the partial results into one response"]:::core
-  n5["<b>6. One round-trip for the client</b><br/>the client received the composed page in a single call"]:::stop
-  n6["<b>A service call fails</b><br/>the circuit breaker opens, the gateway returns a partial page instead of hanging"]:::warn
-  n0 -->|"1. fan out"| n1
-  n1 -->|"2. next service"| n2
-  n2 -->|"3. next service"| n3
-  n3 -->|"4. merge partials"| n4
-  n4 -->|"5. single reply"| n5
-  n2 -->|"6. failure - partial page"| n6
-```
-
 1. **One request enters the gateway** — The client sends a single request for the whole page.
 
 2. **The gateway fans out** — The gateway calls the several services that own pieces of the page.
@@ -149,30 +85,6 @@ flowchart TD
 ### The costs and variations
 
 > **Why this matters:** The gateway adds a network hop and is another moving part, but it also insulates clients from partitioning and instance locations — and can expose a different API per client.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Every request passes through the gateway</b><br/>one more network leg per call"]:::start
-  n1["<b>2. CLI to GW</b><br/>hops gains CLI-GW, latency 0 becomes 12 ms"]:::step
-  n2["<b>3. GW to PROD</b><br/>hops gains GW-PROD, latency 12 becomes 24 ms"]:::step
-  n3["<b>4. Back to CLI</b><br/>hops gains GW-CLI, latency 24 becomes 36 ms"]:::step
-  n4["<b>5. Three hops, 36 ms</b><br/>the extra gateway hop added 12 ms, insignificant for most applications"]:::stop
-  n5["<b>Alt - no gateway</b><br/>the client calls PROD directly in 24 ms but must locate and call every other service itself"]:::warn
-  n6["<b>Variation - a different API per client</b><br/>the gateway can expose an API suited to each client"]:::warn
-  n7["<b>Variation - Backends for frontends</b><br/>a separate gateway per client type is the BFF variation"]:::warn
-  n0 -->|"1. measure the hop"| n1
-  n1 -->|"2. second leg"| n2
-  n2 -->|"3. third leg"| n3
-  n3 -->|"4. tally"| n4
-  n3 -->|"5. alt - direct call"| n5
-  n0 -->|"6. per-client API"| n6
-  n0 -->|"7. BFF"| n7
-```
 
 1. **An extra hop, usually insignificant** — Every request passes through the gateway, adding one more network leg.
 
@@ -237,15 +149,6 @@ flowchart TD
   R -->|"comprises"| P2["REV — reviews service"]
 ```
 
-```mermaid
-flowchart LR
-  CLI["CLI client"] -->|"calls"| GW["API Gateway"]
-  MOB["MOB client"] -->|"calls"| GW
-  WEB["WEB client"] -->|"calls"| GW
-  GW -->|"route /products"| PROD["Product service"]
-  GW -->|"compose"| RES["product + price + reviews"]
-```
-
 ```java
 // SYSTEM DESIGN — API gateway: client -> gateway -> upstream services, one product request composed end to end
 // PARTIES: WEB = the web client · GW = API Gateway · PROD = Product service · PRI = Pricing service · REV = Reviews service
@@ -276,15 +179,6 @@ A mobile client starts returning 404s on the product page. The on-call engineer 
 - API gateway
 - route_table (path to service)
 - Product Info Service
-
-```mermaid
-flowchart LR
-  C["Mobile client"] -->|"GET /products/P-9"| G["API gateway"]
-  G -->|"looks up path"| R["route_table: /products -> PROD"]
-  R -->|"target PROD"| G
-  G -->|"proxies"| P["Product Info Service"]
-  P -->|"JSON body"| G -->|"response"| C
-```
 
 ```java
 // GATEWAY SIDE — a GET /products/P-9 is proxied through a route-table lookup
@@ -325,18 +219,6 @@ The product details page needs the title and author from Product Info, the price
 - Pricing Service
 - Review Service
 
-```mermaid
-flowchart LR
-  C["Client"] -->|"GET /product/P-9"| G["API gateway"]
-  G -->|"fan out"| A["Product Info"]
-  G -->|"fan out"| B["Pricing"]
-  G -->|"fan out"| D["Review"]
-  A -->|"returns to"| G
-  B -->|"returns to"| G
-  D -->|"returns to"| G
-  G -->|"one composed response"| C
-```
-
 ```java
 // GATEWAY SIDE — one page request fans out to three services and returns one composed response
 // PARTIES: CLI = client · GW = API gateway · PROD = Product Info Service · PRI = Pricing Service · REV = Review Service
@@ -373,14 +255,6 @@ A latency review flags that every request now passes through the gateway. The te
 - API gateway
 - Product Info Service
 - latency tally
-
-```mermaid
-flowchart LR
-  C["Client"] -->|"8 ms"| G["API gateway"]
-  G -->|"12 ms"| P["Product Info Service"]
-  P -->|"reply 8 ms"| C
-  C -->|"total 28 ms"| T["latency tally"]
-```
 
 ```java
 // GATEWAY SIDE — measure the extra hop the gateway adds to every request
@@ -419,16 +293,6 @@ Web and mobile need different product-page shapes, and a Pricing Service outage 
 - Circuit breaker
 - Backends for frontends gateway
 
-```mermaid
-flowchart LR
-  W["Web client"] -->|"full page"| G["API gateway"]
-  M["Mobile client"] -->|"trimmed page"| G
-  G -->|"calls"| P["Pricing Service"]
-  P -.->|"fails"| CB["Circuit breaker"]
-  CB -->|"open"| G
-  G -->|"partial page"| W
-```
-
 ```java
 // GATEWAY SIDE — one gateway exposes a different API per client, and a circuit breaker protects the page
 // PARTIES: WEB = desktop client · MOB = mobile client · GW = API gateway · PRI = Pricing Service
@@ -464,13 +328,22 @@ _From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-syste
 
 An API gateway is the single entry point for all clients; it proxies simple requests and fans others out to multiple services, and may expose a different API for each client.
 
-```mermaid
-flowchart LR
-  C["Mobile client"] -->|"GET /products/P-9"| G["API gateway"]
-  G -->|"looks up path"| R["route_table: /products -> PROD"]
-  R -->|"target PROD"| G
-  G -->|"proxies"| P["Product Info Service"]
-  P -->|"JSON body"| G -->|"response"| C
+```java
+// GATEWAY SIDE — a GET /products/P-9 is proxied through a route-table lookup
+// PARTIES: CLI = mobile client · GW = API gateway · PROD = Product Info Service
+// DEF: route — one path-to-service entry the gateway proxies on; here route_table["/products"] = "PROD"
+// STATE (before):
+//    route_table : {"/products" : "PROD", "/pricing" : "PRI"}   // the gateway's route map
+//    path : ""                               // the path parsed out of the request URL
+//    target : ""                             // the service the gateway will call
+//    response : null                         // what comes back from the service
+// DEF: route_request · CALLED BY: CLI sending one request to the gateway
+// -> request : "GET /products/P-9"
+//    step 1 · parse the URL path    path : "" -> "/products"  BECAUSE the gateway strips the host and query string to find the path
+//    step 2 · look the path up    target : "" -> "PROD"  BECAUSE route_table["/products"] maps to the Product Info Service
+//    step 3 · forward and read back    response : null -> {"title":"POJOs in Action","author":"Chris Richardson"}  BECAUSE PROD answers the proxied request
+// <- response : {"title":"POJOs in Action","author":"Chris Richardson"} · the client never learned PROD's host or port
+//    alt route_table changes : route_table["/products"] : "PROD" -> "PROD-v2"  BECAUSE a new version is deployed -> the client keeps sending to the gateway unchanged
 ```
 
 

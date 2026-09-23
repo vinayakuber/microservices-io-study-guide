@@ -10,29 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.16 (p.150) · micro
 
 > **Why this matters:** Domain objects come in clusters: an Order is nothing without its line items. The Aggregate pattern, from Domain-Driven Design, models such a cluster as a graph of objects that can be treated as a unit, reached by one root.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Pattern from DDD</b><br/>the Aggregate pattern comes from Domain-Driven Design"]:::start
-  n1["<b>2. A graph of objects</b><br/>Order PO-2001 total 0.00, two floating items BOOK-1 30.00 and BOOK-2 5.00"]:::core
-  n2["<b>3. item_a hangs off the root</b><br/>BOOK-1 becomes order.items first"]:::step
-  n3["<b>4. item_b hangs off the root</b><br/>BOOK-2 becomes order.items second"]:::step
-  n4["<b>5. Root recomputes the total</b><br/>order.total 0.00 becomes 35.00, 30.00 plus 5.00"]:::core
-  n5["<b>6. Graph treated as a unit</b><br/>order PO-2001 with two items and total 35.00"]:::stop
-  n6["<b>Floating objects with no root</b><br/>each item changeable directly, the total drifts from the sum"]:::warn
-  n0 -->|"from Domain-Driven Design"| n1
-  n1 -->|"items attached to the root"| n2
-  n1 -->|"no root - objects float"| n6
-  n2 -->|"next item"| n3
-  n3 -->|"both under one root"| n4
-  n4 -->|"any child change - recompute again"| n4
-  n4 -->|"unit complete"| n5
-```
-
 1. **From DDD** — The Aggregate pattern comes from Domain-Driven Design (DDD).
 
 2. **A graph of objects** — Related objects, like an Order and its line items, form a graph.
@@ -59,33 +36,6 @@ flowchart TD
 ### Business rules and invariants at the root
 
 > **Why this matters:** Treating the graph as a unit only pays off if the boundary is where the rules are enforced. Every change goes through the root, which re-checks the invariants and refuses any mutation that would break them.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Root owns the graph</b><br/>all reads and writes go through the Order root, never a child directly"]:::start
-  n1["<b>2. Add BOOK-1</b><br/>root appends the item, recomputes total 0.00 becomes 30.00"]:::step
-  n2["<b>3. Invariant holds</b><br/>30.00 >= 25.00 MINIMUM, mutation accepted"]:::core
-  n3["<b>4. Add BOOK-2 times 2</b><br/>root recomputes total 30.00 becomes 40.00"]:::step
-  n4["<b>5. Invariant holds again</b><br/>40.00 >= 25.00 MINIMUM"]:::core
-  n5["<b>6. place_order</b><br/>state NEW becomes PLACED"]:::step
-  n6["<b>7. remove_line_item refused</b><br/>state is PLACED, a placed order is immutable, total 40.00 unchanged"]:::warn
-  n7["<b>8. Root enforces every invariant</b><br/>a violating mutation is rejected with no state change"]:::stop
-  n8["<b>Invariant would fail</b><br/>a change pushing total below MINIMUM 25.00 is refused"]:::warn
-  n0 -->|"route every change through root"| n1
-  n1 -->|"recompute total"| n2
-  n2 -->|"invariant holds - accept"| n3
-  n2 -->|"invariant fails - refuse"| n8
-  n3 -->|"recompute total"| n4
-  n4 -->|"invariant holds - accept"| n5
-  n5 -->|"state transition"| n6
-  n6 -->|"refused - no state change"| n7
-  n8 -->|"no state change"| n7
-```
 
 1. **A root owns the graph** — All reads and writes go through the aggregate root, never to a child object directly.
 
@@ -127,28 +77,6 @@ flowchart TD
 ### Aggregates structure the business logic of a service
 
 > **Why this matters:** An aggregate is not just a data shape — it is how a service organizes its logic. The service becomes a collection of aggregates, each one changed by its own transaction and emitting a domain event when it is created or updated.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Service is a collection of aggregates</b><br/>two roots, PO-2001 and CUST-7, each with its own root"]:::start
-  n1["<b>2. place_order routed through root</b><br/>PO-2001 state NEW becomes PLACED"]:::step
-  n2["<b>3. Aggregate emits a domain event</b><br/>events becomes OrderPlaced for PO-2001"]:::core
-  n3["<b>4. One transaction, one aggregate</b><br/>CUST-7 credit 500.00 stays 500.00, untouched"]:::core
-  n4["<b>5. Service publishes the event</b><br/>OrderPlaced sent for other services"]:::step
-  n5["<b>6. Business logic structured by aggregates</b><br/>each change touches exactly one aggregate"]:::stop
-  n6["<b>Two aggregates in one tx</b><br/>would break the one-unit boundary"]:::warn
-  n0 -->|"route the change to its root"| n1
-  n1 -->|"aggregate changed"| n2
-  n2 -->|"same transaction"| n3
-  n3 -->|"only one aggregate"| n4
-  n3 -->|"tx tries to touch CUST-7 too"| n6
-  n4 -->|"event published"| n5
-```
 
 1. **A collection of aggregates** — A service organizes its business logic as a collection of DDD aggregates.
 
@@ -220,13 +148,6 @@ flowchart TD
   R -->|"comprises"| P0["Stores the aggregate as one consistency boundary"]
 ```
 
-```mermaid
-flowchart LR
-  CLI["client"] -->|"add CHAIR-1 to PO-77"| AG["order aggregate root"]
-  AG -->|"load / save"| REPO["repository"]
-  REPO -->|"SELECT / UPDATE"| DB[("PostgreSQL 16 @ orders-db-1")]
-```
-
 ```java
 // SYSTEM DESIGN — aggregate as a pipeline: client -> aggregate root (domain objects) -> repository -> database (one unit of consistency per command)
 // PARTIES: CLI = client (calls the aggregate) · AG = order aggregate root (order + line items) · REPO = repository · DB = PostgreSQL 16 @ orders-db-1
@@ -264,14 +185,6 @@ Your Order and its line items live as separate objects, and every time a line ch
 - Total — recomputed from the lines
 - Root — the single entry point
 
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|"aggregates via"| ROOT["Order root"]
-  ROOT -->|owns| A["Line item BOOK-1"]
-  ROOT -->|owns| B["Line item BOOK-2"]
-  ROOT -->|recomputes| TOT["total 35.00"]
-```
-
 ```java
 // ORDER AGGREGATE SIDE — from DDD: a graph of objects can be treated as a unit, reached by one root
 // PARTIES: SVC = Order Service · AG = the Order aggregate (root Order entity + its line-item value objects)
@@ -307,14 +220,6 @@ Your order must never exceed a maximum total, and the cap must hold after every 
 - Invariant — e.g. total <= cap
 - Recompute — total from line items
 - Refusal — rejecting a violating change
-
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|add_line_item| ROOT["Order root"]
-  ROOT -->|recompute total| TOT["total 60.00 then 110.00"]
-  TOT -->|check total <= 100.00| CHK["second add violates"]
-  CHK -->|refuse| NO["no change, total back to 60.00"]
-```
 
 ```java
 // ORDER AGGREGATE SIDE — the root re-checks invariants after each mutation and refuses a violating change
@@ -357,13 +262,6 @@ Your service holds two aggregates — Order and Customer — and you want a down
 - Domain event — emitted on update
 - One transaction — one aggregate
 
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|place_order| AG["Order aggregate"]
-  AG -->|emit OrderPlaced| EVT["Domain event"]
-  SVC -.->|untouched| CUST["Customer aggregate"]
-```
-
 ```java
 // ORDER SERVICE SIDE — the business logic is a collection of aggregates, and an aggregate emits a domain event when it changes
 // PARTIES: SVC = Order Service · AG = Order aggregate · EVT = the domain event the aggregate emits
@@ -397,13 +295,6 @@ A developer wants to bump a line item's quantity directly, bypassing the Order r
 - Child objects — not addressable from outside
 - Invariant — enforced only at the root
 - Sizing — one operation, one aggregate
-
-```mermaid
-flowchart LR
-  OUT["External code"] -->|OK| ROOT["Order root"]
-  OUT -.->|blocked| CHILD["Line item child"]
-  ROOT -->|enforces invariants| CHILD
-```
 
 ```java
 // ORDER AGGREGATE SIDE — every mutation must go through the root; reaching a child directly is refused
@@ -440,12 +331,20 @@ _From the 28 problems:_ 26-payment-system · 22-hotel-reservation
 
 Model the cluster as an aggregate — a graph of objects that can be treated as a unit, with a root and the objects it owns.
 
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|"aggregates via"| ROOT["Order root"]
-  ROOT -->|owns| A["Line item BOOK-1"]
-  ROOT -->|owns| B["Line item BOOK-2"]
-  ROOT -->|recomputes| TOT["total 35.00"]
+```java
+// ORDER AGGREGATE SIDE — from DDD: a graph of objects can be treated as a unit, reached by one root
+// PARTIES: SVC = Order Service · AG = the Order aggregate (root Order entity + its line-item value objects)
+// DEF: item — a line-item object the aggregate root owns and sums into the total = { product:"BOOK-1", price:30.00 }
+// STATE (before) — two floating objects with no owning root:
+//    order : { id:"PO-77", total:0.00 }
+//    item_a : { product:"BOOK-1", price:30.00 }
+//    item_b : { product:"BOOK-2", price:5.00 }
+// DEF: treat_as_unit · CALLED BY: SVC when it makes the objects one aggregate
+// -> aggregate_root : "PO-77"
+//    step 1 · item_a hangs off the root : item_a : {product:"BOOK-1"} -> order.items[0]   BECAUSE the root now owns it
+//    step 2 · item_b hangs off the root : item_b : {product:"BOOK-2"} -> order.items[1]   BECAUSE both children are reached through the one root
+//    step 3 · the root recomputes the total : order.total : 0.00 -> 35.00   BECAUSE 30.00 + 5.00 = 35.00
+// <- outcome : order : { id:"PO-77", items:[{BOOK-1},{BOOK-2}], total:35.00 } · a graph treated as a unit
 ```
 
 

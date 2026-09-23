@@ -89,10 +89,7 @@ registerChapter({
       q: "Why does registration need a full lifecycle — register, unregister, evict crashed and broken instances?",
       solution: "An instance must be registered on startup, unregistered on shutdown, and evicted if it crashes or runs but cannot handle requests, or the registry drifts from reality.",
       components: ["Register on startup", "Unregister on shutdown", "Evict crashed instances", "Evict broken instances"],
-      diagram: `flowchart LR
-  B["boot 10.0.2.6"] -->|"triggers"| R["register"]
-  K["hard kill"] -->|"leaves"| S["stale entry"]
-  S -->|"causes"| D["client routed to dead host"]`,
+      
       code: `// REGISTRY SIDE — why the registration lifecycle exists: stale entries route requests to dead endpoints
 // PARTIES: SVC = order-service instance · REG = service registry · CLI = a client resolving order-service
 // STATE (before):
@@ -117,10 +114,7 @@ registerChapter({
       q: "How does a third-party registrar own register/unregister while keeping the service oblivious?",
       solution: "A separate registrar — a sidecar like Prana, a parent process, or a Docker helper — registers the instance on startup and unregisters it on shutdown, acting on the service's behalf.",
       components: ["Co-located registrar (sidecar/parent/helper)", "Register on startup", "Unregister on shutdown", "Service stays oblivious"],
-      diagram: `flowchart LR
-  SVC["order-service (non-JVM)"] -->|"runs beside"| RGR["registrar sidecar"]
-  RGR -->|"register"| REG["registry"]
-  RGR -->|"unregister"| REG`,
+      
       code: `// REGISTRAR SIDE — a separate process registers and unregisters the instance on its behalf
 // PARTIES: SVC = order-service instance · RGR = third-party registrar (sidecar) · REG = service registry
 // DEF: proc — the service's OS process whose lifecycle the registrar watches; here svc_proc = "STOPPED" -> "STARTED" on host "10.0.2.5"
@@ -144,10 +138,7 @@ registerChapter({
       q: "How does health-check gating decide registration, and what is its blind spot?",
       solution: "The registrar registers the instance while the health check passes and unregisters it on failure; a shallow registrar that only knows RUNNING vs NOT RUNNING cannot see a running-but-broken instance.",
       components: ["Health probe", "Register when healthy", "Unregister on failure", "Superficial RUNNING/NOT RUNNING view"],
-      diagram: `flowchart LR
-  RGR["registrar"] -->|"GET /health -> 200"| SVC["instance"]
-  RGR -->|"GET /health -> 503"| SVC
-  SVC -->|"503"| U["unregister"]`,
+      
       code: `// REGISTRAR SIDE — health-check gating decides whether an instance stays registered
 // PARTIES: SVC = order-service instance · RGR = registrar with a health check · REG = registry
 // STATE (before):
@@ -171,9 +162,7 @@ registerChapter({
       q: "What does the registrar add to the system, and why must it be highly available?",
       solution: "Unless it is part of the infrastructure, the registrar is another component to install, configure, and maintain, and because it sits on the path to discovery it must be highly available.",
       components: ["Registrar on the discovery path", "Install/configure/maintain burden", "High availability requirement"],
-      diagram: `flowchart LR
-  RGR["registrar (down)"] -. "no register/unregister" .-> REG["registry"]
-  REG -->|"holds"| S["stale registry entries"]`,
+      
       code: `// REGISTRAR SIDE — the registrar is a critical component: if it dies, register/unregister stops and the registry drifts
 // PARTIES: RGR = registrar · REG = registry · SVC = order-service instance
 // STATE (before):
@@ -223,7 +212,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  SVC[\"service: order-service instance\"] -->|\"runs beside\"| RGR[\"registrar: Netflix Prana sidecar\"]\n  RGR -->|\"register / unregister\"| REG[(\"registry: Eureka\")]",
+    
     program: `// SYSTEM DESIGN — third-party registration as a pipeline: service instance -> third-party registrar -> service registry
 // PARTIES: SVC = order-service instance (service: runs the app and never talks to the registry) · RGR = third-party registrar Netflix Prana (registrar: registers on startup, unregisters on shutdown) · REG = service registry Eureka (registry: stores the reachable endpoints)
 // DEF: instance — a runnable copy of a service at a network location; here {"host":"10.0.2.5","port":8080}

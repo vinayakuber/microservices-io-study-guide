@@ -10,28 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.5 · microservices.
 
 > **Why this matters:** When the logic is simple, an object model is overkill; a plain method per request is easier to read and write. The script pulls the request's data into an object and hands it to the database.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Map each request to a method</b><br/>OrderService exposes createOrder, reviseOrder, cancelOrder"]:::start
-  n1["<b>2. Build a pure data object</b><br/>Order holds orderId and lineItems, no behavior"]:::step
-  n2["<b>3. Fill from the request</b><br/>orderId PO-100, line S1 qty 2 unit 25.00"]:::step
-  n3["<b>4. Reach the database via a DAO</b><br/>DAO.save order, SQL stays out of the script"]:::core
-  n4["<b>5. Persist the row</b><br/>store gains PO-100"]:::step
-  n5["<b>6. One method per operation</b><br/>the script moves data, it does not own it"]:::stop
-  n6["<b>Rules creep into the script</b><br/>adding logic here starts the sprawl"]:::warn
-  n0 -->|"1. request maps to a script"| n1
-  n1 -->|"2. allocate the data object"| n2
-  n2 -->|"3. fill its fields"| n3
-  n3 -->|"4. hand off to the DAO"| n4
-  n4 -->|"5. row saved"| n5
-  n1 -->|"6. rules in the script - sprawl"| n6
-```
-
 1. **Map each request to a method** — A service class exposes one method per system operation — createOrder(), reviseOrder(), cancelOrder().
 
 2. **Build a pure data object** — The script fills an Order (orderId, orderLineItems) that has no behavior.
@@ -56,28 +34,6 @@ flowchart TD
 
 > **Why this matters:** The signature of the pattern is that the classes implementing behavior are separate from those storing state. That split is what makes the style read like plain procedural C, for better and for worse.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Service classes hold the scripts</b><br/>OrderService has methods and no state"]:::start
-  n1["<b>2. Data classes hold the state</b><br/>Order has orderId and lineItems, little or no behavior"]:::step
-  n2["<b>3. Load the object</b><br/>findOrderById returns PO-100"]:::step
-  n3["<b>4. The script does the mutation</b><br/>qty 2 becomes 5, written by the script not the Order"]:::core
-  n4["<b>5. Persist the change</b><br/>DAO.save writes the object back"]:::step
-  n5["<b>6. The split signature</b><br/>behavior and state stay in separate classes"]:::stop
-  n6["<b>Object never mutates itself</b><br/>any rule on fields lives far from the data"]:::warn
-  n0 -->|"1. scripts in one class"| n1
-  n1 -->|"2. data in another"| n2
-  n2 -->|"3. load the stored object"| n3
-  n3 -->|"4. script writes the field"| n4
-  n4 -->|"5. saved back"| n5
-  n1 -->|"6. rule far from its data"| n6
-```
-
 1. **Service classes hold the scripts** — OrderService has methods and no meaningful state.
 
 2. **Data classes hold the state** — Order holds orderId and orderLineItems and little or no behavior.
@@ -100,28 +56,6 @@ flowchart TD
 ### Use scripts for simple logic only
 
 > **Why this matters:** The procedural style is seductive because you skip class design, and that is fine while the rules are few. The same method that reads cleanly for simple logic becomes a nightmare as the rules multiply.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Accept the style for simple logic</b><br/>do not be ashamed of procedural code where it fits"]:::start
-  n1["<b>2. Load the order</b><br/>PO-100 status CREATED"]:::step
-  n2["<b>3. Evaluate the rule</b><br/>cancellable false becomes true"]:::step
-  n3["<b>4. Set the field</b><br/>status CREATED becomes CANCELLED"]:::step
-  n4["<b>5. Persist the change</b><br/>DAO.save writes it back"]:::core
-  n5["<b>6. Linear happy path</b><br/>simple logic reads top to bottom"]:::stop
-  n6["<b>Complexity arrives</b><br/>each new rule adds another branch, so switch to the Domain model first"]:::warn
-  n0 -->|"1. simple logic only"| n1
-  n1 -->|"2. load the object"| n2
-  n2 -->|"3. rule holds"| n3
-  n3 -->|"4. flip the status"| n4
-  n4 -->|"5. save"| n5
-  n0 -->|"6. logic grows complex - switch"| n6
-```
 
 1. **Accept the style when logic is simple** — Do not be ashamed of procedural code where it is appropriate.
 
@@ -196,13 +130,6 @@ flowchart TD
   R -->|"comprises"| P1["written by save(Order), read by findOrderById()"]
 ```
 
-```mermaid
-flowchart LR
-  WEB["presentation tier"] -->|"POST /orders"| TS["transaction script: OrderService.createOrder()"]
-  TS -->|"save(Order)"| DAO["DAO: OrderDao"]
-  DAO -->|"INSERT / SELECT"| DB[("PostgreSQL 16 @ orders-db-1")]
-```
-
 ```java
 // SYSTEM DESIGN — transaction script as a pipeline: presentation tier -> transaction script (OrderService) -> DAO (OrderDao) -> database (PostgreSQL 16 @ orders-db-1)
 // PARTIES: WEB = presentation tier (client) · SVC = OrderService (transaction script service class) · DAO = OrderDao (data access object) · DB = PostgreSQL 16 @ orders-db-1
@@ -237,13 +164,6 @@ Your business logic is simple, and you want each HTTP request handled by one pro
 - OrderDao — data access object
 - Database — rows the DAO writes
 
-```mermaid
-flowchart LR
-  WEB["create_order request"] -->|"createOrder()"| TS["TransactionScript"]
-  TS -->|save| DAO["OrderDao"]
-  DAO -->|INSERT| DB[("Database")]
-```
-
 ```java
 // ORDER SERVICE SIDE — the transaction-script pattern: one procedural method per request type, using a DAO for the database
 // PARTIES: WEB = the request handler · TS = the transaction script · DAO = the data access object
@@ -276,14 +196,6 @@ Your scripts hold no data themselves — a script mutates an order's quantity an
 - Order row — holds the state
 - OrderDao — loads and saves the row
 - Mutate — the script changes the row
-
-```mermaid
-flowchart LR
-  TS["Script reviseOrder"] -->|load| DAO["OrderDao"]
-  DAO -->|returns| ROW["Order row qty 3"]
-  TS -->|qty 3 to 5| ROW
-  ROW -->|save| DAO
-```
 
 ```java
 // ORDER SERVICE SIDE — behavior and state are in separate classes: the script mutates a DAO-loaded data object
@@ -319,14 +231,6 @@ Your service needs to cancel an order, and the only rule is that the order must 
 - Flip — CREATED to CANCELLED
 - Save — the row persists the change
 
-```mermaid
-flowchart LR
-  TS["Script cancelOrder"] -->|load| DAO["OrderDao"]
-  DAO -->|state CREATED| TS
-  TS -->|flip to CANCELLED| ROW["Order row"]
-  ROW -->|save| DAO
-```
-
 ```java
 // ORDER SERVICE SIDE — simple logic is the pattern's sweet spot: a cancel script with one guard
 // PARTIES: TS = the transaction script · DAO = the data access object
@@ -361,13 +265,6 @@ The business keeps adding rules — discounts, then approvals, then split shipme
 - Duplication — rules repeated across scripts
 - Domain model — the refactor target
 
-```mermaid
-flowchart LR
-  A["createOrder + discount"] -->|"adds"| B["+ approval rule"]
-  B -->|"adds"| C["+ split shipment rule"]
-  C -->|too many branches| FIX["refactor to domain model"]
-```
-
 ```java
 // ORDER SERVICE SIDE — the pattern sprawls as rules multiply: a script that grows a branch per new business rule
 // PARTIES: TS = the transaction script · DAO = the data access object
@@ -399,11 +296,17 @@ _From the 28 problems:_ 03-framework-for-system-design-interviews
 
 Organize business logic as a collection of procedural transaction scripts, one for each type of request, each located in a service class and reaching the database through data access objects.
 
-```mermaid
-flowchart LR
-  WEB["create_order request"] -->|"createOrder()"| TS["TransactionScript"]
-  TS -->|save| DAO["OrderDao"]
-  DAO -->|INSERT| DB[("Database")]
+```java
+// ORDER SERVICE SIDE — the transaction-script pattern: one procedural method per request type, using a DAO for the database
+// PARTIES: WEB = the request handler · TS = the transaction script · DAO = the data access object
+// STATE (before):
+//    orders : {}
+// DEF: createOrder · CALLED BY: WEB on a create_order request
+// -> order_id : "PO-77" · -> total : 45.00
+//    step 1 · script builds the row : row : "none" -> { id:"PO-77", total:45.00, state:"CREATED" }
+//    step 2 · script calls the DAO : dao.save(row) -> orders : {} -> { "PO-77" : { total:45.00, state:"CREATED" } }
+//    step 3 · script returns : created : "none" -> "PO-77"
+// <- outcome : orders : { "PO-77" : { total:45.00, state:"CREATED" } } · one method did the whole request
 ```
 
 

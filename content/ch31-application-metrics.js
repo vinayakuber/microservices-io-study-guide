@@ -80,7 +80,7 @@ registerChapter({
       q: "What is the Application Metrics solution, and why must the instrumentation have minimal runtime overhead?",
       solution: "Instrument the service to gather statistics about individual operations — a counter increments on each completed operation — and the increment must be cheap because the force is minimal runtime overhead.",
       components: ["Order Service", "counter (orders_created)", "metrics service", "create_order operation"],
-      diagram: "flowchart LR\n  C[\"Client\"] -->|\"POST orders\"| S[\"Order Service\"]\n  S -->|\"increment\"| N[\"counter: orders_created\"]\n  N -->|\"0 -> 3\"| M[\"central metrics service\"]",
+      
       code: "// ORDER SERVICE SIDE — a counter gathers statistics about one operation, with minimal overhead\n// PARTIES: SVC = Order Service · MS = metrics service (Prometheus)\n// STATE (before):\n//    counters : { orders_created: 0 }\n// DEF: create_order · CALLED BY: client requests arriving at SVC\n// -> request1 : \"PO-2001\"\n//    step 1 · handle request1, increment the counter    counters.orders_created : 0 -> 1   BECAUSE one create_order completed\n// -> request2 : \"PO-2002\"\n//    step 2 · handle request2, increment                counters.orders_created : 1 -> 2\n// -> request3 : \"PO-2003\"\n//    step 3 · handle request3, increment                counters.orders_created : 2 -> 3\n// <- outcome : counters : { orders_created: 3 } · the increment is one in-memory add per call, not a per-request network hop",
       tieback: "This is the chapter's instrument-an-operation step: a counter gathers per-operation statistics at minimal overhead.",
       refs: ["Instrumenting an operation"],
@@ -91,7 +91,7 @@ registerChapter({
       q: "Which two aggregation models does the pattern describe, and what lands in the central service?",
       solution: "Push — the service pushes metrics to the metrics service — and pull — the metrics service pulls (scrapes) metrics from the service. Either way the central service holds the values for reporting and alerting.",
       components: ["Order Service", "central metrics service", "push model", "pull model"],
-      diagram: "flowchart LR\n  S[\"Order Service\"] -->|\"push: POST metrics\"| M[\"metrics service\"]\n  M -->|\"pull: GET /metrics\"| S\n  M -->|\"reports + alerts\"| R[\"dashboards\"]",
+      
       code: "// AGGREGATION SIDE — the central metrics service receives two values via push or via pull\n// PARTIES: SVC = Order Service · MS = metrics service\n// STATE (before):\n//    MS.view : { orders_created: 0, request_ms_sum: 0 }\n// DEF: aggregate · CALLED BY: MS reporting and alerting on the values\n// -> counter : 3 · -> sum : 123                // = 3 create_order calls, 3 x 41 ms = 123 ms\n//    step 1 (push) · SVC POSTs {\"orders_created\":3} to MS      MS.view.orders_created : 0 -> 3\n//    step 2 (push) · SVC POSTs {\"request_ms_sum\":123} to MS    MS.view.request_ms_sum : 0 -> 123\n//    step 3 (push) · MS now has both values to report and alert on\n// <- outcome : MS.view : { orders_created: 3, request_ms_sum: 123 } · push = the service pushes metrics to the metrics service\n//    alt pull : MS GETs /metrics -> body \"orders_created 3 request_ms_sum 123\" -> MS.view : {0,0} -> {3,123}   BECAUSE the metrics service pulls the metric from the service",
       tieback: "This is the chapter's push-and-pull aggregation step: the central service turns per-service counters into reporting and alerting.",
       refs: ["Aggregating: push and pull"],
@@ -102,7 +102,7 @@ registerChapter({
       q: "What does it cost to instrument with metrics, beyond the runtime overhead?",
       solution: "The drawback is that metrics code is intertwined with business logic, making the business logic more complicated — the histogram increment sits inline in the business method.",
       components: ["Order Service", "histogram (request_ms)", "observe() calls", "save() calls"],
-      diagram: "flowchart LR\n  B[\"create_order method\"] -->|\"save()\"| S[\"business logic\"]\n  B -->|\"observe()\"| H[\"histogram\"]\n  H -.->|\"intertwined with\"| S",
+      
       code: "// ORDER SERVICE SIDE — the histogram increment sits inline in business logic, tangling the code\n// PARTIES: SVC = Order Service\n// STATE (before):\n//    hist : { request_ms: [] }\n// DEF: create_order · CALLED BY: three client requests\n// -> request1 : \"PO-2004\" · started_at : 100 · ended_at : 141\n//    step 1 · save order, then observe : hist.request_ms : [] -> [41]          BECAUSE 141 - 100 = 41 ms\n// -> request2 : \"PO-2005\" · started_at : 200 · ended_at : 237\n//    step 2 · save order, then observe : hist.request_ms : [41] -> [41,37]     BECAUSE 237 - 200 = 37 ms\n// -> request3 : \"PO-2006\" · started_at : 300 · ended_at : 348\n//    step 3 · save order, then observe : hist.request_ms : [41,37] -> [41,37,48]   BECAUSE 348 - 300 = 48 ms\n// <- outcome : hist : { request_ms: [41,37,48] } · three observe() calls are woven between the save() calls",
       tieback: "This is the chapter's intertwined-code drawback: observe() and save() sit side by side, complicating the business logic.",
       refs: ["What it costs"],
@@ -113,7 +113,7 @@ registerChapter({
       q: "What infrastructure does aggregating metrics require, and how does it trade against the per-request overhead?",
       solution: "Aggregating metrics can require significant infrastructure — running a central metrics service such as Prometheus or AWS CloudWatch — even though the per-request overhead stays low.",
       components: ["central metrics service", "Prometheus / AWS CloudWatch", "many time series"],
-      diagram: "flowchart LR\n  S[\"Services\"] -->|\"push/pull\"| M[\"central metrics service\"]\n  M -->|\"holds\"| T[\"many series\"]\n  M -->|\"adds ops cost\"| C[\"infrastructure\"]\n  S -.->|\"per-request stays cheap\"| X[\"in-memory add\"]",
+      
       code: "// METRICS SERVICE SIDE — the central service holds many series, so aggregation costs real infrastructure\n// PARTIES: SVC = Order Service · MS = metrics service (Prometheus)\n// STATE (before):\n//    series : {}                              // time series MS holds, keyed by metric name\n//    series_count : 0\n//    per_request_cost : \"in-memory add\"       // what each increment costs in the service\n// DEF: scrape · CALLED BY: MS pulling metrics from SVC on an interval\n// -> interval_seconds : 15\n//    step 1 · MS scrapes /metrics    series : {} -> {\"orders_created\":3,\"request_ms\":[41,37,48]}\n//    step 2 · MS counts the series it now stores    series_count : 0 -> 2  BECAUSE orders_created and request_ms each become a stored series\n//    step 3 · the per-request cost stays cheap    per_request_cost : \"in-memory add\" -> \"in-memory add\"  BECAUSE the overhead is in the service's counter, not the scrape\n// <- series_count : 2 · the central service runs as extra infrastructure, while each request still costs one in-memory add\n//    alt no central service : counters stay on individual services -> no dashboard, no alerting, and each service's numbers die with its process",
       tieback: "This is the chapter's aggregation-infrastructure issue: the central metrics service is operational cost, even though per-request overhead is minimal.",
       refs: ["Aggregating: push and pull", "What it costs"],
@@ -165,7 +165,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  SVC[\"Order Service (writer)\"] -->|\"push POST metrics\"| TR[\"push/pull transport\"]\n  TR -->|\"pull GET /metrics\"| SVC\n  TR -->|\"delivers\"| COL[\"Prometheus (collector)\"]\n  COL -->|\"stores\"| STO[(\"time-series registry (aggregator)\")]\n  STO -->|\"queries\"| DSH[\"dashboard (reader)\"]",
+    
     program: `// SYSTEM DESIGN — application metrics pipeline: writer (Order Service, instrumented) -> transport (push/pull) -> collector (Prometheus metrics service) -> aggregator (time-series registry) -> reader (dashboard)
 // PARTIES: SVC = Order Service (writer, instrumented) · MS = Prometheus (collector, metrics service) · STO = time-series registry (aggregator, holds each series) · DSH = dashboard (reader)
 // DEF: metric — a measured quantity per operation; here counter orders_created = 3 and request_ms_sum = 123

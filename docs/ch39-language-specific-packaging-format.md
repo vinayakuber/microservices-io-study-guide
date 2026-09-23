@@ -10,24 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns p.387 · microservices
 
 > **Why this matters:** Every language has a native package format. Shipping that format directly is the simplest possible deployment, and its drawbacks are what motivate every other deployment option.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Build the native artifact</b><br/>artifact : null becomes restaurant-service-3.1.0.jar"]:::start
-  n1["<b>2. Know the per-language shape</b><br/>format : unknown becomes jar, Node.js is a directory, Go is an executable"]:::step
-  n2["<b>3. Hand off to the pipeline</b><br/>pipeline : 0 becomes 1, the service management interface is invoked"]:::step
-  n3["<b>4. One executable JAR to deploy</b><br/>restaurant-service-3.1.0.jar ships"]:::stop
-  n4["<b>WAR packaging instead</b><br/>artifact : null becomes restaurant-service-3.1.0.war, needs a web container"]:::warn
-  n0 -->|"1. compile the service"| n1
-  n1 -->|"2. pick the format"| n2
-  n2 -->|"3. hand to production"| n3
-  n1 -->|"4. the WAR variant"| n4
-```
-
 1. **Build the native artifact** — A Spring Boot Java service builds to an executable JAR file, or a WAR file.
 
 2. **Know the per-language shape** — For Node.js a service is a directory of source code and modules; for Go it is an OS-specific executable.
@@ -52,25 +34,6 @@ flowchart TD
 ### Install the runtime and start the service
 
 > **Why this matters:** The package does not carry its own runtime. The machine must be configured first — the JDK for a JAR, plus a web container such as Tomcat for a WAR — before the service can run.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Install the runtime</b><br/>runtime : empty becomes jdk 17"]:::start
-  n1["<b>2. Copy the package</b><br/>process : null becomes pending, the JAR is copied onto the machine"]:::step
-  n2["<b>3. Start the service</b><br/>process : pending becomes jvm-8121, a JVM process"]:::core
-  n3["<b>4. One JVM, one instance</b><br/>the service is running"]:::stop
-  n4["<b>WAR path needs Tomcat</b><br/>runtime : jdk 17 becomes jdk 17 plus tomcat 10"]:::warn
-  n0 -->|"1. JDK first"| n1
-  n1 -->|"2. put the JAR on the machine"| n2
-  n2 -->|"3. run as a JVM"| n3
-  n0 -->|"4. a WAR adds a web container"| n4
-  n4 -->|"5. then copy and start"| n1
-```
 
 1. **Install the runtime** — For a Java service you install the JDK first; a WAR additionally needs Apache Tomcat.
 
@@ -97,24 +60,6 @@ flowchart TD
 
 > **Why this matters:** You are not forced to one instance per machine. Multiple JVMs can run on a single machine, each running a single service instance.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Launch multiple JVMs</b><br/>jvms : empty becomes jvm-1, jvm-2, jvm-3"]:::start
-  n1["<b>2. Bind separate ports</b><br/>ports : 0 becomes 3, one port per instance"]:::step
-  n2["<b>3. Recall instance shapes</b><br/>serving : 0 becomes 3, three instances share one machine and JDK"]:::core
-  n3["<b>4. Several instances on one machine</b><br/>a Node.js service may spawn multiple workers"]:::stop
-  n4["<b>Or keep one instance per machine</b><br/>instance_count : 3 becomes 1"]:::warn
-  n0 -->|"1. one JVM per instance"| n1
-  n1 -->|"2. each binds a port"| n2
-  n2 -->|"3. shared machine and JDK"| n3
-  n2 -->|"4. coarser sharing"| n4
-```
-
 1. **Launch multiple JVMs** — Each JVM runs a single service instance, and a machine can host several JVMs.
 
 2. **Bind separate ports** — Each instance binds its own port on the shared machine.
@@ -139,24 +84,6 @@ flowchart TD
 ### Why this option motivates the others
 
 > **Why this matters:** The language-specific package leaves the runtime outside the artifact, so the machine must be configured by hand. That unmanaged, shared runtime is exactly what the VM and container options fix by encapsulating the stack.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Configure the machine by hand</b><br/>setup : empty becomes install jdk, install tomcat"]:::start
-  n1["<b>2. Notice the stack is not encapsulated</b><br/>jdk : null becomes 17, pinned by hand"]:::warn
-  n2["<b>3. Prefer the encapsulating options</b><br/>stack_encapsulated : 0 becomes 1, a VM or container image WOULD carry the stack"]:::core
-  n3["<b>4. The drawback motivates the others</b><br/>the unmanaged runtime is the whole problem"]:::stop
-  n4["<b>VM packaging fixes it</b><br/>setup : install jdk, install tomcat becomes empty, the image encapsulates everything"]:::warn
-  n0 -->|"1. manual steps before it runs"| n1
-  n1 -->|"2. the package carries no runtime"| n2
-  n2 -->|"3. recommend VM or container"| n3
-  n2 -->|"4. a VM image absorbs the steps"| n4
-```
 
 1. **Configure the machine by hand** — The JDK and, for a WAR, Tomcat must be installed and pinned before the service runs.
 
@@ -219,13 +146,6 @@ flowchart TD
   R -->|"comprises"| P1["runs as jvm-8121"]
 ```
 
-```mermaid
-flowchart LR
-  BLD["Deployment pipeline"] -->|"build JAR"| PKG["restaurant-service-3.1.0.jar"]
-  PKG -->|"deploy"| MACH["machine: JDK 17 + Tomcat 10"]
-  MACH -->|"launch"| JVM["JVM process jvm-8121"]
-```
-
 ```java
 // SYSTEM DESIGN — language-specific packaging: build pipeline -> package -> machine (runtime) -> JVM process
 // PARTIES: BLD = deployment pipeline (builder) · PKG = restaurant-service-3.1.0.jar (the package) · MACH = machine (server host) · JVM = JVM process jvm-8121 (the runtime)
@@ -257,13 +177,6 @@ Your team wants the simplest possible deployment: build the service in its own l
 - WAR — the web-container variant
 - Deployment pipeline — builds it
 - Service management interface — the handoff
-
-```mermaid
-flowchart LR
-  SRC["Spring Boot source"] -->|"compile"| JAR["restaurant-service-3.1.0.jar"]
-  JAR -->|"hand off"| PIPE["Pipeline"]
-  PIPE -->|"invokes"| SMI["Service management interface"]
-```
 
 ```java
 // BUILD SIDE — package the service in its language's native format so the pipeline can ship one artifact
@@ -300,14 +213,6 @@ The JAR you shipped will not start on a bare machine, because it does not carry 
 - Package copy — onto the machine
 - JVM process — the running instance
 
-```mermaid
-flowchart LR
-  MACH["Production machine"] -->|"install"| JDK["JDK 17"]
-  MACH -->|"install"| TC["Tomcat 10"]
-  MACH -->|"copy"| JAR["restaurant-service-3.1.0.jar"]
-  JAR -->|"start"| JVM["jvm-8121"]
-```
-
 ```java
 // RUNTIME SIDE — configure a machine, copy the package, and start it as a JVM process
 // PARTIES: MACH = the production machine · SVC = Restaurant Service
@@ -342,16 +247,6 @@ You are not forced to dedicate a whole machine to one instance. You want three i
 - One machine — the shared host
 - Separate ports — per instance
 - Node.js workers — the process alternative
-
-```mermaid
-flowchart LR
-  MACH["Production machine"] -->|"launch"| J1["jvm-1 :8081"]
-  MACH -->|"launch"| J2["jvm-2 :8082"]
-  MACH -->|"launch"| J3["jvm-3 :8083"]
-  J1 -->|"own port"| P["ports 3"]
-  J2 -->|"own port"| P
-  J3 -->|"own port"| P
-```
 
 ```java
 // RUNTIME SIDE — run three service instances on one machine, one JVM per instance, each on its own port
@@ -388,14 +283,6 @@ Your JAR works, but the machine setup was manual and fragile: the JDK and Tomcat
 - VM image — encapsulates the stack
 - Container image — the lighter alternative
 
-```mermaid
-flowchart LR
-  PKG["JAR package"] -->|"no runtime inside"| HAND["install JDK + Tomcat by hand"]
-  HAND -->|"fragile"| GAP["stack not encapsulated"]
-  GAP -->|"motivates"| VM["VM image"]
-  GAP -->|"motivates"| CNT["Container image"]
-```
-
 ```java
 // TRADEOFF SIDE — the package runs on a shared, hand-configured runtime, which motivates VM and container packaging
 // PARTIES: MACH = the machine · SVC = Restaurant Service
@@ -428,11 +315,19 @@ _From the 28 problems:_ 01-scale-from-zero-to-millions
 
 Deploy the service in its language-specific package: an executable JAR or WAR for Java, a directory of source code and modules for Node.js, or an OS-specific executable for Go.
 
-```mermaid
-flowchart LR
-  SRC["Spring Boot source"] -->|"compile"| JAR["restaurant-service-3.1.0.jar"]
-  JAR -->|"hand off"| PIPE["Pipeline"]
-  PIPE -->|"invokes"| SMI["Service management interface"]
+```java
+// BUILD SIDE — package the service in its language's native format so the pipeline can ship one artifact
+// PARTIES: BLD = deployment pipeline · SVC = Restaurant Service
+// STATE (before):
+//    artifact : null                    // nothing built yet
+//    src : "restaurant-service"         // Spring Boot Java source
+// DEF: build version 3.1.0 · CALLED BY: BLD on commit
+// -> service : "restaurant-service" · -> version : "3.1.0"
+//    step 1 · compile the source   // artifact : null -> "restaurant-service-3.1.0.jar"   BECAUSE a Spring Boot app packages as an executable JAR
+//    step 2 · choose the format   // format : "unknown" -> "jar"   // a JAR or WAR; a WAR would add a web container
+//    step 3 · hand off   // pipeline : 0 -> 1   BECAUSE the pipeline invokes the service management interface
+// <- artifact : "restaurant-service-3.1.0.jar" · one executable JAR to deploy
+//    alt WAR packaging : artifact : null -> "restaurant-service-3.1.0.war"   BECAUSE a WAR also needs a web container installed
 ```
 
 

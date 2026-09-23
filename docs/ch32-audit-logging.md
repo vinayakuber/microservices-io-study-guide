@@ -10,27 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 32 (p.377) · micr
 
 > **Why this matters:** The pattern answers "how to understand the behavior of users and the application?" by recording user activity in a database. Each user action becomes a durable row naming who did what, and when.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-n0["<b>1. User acts</b><br/>alice performs view_order on PO-2001"]:::start
-  n1["<b>2. Write one row per action</b><br/>INSERT audit row id=1, action view_order"]:::step
-  n2["<b>3. Next action, next row</b><br/>INSERT id=2 create_order, then id=3 pay_order"]:::step
-  n3["<b>4. Audit log accumulates</b><br/>audit_log holds 3 rows, WHO=alice, WHEN=now"]:::core
-  n4["<b>5. Behavior reconstructable</b><br/>the DB records who did what and when"]:::stop
-  n5["<b>Missed write</b><br/>an action with no row leaves no trace"]:::warn
-  n0 -->|"1. action to record"| n1
-  n1 -->|"2. next action"| n2
-  n2 -->|"3. more actions"| n1
-  n2 -->|"4. rows accumulate"| n3
-  n3 -->|"5. reconstruct later"| n4
-  n2 -->|"6. write fails - no trace"| n5
-```
-
 1. **Record in a database** — The solution is to record user activity in a database.
 
 2. **One row per action** — Each action a user performs is written as an audit record.
@@ -57,32 +36,6 @@ n0["<b>1. User acts</b><br/>alice performs view_order on PO-2001"]:::start
 
 > **Why this matters:** The force behind audit logging is knowing what a user recently performed — for customer support, compliance, and security. Reading the log reconstructs a user's recent behavior.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-n0["<b>1. One audit log, three questions</b><br/>SUP wants to know what alice recently did"]:::start
-  n1["<b>2. Query by user</b><br/>match the rows for alice, in order"]:::step
-  n2["<b>3. Answer holds the rows</b><br/>3 rows, row id=3 is the payment"]:::core
-  n3["<b>4. Support asks</b><br/>did alice pay? - yes, at t3"]:::step
-  n4["<b>5. Compliance asks</b><br/>who touched PO-2001?"]:::step
-  n5["<b>6. Security asks</b><br/>which pay_order actions happened?"]:::step
-  n6["<b>7. One log, three readers</b><br/>the same rows answer all three"]:::stop
-  n7["<b>Query misses</b><br/>no match returns nothing"]:::warn
-  n0 -->|"1. choose a question"| n1
-  n1 -->|"2. match rows by user"| n2
-  n2 -->|"3. support"| n3
-  n2 -->|"4. compliance"| n4
-  n2 -->|"5. security"| n5
-  n3 -->|"6. merge answers"| n6
-  n4 -->|"7. merge answers"| n6
-  n5 -->|"8. merge answers"| n6
-  n1 -->|"9. no match - empty"| n7
-```
-
 1. **Three readers** — Customer support, compliance, and security all want to know what actions a user recently performed.
 
 2. **Reconstruct behavior** — Querying the log by user returns that user's actions in order.
@@ -108,30 +61,6 @@ n0["<b>1. One audit log, three questions</b><br/>SUP wants to know what alice re
 ### Auditing and event sourcing
 
 > **Why this matters:** Audit logging is not free: the auditing code is intertwined with the business logic, making it more complicated. The related pattern Event Sourcing offers a reliable way to implement auditing.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-n0["<b>1. Request arrives</b><br/>create_order for PO-2001"]:::start
-  n1["<b>2. Save, then audit</b><br/>save the order, then call audit - row 1"]:::step
-  n2["<b>3. Publish, then audit</b><br/>publish, then call audit - row 2"]:::step
-  n3["<b>4. Inline audit path</b><br/>inline_audit holds 2 hand-written rows"]:::core
-  n4["<b>5. Drawback - intertwined</b><br/>audit calls sit between business statements"]:::warn
-  n5["<b>6. Event sourcing path</b><br/>append 2 domain events OrderCreated, OrderPublished"]:::core
-  n6["<b>7. Event log IS the audit trail</b><br/>audit becomes a read of event_log, no audit calls"]:::stop
-  n7["<b>Missed audit call</b><br/>an action is left unrecorded"]:::warn
-  n0 -->|"1. method runs"| n1
-  n1 -->|"2. second audit call"| n2
-  n2 -->|"3. inline approach"| n3
-  n3 -->|"4. drawback - intertwined"| n4
-  n2 -->|"5. event sourcing instead"| n5
-  n5 -->|"6. reliable audit"| n6
-  n1 -->|"7. missed call - unrecorded"| n7
-```
 
 1. **Intertwined code** — The drawback is that auditing code is intertwined with the business logic, making it more complicated.
 
@@ -208,14 +137,6 @@ flowchart TD
   R -->|"comprises"| P1["reconstructs what a user did"]
 ```
 
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|"INSERT audit row"| LOG[("audit log store: PostgreSQL 16 @ audit-db-1")]
-  LOG -->|"shipped"| AGG["log aggregator"]
-  AGG -->|"indexed"| IDX[("aggregated index")]
-  IDX -->|"query user=alice"| RDR["reader: support/compliance/security"]
-```
-
 ```java
 // SYSTEM DESIGN — audit logging pipeline: service (Order Service, business op + audit record) -> audit log (PostgreSQL 16 @ audit-db-1) -> log aggregator -> reader (support/compliance/security)
 // PARTIES: SVC = Order Service (writer, business op + audit record) · DB = PostgreSQL 16 @ audit-db-1 (audit log store) · AGG = log aggregator (collects and indexes audit rows) · RDR = support agent (reader)
@@ -249,13 +170,6 @@ A user named alice views, creates, and pays for order PO-2001. The team needs a 
 - Order Service
 - audit database
 - audit row (id, user, action, target, at)
-
-```mermaid
-flowchart LR
-  U["alice"] -->|"view/create/pay"| S["Order Service"]
-  S -->|"INSERT row"| D["audit database"]
-  D -->|"3 rows"| L["audit_log"]
-```
 
 ```java
 // ORDER SERVICE SIDE — every user action becomes one audit row in the database
@@ -293,14 +207,6 @@ A support agent must answer whether alice paid for PO-2001, a compliance auditor
 - security team
 - audit database
 
-```mermaid
-flowchart LR
-  S["Support"] -->|"query user=alice"| D["audit database"]
-  C["Compliance"] -->|"query target=PO-2001"| D
-  K["Security"] -->|"query action=pay_order"| D
-  D -->|"ordered rows"| R["reconstruction"]
-```
-
 ```java
 // SUPPORT SIDE — reading the audit log reconstructs what one user did, for support/compliance/security
 // PARTIES: SUP = support agent · DB = PostgreSQL 16 @ audit-db-1
@@ -336,13 +242,6 @@ The audit() calls are scattered between business statements inside create_order,
 - business statements
 - inline audit rows
 
-```mermaid
-flowchart LR
-  M["create_order"] -->|"save()"| B["business"]
-  M -->|"audit()"| A["inline_audit"]
-  A -.->|"intertwined"| B
-```
-
 ```java
 // ORDER SERVICE SIDE — audit code interleaves with business logic, making the method harder to read
 // PARTIES: SVC = Order Service
@@ -377,13 +276,6 @@ The team is tired of hand-writing audit() calls that can drift from what actuall
 - domain events
 - implicit audit trail
 
-```mermaid
-flowchart LR
-  S["Order Service"] -->|"append event"| E["event store"]
-  E -->|"OrderCreated, OrderPublished"| L["event_log"]
-  L -->|"is the audit trail"| A["audit read"]
-```
-
 ```java
 // ORDER SERVICE SIDE — event sourcing makes auditing implicit: the event log itself is the audit trail
 // PARTIES: SVC = Order Service · ES = EventStoreDB 24 @ orders-events-1
@@ -417,11 +309,20 @@ _From the 28 problems:_ 20-metrics-monitoring · 26-payment-system
 
 Record user activity in a database, giving a record of user actions.
 
-```mermaid
-flowchart LR
-  U["alice"] -->|"view/create/pay"| S["Order Service"]
-  S -->|"INSERT row"| D["audit database"]
-  D -->|"3 rows"| L["audit_log"]
+```java
+// ORDER SERVICE SIDE — every user action becomes one audit row in the database
+// PARTIES: U1 = user alice · SVC = Order Service · DB = PostgreSQL 16 @ audit-db-1
+// DEF: audit — a durable row recording who did what to which target and when; here (1,"alice","view_order","PO-2001",now)
+// STATE (before):
+//    audit_log : []                                  // rows: (id, user, action, target, at)
+// DEF: record_activity · CALLED BY: U1 performing actions
+// -> action1 : ("alice","view_order","PO-2001")
+//    step 1 · INSERT audit row id=1   audit_log : [] -> [(1,"alice","view_order","PO-2001",now)]
+// -> action2 : ("alice","create_order","PO-2001")
+//    step 2 · INSERT audit row id=2   audit_log : [1 row] -> [(1,"alice","view_order","PO-2001",now),(2,"alice","create_order","PO-2001",now)]
+// -> action3 : ("alice","pay_order","PO-2001")
+//    step 3 · INSERT audit row id=3   audit_log : [2 rows] -> [(1,"alice","view_order","PO-2001",now),(2,"alice","create_order","PO-2001",now),(3,"alice","pay_order","PO-2001",now)]
+// <- outcome : audit_log : 3 rows · WHO=alice, WHAT=view/create/pay, WHEN=timestamp   BECAUSE the DB now holds a record of her actions
 ```
 
 

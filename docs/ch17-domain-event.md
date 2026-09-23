@@ -10,24 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.17 (p.160) · micro
 
 > **Why this matters:** A service often needs to publish events when it updates its data — to keep a CQRS view fresh or to participate in a choreography-based saga. Without a publish step, an update is invisible to the consumers that need it.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Data changes locally</b><br/>order.state NEW becomes PLACED, written only inside the service"]:::start
-  n1["<b>2. Two consumers need the news</b><br/>a CQRS view and a choreography saga both depend on the change"]:::step
-  n2["<b>3. The open question</b><br/>how does a service publish an event when it updates its data"]:::core
-  n3["<b>4. A publish step is required</b><br/>the update must be emitted, not just stored"]:::stop
-  n4["<b>No publish step</b><br/>view.placed_count stays 0 and saga.next_step stays none, consumers stranded"]:::warn
-  n0 -->|"1. service updates its own data"| n1
-  n1 -->|"2. consumers depend on the change"| n2
-  n2 -->|"3. the pattern to find"| n3
-  n1 -->|"4. skipped publish - consumers stranded"| n4
-```
-
 1. **Data changes silently** — A service updates its own data, but the update is local to that service.
 
 2. **Consumers need to know** — Events may be needed to update a CQRS view or to coordinate a choreography-based saga.
@@ -52,30 +34,6 @@ flowchart TD
 ### Aggregates emit domain events
 
 > **Why this matters:** The solution puts the event at the source of the change: DDD aggregates emit a domain event when they are created or updated, and the service publishes it so other services can consume it.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Command arrives at the aggregate</b><br/>place_order for order PO-2001"]:::start
-  n1["<b>2. Aggregate changes state</b><br/>order.state NEW becomes PLACED"]:::step
-  n2["<b>3. Aggregate emits the event</b><br/>events gains OrderPlaced with order_id PO-2001"]:::core
-  n3["<b>4. Service publishes to the broker</b><br/>OrderPlaced delivered via the transactional outbox"]:::step
-  n4["<b>5. Broker delivers to the consumer</b><br/>the CQRS view updater receives OrderPlaced"]:::step
-  n5["<b>6. Consumer updates the read model</b><br/>view.order_count 0 becomes 1"]:::step
-  n6["<b>7. View reflects the change</b><br/>the consumer reacts without calling the aggregate"]:::stop
-  n7["<b>Event lost in transit</b><br/>view.order_count stays 0, the read model is stale"]:::warn
-  n0 -->|"1. service calls the aggregate"| n1
-  n1 -->|"2. state flips"| n2
-  n2 -->|"3. change recorded as an event"| n3
-  n3 -->|"4. publish the event"| n4
-  n4 -->|"5. deliver to subscriber"| n5
-  n5 -->|"6. count goes up"| n6
-  n4 -->|"7. event lost - view stale"| n7
-```
 
 1. **Aggregates hold the business logic** — The business logic of a service is organized as a collection of DDD aggregates.
 
@@ -105,30 +63,6 @@ flowchart TD
 ### Publish atomically with the data change
 
 > **Why this matters:** Publishing must not lose the event or emit it for a change that rolled back. Because a service cannot enlist both its database and the broker in one distributed transaction, it uses the Transactional Outbox to write the event in the same transaction as the data.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. No distributed transaction</b><br/>one transaction cannot span the database and the broker"]:::start
-  n1["<b>2. Begin one local transaction</b><br/>the broker is not enlisted"]:::step
-  n2["<b>3. Update the data</b><br/>order.state NEW becomes PLACED"]:::step
-  n3["<b>4. Write the event to the outbox</b><br/>outbox gains OrderPlaced for PO-2001, same transaction"]:::core
-  n4["<b>5. Commit both or neither</b><br/>event cannot be lost, nor published for a rolled-back change"]:::step
-  n5["<b>6. Relay polls the outbox</b><br/>sent false becomes true, then forwards to the broker"]:::step
-  n6["<b>7. Event reaches the broker</b><br/>atomic with the data change"]:::stop
-  n7["<b>Rollback path</b><br/>the transaction aborts and both rows vanish together"]:::warn
-  n0 -->|"1. split write is impossible"| n1
-  n1 -->|"2. single local transaction"| n2
-  n2 -->|"3. change the row"| n3
-  n3 -->|"4. event stored alongside"| n4
-  n4 -->|"5. commit"| n5
-  n5 -->|"6. relay forwards"| n6
-  n4 -->|"7. rollback - event discarded with the change"| n7
-```
 
 1. **No distributed transaction** — A service cannot span one transaction across its database and the message broker.
 
@@ -194,14 +128,6 @@ flowchart TD
   R -->|"comprises"| P1["react — updates its read model order_count 0 -&gt; 1"]
 ```
 
-```mermaid
-flowchart LR
-  AG["Order aggregate (publisher)"] -->|"emit OrderPlaced"| OB[("Transactional outbox (PostgreSQL 16 @ orders-db-1)")]
-  OB -->|"relay publishes after commit"| BRK["message broker (transport)"]
-  BRK -->|"deliver"| SUB["subscriber: CQRS view updater"]
-  SUB -->|"order_count 0 -> 1"| V[("read model")]
-```
-
 ```java
 // SYSTEM DESIGN — domain event as a pipeline: aggregate (publisher) -> event broker (transport) -> subscriber (consumer)
 // PARTIES: AG = Order aggregate (publisher, inside Order Service) · DB = PostgreSQL 16 @ orders-db-1 (holds the outbox table) · BRK = message broker (event transport) · SUB = CQRS view updater (subscriber/consumer)
@@ -238,13 +164,6 @@ Your order service updates an order, but the CQRS read model still shows the old
 - Choreography saga — needs the event to advance
 - Publish step — missing without the pattern
 
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|state NEW to PLACED| DB[("Own data")]
-  DB -.->|no event| VIEW["CQRS view stays stale"]
-  DB -.->|no event| SAGA["Saga never advances"]
-```
-
 ```java
 // ORDER SERVICE SIDE — the problem the pattern solves: data changes, but the consumers that need to know are never told
 // PARTIES: SVC = Order Service (writes) · VIEW = a CQRS read model · SAGA = a choreography-based saga coordinated via events
@@ -279,14 +198,6 @@ You want a read model to count placed orders and a saga to react, and you want t
 - Service — publishes the event
 - Broker — carries the event
 - Consumer handler — updates the read model
-
-```mermaid
-flowchart LR
-  AG["Order aggregate"] -->|state NEW to PLACED| EVT["OrderPlaced"]
-  EVT -->|publish| BRK[("Broker")]
-  BRK -->|deliver| CNS["Consumer handler"]
-  CNS -->|order_count 0 to 1| VIEW[("Read model")]
-```
 
 ```java
 // ORDER SERVICE SIDE — an aggregate emits a domain event when it changes, and a consumer reacts to it
@@ -327,14 +238,6 @@ Your service updates an order and publishes OrderPlaced, but you are worried the
 - Relay — publishes after commit
 - Broker — receives the event
 
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|UPDATE order| DB[("Database")]
-  SVC -->|INSERT outbox row| DB
-  DB -->|COMMIT both| OK["Event durable with data"]
-  OK -->|relay| BRK[("Broker")]
-```
-
 ```java
 // ORDER SERVICE SIDE — publishing reliably: the event is written to the outbox in the SAME transaction as the data change
 // PARTIES: SVC = Order Service · DB = PostgreSQL 16 @ orders-db-1 · BRK = the message broker
@@ -370,14 +273,6 @@ A user places an order and immediately reloads the order-count page, but the cou
 - Broker delivery — asynchronous
 - Consumer handler — updates the view later
 - Read side — briefly stale
-
-```mermaid
-flowchart LR
-  WRITE["Order placed"] -->|OrderPlaced| BRK[("Broker")]
-  BRK -->|delayed delivery| CNS["Consumer"]
-  CNS -->|count 0 to 1| VIEW[("Read model")]
-  VIEW -.->|stale until delivered| READER["Reader sees old count"]
-```
 
 ```java
 // CONSUMER SIDE — the read model catches up asynchronously, so it is briefly stale after the event is emitted
@@ -415,11 +310,19 @@ _From the 28 problems:_ 19-distributed-message-queue · 26-payment-system
 
 Organize the business logic of a service as a collection of DDD aggregates that emit domain events when they are created or updated.
 
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|state NEW to PLACED| DB[("Own data")]
-  DB -.->|no event| VIEW["CQRS view stays stale"]
-  DB -.->|no event| SAGA["Saga never advances"]
+```java
+// ORDER SERVICE SIDE — the problem the pattern solves: data changes, but the consumers that need to know are never told
+// PARTIES: SVC = Order Service (writes) · VIEW = a CQRS read model · SAGA = a choreography-based saga coordinated via events
+// STATE (before):
+//    order : { id:"PO-77", state:"NEW" }
+//    view : { placed_count : 0 }
+//    saga : { next_step : "none" }
+// DEF: place_order_without_publish · CALLED BY: SVC
+// -> command : "place_order"
+//    step 1 · SVC writes its own data locally : order.state : "NEW" -> "PLACED"
+//    step 2 · the CQRS view is not notified and stays stale : view.placed_count : 0 -> 0
+//    step 3 · the saga is not triggered and never advances : saga.next_step : "none" -> "none"
+// <- outcome : order.state : "PLACED" · but every consumer still sees the old state, so the service needs a way to publish events when it updates data
 ```
 
 

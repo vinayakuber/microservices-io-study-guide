@@ -80,10 +80,7 @@ registerChapter({
       q: 'What happens when a new service copies the legacy model directly, with no boundary?',
       solution: 'The raw legacy record is copied into the new service\'s domain model, and the service\'s code comes to depend on legacy names and codes, so the legacy model pollutes the new service.',
       components: ['Legacy record — with legacy names', 'Direct copy — no translation', 'Legacy codes — adopted verbatim', 'Pollution — the new model leaks in'],
-      diagram: `flowchart LR
-  LEG["Legacy monolith"] -->|"cust_dob, status_cd"| NEW["New Customer service"]
-  NEW -->|"stores raw"| M["new_customer"]
-  M -->|"polluted"| P["legacy names leak in"]`,
+      
       code: `// NEW SERVICE SIDE — a new Customer service reads a record straight from the legacy monolith, with no boundary
 // PARTIES: NEW = new Customer service · LEG = PostgreSQL 14 @ legacy-db-1 (customer table)
 // STATE (before):
@@ -104,10 +101,7 @@ registerChapter({
       q: 'What does the anti-corruption layer do to a legacy record?',
       solution: 'A layer sits between the new service and the legacy monolith and translates the legacy model into the new service\'s model field by field, renaming fields and translating values where the two models disagree.',
       components: ['Anti-corruption layer — the boundary', 'Field rename — cust_dob to dateOfBirth', 'Value translation — code to word', 'Clean model — only the new vocabulary'],
-      diagram: `flowchart LR
-  LEG["Legacy monolith"] -->|"cust_id, cust_dob, status_cd"| ACL["Anti-corruption layer"]
-  ACL -->|"id, dateOfBirth, status"| NEW["New Customer service"]
-  ACL -->|"A -> ACTIVE"| MAP["translation"]`,
+      
       code: `// ACL SIDE — the anti-corruption layer translates a legacy record into the new service's own model
 // PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = PostgreSQL 14 @ legacy-db-1 (legacy monolith customer table)
 // STATE (before):
@@ -128,10 +122,7 @@ registerChapter({
       q: 'Why does a change to the legacy model stop inside the anti-corruption layer?',
       solution: 'Because the translation lives in one place, the legacy vocabulary stays inside the layer; when the monolith changes a code, only the layer\'s mapping is updated, and the new service keeps seeing its own unchanged model.',
       components: ['One translation point — the ACL', 'Legacy change — a rename plus a new code', 'Mapping update — only in the layer', 'Unchanged domain — the service is untouched'],
-      diagram: `flowchart LR
-  LEG["Legacy monolith"] -->|"stat_code '1'"| ACL["Anti-corruption layer"]
-  ACL -->|"mapping updated"| MAP["status_cd -> stat_code, A -> 1"]
-  MAP -->|"still yields"| NEW["New service status ACTIVE"]`,
+      
       code: `// ACL SIDE — the legacy monolith renames its status field and changes its code; the change stops inside the ACL
 // PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = PostgreSQL 14 @ legacy-db-1 (legacy monolith customer table)
 // STATE (before):
@@ -152,11 +143,7 @@ registerChapter({
       q: 'What happens when a call bypasses the anti-corruption layer?',
       solution: 'Any call that bypasses the layer reintroduces the pollution it was meant to stop, because the legacy model reaches the new service again; the layer only works if every interaction goes through it.',
       components: ['The layer — the only sanctioned path', 'A bypass — a direct legacy read', 'Pollution — the legacy model returns', 'Discipline — every call through the layer'],
-      diagram: `flowchart LR
-  DEV["Developer"] -->|"bypasses"| DB["Legacy DB direct"]
-  DB -->|"raw row"| NEW["New service"]
-  NEW -->|"polluted again"| P["legacy names leak in"]
-  DEV -->|"should use"| ACL["Anti-corruption layer"]`,
+      
       code: `// BOUNDARY SIDE — one direct read that skips the layer reintroduces the exact pollution the layer stops
 // PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = PostgreSQL 14 @ legacy-db-1 (legacy monolith customer table)
 // STATE (before):
@@ -203,7 +190,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  NEW[\"new Customer service\"] -->|\"needs customer C-1042\"| ACL[\"anti-corruption layer\"]\n  ACL -->|\"adapter reads\"| LEG[(\"PostgreSQL 14 @ legacy-db-1\")]\n  LEG -->|\"cust_id, cust_dob, status_cd\"| ACL\n  ACL -->|\"translator maps A -> ACTIVE\"| NEW\n  NEW -->|\"stores\"| DM[\"domain: id, dateOfBirth, status\"]",
+    
     program: `// SYSTEM DESIGN — anti-corruption layer: new subsystem -> ACL (adapter + translator) -> legacy monolith
 // PARTIES: NEW = new Customer service (the clean subsystem) · ACL = anti-corruption layer (adapter that calls the legacy API + translator that maps the legacy model to the modern model) · LEG = PostgreSQL 14 @ legacy-db-1 (legacy monolith customer table)
 // DEF: adapter — the ACL half that calls the legacy API/table; here SELECT of customer "C-1042"

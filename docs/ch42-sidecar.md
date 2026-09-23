@@ -10,24 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns p.410 · microservices
 
 > **Why this matters:** Cross-cutting concerns belong outside the service code. A sidecar process or container that runs alongside the service instance carries those concerns, so the service stays focused on business logic.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Run the service instance</b><br/>processes : empty becomes order-service"]:::start
-  n1["<b>2. Run a sidecar alongside it</b><br/>processes : order-service becomes order-service, order-sidecar"]:::step
-  n2["<b>3. Move concerns into the sidecar</b><br/>concerns : empty becomes tracing, metrics"]:::core
-  n3["<b>4. Service stays focused</b><br/>service and sidecar share one host"]:::stop
-  n4["<b>Container form instead</b><br/>sidecar : order-sidecar becomes order-sidecar-container"]:::warn
-  n0 -->|"1. the instance runs"| n1
-  n1 -->|"2. the sidecar beside it"| n2
-  n2 -->|"3. concerns move out"| n3
-  n1 -->|"4. process or container"| n4
-```
-
 1. **Run the service instance** — The service instance runs as its own process or container.
 
 2. **Run a sidecar alongside it** — A separate sidecar process or container runs alongside the service instance.
@@ -52,24 +34,6 @@ flowchart TD
 ### Intercept outbound traffic
 
 > **Why this matters:** The sidecar sits between the service and its outbound traffic, so it can act on every call that leaves. This is where a concern such as distributed tracing attaches a unique id.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Sit in the traffic path</b><br/>the sidecar stands between the service and its outbound calls"]:::start
-  n1["<b>2. Intercept the request</b><br/>request : empty becomes call SELECT * FROM orders"]:::step
-  n2["<b>3. Apply the concern</b><br/>trace_id : null becomes trc-77c1, stamped for tracing"]:::core
-  n3["<b>4. Forward the stamped call</b><br/>sent : 0 becomes 1, on its way to db:5432"]:::stop
-  n4["<b>Inbound reply also mediated</b><br/>reply : 0 becomes 1"]:::warn
-  n0 -->|"1. in the path"| n1
-  n1 -->|"2. see the call before it leaves"| n2
-  n2 -->|"3. stamp then forward"| n3
-  n2 -->|"4. the return path"| n4
-```
 
 1. **Sit in the traffic path** — The sidecar stands between the service and its outbound calls.
 
@@ -96,24 +60,6 @@ flowchart TD
 
 > **Why this matters:** Inbound traffic passes through the sidecar too. A monitoring service can ping the sidecar for health, and the sidecar records metrics — observability without touching the service.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Own the health URL</b><br/>health : empty becomes status UP, the sidecar answers /health"]:::start
-  n1["<b>2. Count the requests</b><br/>metric : 0 becomes 1, one measured request"]:::step
-  n2["<b>3. Report to the monitor</b><br/>samples : 0 becomes 1, emitted to the monitoring service"]:::core
-  n3["<b>4. Observability, service unchanged</b><br/>the service code never changes"]:::stop
-  n4["<b>Service failed behind the sidecar</b><br/>health : status UP becomes status DOWN"]:::warn
-  n0 -->|"1. answer the ping"| n1
-  n1 -->|"2. record the metric"| n2
-  n2 -->|"3. emit to the monitor"| n3
-  n0 -->|"4. the process died"| n4
-```
-
 1. **Own the health URL** — The sidecar answers the health-check URL that a monitoring service pings.
 
 2. **Count the requests** — The sidecar records metrics about the requests it mediates.
@@ -138,24 +84,6 @@ flowchart TD
 ### Sidecars form a service mesh
 
 > **Why this matters:** A single sidecar handles one instance. When every instance has a sidecar, the set of sidecars collectively mediates all in and out traffic — which is how a service mesh is often implemented.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Give every instance a sidecar</b><br/>sidecars : empty becomes a, b, one per service instance"]:::start
-  n1["<b>2. Route hop to hop</b><br/>hops : 0 becomes 1, sidecar A forwards to sidecar B"]:::step
-  n2["<b>3. Mediate all traffic</b><br/>mediated : 0 becomes 1, the sidecars collectively mediate everything"]:::core
-  n3["<b>4. A service mesh</b><br/>a mesh is often implemented using the sidecar pattern"]:::stop
-  n4["<b>Only one sidecar</b><br/>sidecars : a, b becomes a, traffic is not fully mediated"]:::warn
-  n0 -->|"1. a sidecar on every instance"| n1
-  n1 -->|"2. forward to the next"| n2
-  n2 -->|"3. all in and out mediated"| n3
-  n0 -->|"4. incomplete coverage"| n4
-```
 
 1. **Give every instance a sidecar** — Each service instance gets its own sidecar.
 
@@ -220,18 +148,6 @@ flowchart TD
   R -->|"comprises"| P1["Volume — shared-logs mounted by both"]
 ```
 
-```mermaid
-flowchart LR
-  POD["Kubernetes pod"] -->|"starts"| APP["application container order-service"]
-  POD -->|"starts alongside"| SIDE["sidecar container order-sidecar"]
-  APP -->|"SELECT * FROM orders"| SIDE
-  SIDE -->|"stamps trc-77c1"| DB[("PostgreSQL 16 @ orders-db-1")]
-  APP -->|"mounts"| VOL[("volume shared-logs")]
-  SIDE -->|"mounts"| VOL
-  APP -->|"shares"| NS["network namespace pod-net-7"]
-  SIDE -->|"shares"| NS
-```
-
 ```java
 // SYSTEM DESIGN — sidecar: application container -> sidecar container -> shared resources
 // PARTIES: APP = application container (Order Service "order-service") · SIDE = sidecar container (proxy/log-shipper/config-reloader "order-sidecar") · SHARED = shared resources (the pod network namespace + the volume both containers mount)
@@ -266,14 +182,6 @@ Your order service is polluted with configuration, logging, health-check, metric
 - Sidecar — a separate process or container
 - Shared host — they run alongside
 - Cross-cutting concerns — moved into the sidecar
-
-```mermaid
-flowchart LR
-  POD["Deployment unit"] -->|"start"| SVC["order-service"]
-  POD -->|"start alongside"| SIDE["order-sidecar"]
-  SIDE -->|"carries"| CC["tracing + metrics"]
-  SVC -->|"stays on"| BIZ["business logic"]
-```
 
 ```java
 // COLOCATE SIDE — run a sidecar process alongside each service instance so concerns live outside the service
@@ -310,13 +218,6 @@ You need every outbound call from the order service to carry a trace id for dist
 - Trace id — stamped on the call
 - Forward — the call leaves
 
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|"SELECT * FROM orders"| SIDE["Sidecar"]
-  SIDE -->|"stamps trc-77c1"| DB["db:5432"]
-  SIDE -->|"attaches"| ID["trace id"]
-```
-
 ```java
 // OUTBOUND SIDE — the sidecar mediates every call leaving the service, attaching a trace id
 // PARTIES: SVC = Order Service · SIDE = its sidecar · DB = PostgreSQL 16 @ orders-db-1
@@ -351,14 +252,6 @@ Your monitoring service pings /health on the order service, but you want the hea
 - Monitoring service — pings it
 - Request metrics — recorded by the sidecar
 - Emission — to the monitor
-
-```mermaid
-flowchart LR
-  MON["Monitoring service"] -->|"GET /health"| SIDE["Sidecar"]
-  SIDE -->|"status UP"| MON
-  SIDE -->|"metric 1"| MON
-  SVC["Order Service"] ---|"runs beside"| SIDE
-```
 
 ```java
 // INBOUND SIDE — a monitor pings the sidecar, which answers for the service without touching its code
@@ -395,14 +288,6 @@ One sidecar only handles one instance. You want every instance covered so that, 
 - All traffic mediated
 - A service mesh — the collective result
 
-```mermaid
-flowchart LR
-  SIDEA["Sidecar A"] -->|"forward"| SIDEB["Sidecar B"]
-  SIDEB -->|"hands off"| SVCB["Customer Service"]
-  SIDEA -->|"together"| MESH["service mesh"]
-  SIDEB -->|"together"| MESH
-```
-
 ```java
 // MESH SIDE — when every instance has a sidecar, the set of sidecars mediates all traffic: a service mesh
 // PARTIES: SIDEA = sidecar of Order Service · SIDEB = sidecar of Customer Service · SVCB = Customer Service
@@ -435,12 +320,19 @@ _From the 28 problems:_ 01-scale-from-zero-to-millions
 
 Implement cross-cutting concerns in a sidecar process or container that runs alongside the service instance.
 
-```mermaid
-flowchart LR
-  POD["Deployment unit"] -->|"start"| SVC["order-service"]
-  POD -->|"start alongside"| SIDE["order-sidecar"]
-  SIDE -->|"carries"| CC["tracing + metrics"]
-  SVC -->|"stays on"| BIZ["business logic"]
+```java
+// COLOCATE SIDE — run a sidecar process alongside each service instance so concerns live outside the service
+// PARTIES: POD = the deployment unit (one host) · SVC = Order Service instance · SIDE = the sidecar
+// STATE (before):
+//    processes : {}                     // processes in this pod, none yet
+//    concerns : []                      // cross-cutting concerns, not yet attached
+// DEF: start 2 processes (service + sidecar) · CALLED BY: POD at deploy time
+// -> service : "order-service" · -> sidecar : "order-sidecar"
+//    step 1 · start the service   // processes : {} -> {"order-service"}   BECAUSE the service instance runs as its own process
+//    step 2 · start the sidecar   // processes : {"order-service"} -> {"order-service","order-sidecar"}   // the sidecar runs ALONGSIDE the service
+//    step 3 · attach the concerns   // concerns : [] -> ["tracing","metrics"]   // the sidecar carries cross-cutting concerns, not the service
+// <- processes : 2 · concerns : 2 · the service and sidecar share one host
+//    alt container form : sidecar : "order-sidecar" -> "order-sidecar-container"   BECAUSE a sidecar can be a container instead of a process
 ```
 
 

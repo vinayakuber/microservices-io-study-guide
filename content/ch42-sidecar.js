@@ -101,11 +101,7 @@ registerChapter({
       q: 'Where does the Sidecar pattern put cross-cutting concerns, and where does the sidecar run?',
       solution: 'A sidecar process or container runs alongside the service instance and implements the cross-cutting concerns instead of the service, so the service stays focused on business logic.',
       components: ['Service instance — its own process', 'Sidecar — a separate process or container', 'Shared host — they run alongside', 'Cross-cutting concerns — moved into the sidecar'],
-      diagram: `flowchart LR
-  POD["Deployment unit"] -->|"start"| SVC["order-service"]
-  POD -->|"start alongside"| SIDE["order-sidecar"]
-  SIDE -->|"carries"| CC["tracing + metrics"]
-  SVC -->|"stays on"| BIZ["business logic"]`,
+      
       code: `// COLOCATE SIDE — run a sidecar process alongside each service instance so concerns live outside the service
 // PARTIES: POD = the deployment unit (one host) · SVC = Order Service instance · SIDE = the sidecar
 // STATE (before):
@@ -127,10 +123,7 @@ registerChapter({
       q: 'How does the sidecar act on outbound traffic?',
       solution: 'The sidecar sits between the service and its outbound calls, sees each outbound request before it leaves, stamps it with a trace id, and forwards it.',
       components: ['Traffic path — sidecar in the middle', 'Outbound request — intercepted', 'Trace id — stamped on the call', 'Forward — the call leaves'],
-      diagram: `flowchart LR
-  SVC["Order Service"] -->|"SELECT * FROM orders"| SIDE["Sidecar"]
-  SIDE -->|"stamps trc-77c1"| DB["db:5432"]
-  SIDE -->|"attaches"| ID["trace id"]`,
+      
       code: `// OUTBOUND SIDE — the sidecar mediates every call leaving the service, attaching a trace id
 // PARTIES: SVC = Order Service · SIDE = its sidecar · DB = PostgreSQL 16 @ orders-db-1
 // STATE (before):
@@ -152,11 +145,7 @@ registerChapter({
       q: 'How does the sidecar handle inbound traffic for observability?',
       solution: 'The sidecar answers the health-check URL the monitoring service pings, records metrics about the requests it mediates, and emits the measurements to the monitor.',
       components: ['Health URL — owned by the sidecar', 'Monitoring service — pings it', 'Request metrics — recorded by the sidecar', 'Emission — to the monitor'],
-      diagram: `flowchart LR
-  MON["Monitoring service"] -->|"GET /health"| SIDE["Sidecar"]
-  SIDE -->|"status UP"| MON
-  SIDE -->|"metric 1"| MON
-  SVC["Order Service"] ---|"runs beside"| SIDE`,
+      
       code: `// INBOUND SIDE — a monitor pings the sidecar, which answers for the service without touching its code
 // PARTIES: MON = monitoring service · SIDE = the sidecar · SVC = Order Service
 // STATE (before):
@@ -178,11 +167,7 @@ registerChapter({
       q: 'What do the sidecars collectively form, and how is the hop between services mediated?',
       solution: 'When every instance gets its own sidecar, one sidecar forwards to the next, which hands the call to the next service, and together the sidecars mediate all communication — a service mesh.',
       components: ['One sidecar per instance', 'Hop-to-hop forwarding', 'All traffic mediated', 'A service mesh — the collective result'],
-      diagram: `flowchart LR
-  SIDEA["Sidecar A"] -->|"forward"| SIDEB["Sidecar B"]
-  SIDEB -->|"hands off"| SVCB["Customer Service"]
-  SIDEA -->|"together"| MESH["service mesh"]
-  SIDEB -->|"together"| MESH`,
+      
       code: `// MESH SIDE — when every instance has a sidecar, the set of sidecars mediates all traffic: a service mesh
 // PARTIES: SIDEA = sidecar of Order Service · SIDEB = sidecar of Customer Service · SVCB = Customer Service
 // STATE (before):
@@ -231,7 +216,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  POD[\"Kubernetes pod\"] -->|\"starts\"| APP[\"application container order-service\"]\n  POD -->|\"starts alongside\"| SIDE[\"sidecar container order-sidecar\"]\n  APP -->|\"SELECT * FROM orders\"| SIDE\n  SIDE -->|\"stamps trc-77c1\"| DB[(\"PostgreSQL 16 @ orders-db-1\")]\n  APP -->|\"mounts\"| VOL[(\"volume shared-logs\")]\n  SIDE -->|\"mounts\"| VOL\n  APP -->|\"shares\"| NS[\"network namespace pod-net-7\"]\n  SIDE -->|\"shares\"| NS",
+    
     program: `// SYSTEM DESIGN — sidecar: application container -> sidecar container -> shared resources
 // PARTIES: APP = application container (Order Service "order-service") · SIDE = sidecar container (proxy/log-shipper/config-reloader "order-sidecar") · SHARED = shared resources (the pod network namespace + the volume both containers mount)
 // DEF: sidecar — the container that carries the cross-cutting concerns alongside the app; here "order-sidecar"

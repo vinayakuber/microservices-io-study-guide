@@ -10,36 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 1 · microservices
 
 > **Why this matters:** The unit being organized is the subdomain — a slice of business functionality — and the behavior is a set of operations that mutate and query business entities.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. A subdomain is business functionality</b><br/>a slice of the business, a.k.a. a business capability"]:::start
-  n1["<b>2. Business logic is entities plus adapters</b><br/>DDD aggregates hold the rules, adapters talk outside"]:::step
-  n2["<b>3. Operations are the behavior</b><br/>placeOrder mutates and queries entities"]:::core
-  n3["<b>4a. Invoked by a client request</b><br/>CLI sends a synchronous request to APP"]:::step
-  n4["<b>4b. Invoked by an event</b><br/>another application or service emits it"]:::step
-  n5["<b>4c. Invoked by time</b><br/>the passing of time triggers it"]:::step
-  n6["<b>5. Reserve stock locally</b><br/>SKU-77 qty 5 becomes 3"]:::step
-  n7["<b>6. Mark the order</b><br/>PO-2001 status DRAFT becomes CONFIRMED"]:::step
-  n8["<b>7. Record the credit check</b><br/>credit none becomes approved, same process"]:::step
-  n9["<b>8. Order confirmed locally</b><br/>0 network hops, all subdomains share one component"]:::stop
-  n0 -->|"1. what gets organized"| n1
-  n1 -->|"2. behavior to build"| n2
-  n2 -->|"3a. arrives by request"| n3
-  n2 -->|"3b. arrives by event"| n4
-  n2 -->|"3c. arrives by clock"| n5
-  n3 -->|"4. one way in"| n6
-  n4 -->|"4. one way in"| n6
-  n5 -->|"4. one way in"| n6
-  n6 -->|"5. then the order"| n7
-  n7 -->|"6. same process"| n8
-  n8 -->|"7. local result"| n9
-```
-
 1. **A subdomain is business functionality** — A subdomain is an implementable model of a slice of business functionality, a.k.a. a business capability.
 
 2. **Business logic is entities plus adapters** — It consists of business logic — business entities (DDD aggregates) that implement business rules — plus adapters that communicate with the outside world.
@@ -68,42 +38,6 @@ flowchart TD
 ### The five dark energy forces
 
 > **Why this matters:** Five forces push the architecture toward many small components; they are the reasons a monolith eventually hurts.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Five forces push toward many components</b><br/>the reasons a monolith eventually hurts"]:::start
-  n1["<b>2a. Simple components</b><br/>few subdomains are easier to maintain"]:::step
-  n2["<b>2b. Team autonomy</b><br/>develop, test and deploy independently"]:::step
-  n3["<b>2c. Fast deployment pipeline</b><br/>fast build and test for feedback"]:::step
-  n4["<b>2d. Multiple technology stacks</b><br/>evolve the stack per subdomain"]:::step
-  n5["<b>2e. Segregate by characteristics</b><br/>resources, availability, security"]:::step
-  n6["<b>3. The monolith pays the price</b><br/>one fix rebuilds the whole artifact"]:::core
-  n7["<b>4. Build scope balloons</b><br/>Orders only becomes Orders + Billing, entire WAR"]:::step
-  n8["<b>5. Every subdomain retests</b><br/>tests_run 20 becomes 200"]:::step
-  n9["<b>6. All instances redeploy</b><br/>instances_restarted 0 becomes 4"]:::step
-  n10["<b>7. app.war ships together</b><br/>both teams' code goes out as one"]:::stop
-  n11["<b>Blocked by a broken test</b><br/>TBL's failing test stalls TA's fix, autonomy lost"]:::warn
-  n0 -->|"1. force one"| n1
-  n0 -->|"1. force two"| n2
-  n0 -->|"1. force three"| n3
-  n0 -->|"1. force four"| n4
-  n0 -->|"1. force five"| n5
-  n1 -->|"2. all converge"| n6
-  n2 -->|"2. all converge"| n6
-  n3 -->|"2. all converge"| n6
-  n4 -->|"2. all converge"| n6
-  n5 -->|"2. all converge"| n6
-  n6 -->|"3. rebuild"| n7
-  n7 -->|"4. retest"| n8
-  n8 -->|"5. redeploy"| n9
-  n9 -->|"6. one release"| n10
-  n9 -->|"7. unless a test fails"| n11
-```
 
 1. **Simple components** — Simple components consisting of few subdomains are easier to understand and maintain than complex components.
 
@@ -135,44 +69,6 @@ flowchart TD
 ### The five dark matter forces
 
 > **Why this matters:** Five opposing forces pull the architecture toward few components and local interactions; the monolith wins on every one of them.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Five forces pull toward few components</b><br/>the monolith wins on every one"]:::start
-  n1["<b>2a. Simple interactions</b><br/>local beats distributed to understand"]:::step
-  n2["<b>2b. Efficient interactions</b><br/>avoid many round trips and big transfers"]:::step
-  n3["<b>2c. Prefer ACID over BASE</b><br/>one transaction beats a saga"]:::step
-  n4["<b>2d. Minimize runtime coupling</b><br/>more availability, less latency"]:::step
-  n5["<b>2e. Minimize design-time coupling</b><br/>fewer lockstep changes"]:::step
-  n6["<b>3. One database, one transaction</b><br/>BEGIN local transaction T1 on DB"]:::core
-  n7["<b>4. Write the order</b><br/>PO-2001 status DRAFT becomes PLACED"]:::step
-  n8["<b>5. Record the total</b><br/>PO-2001 total 0 becomes 40"]:::step
-  n9["<b>6. Consume credit</b><br/>CUST-9 used 100 becomes 140, same database"]:::step
-  n10["<b>7. COMMIT T1</b><br/>both writes durable together, atomic"]:::step
-  n11["<b>8. COMMITTED</b><br/>no eventual consistency, no distributed transaction"]:::stop
-  n12["<b>Credit limit exceeded</b><br/>ROLLBACK T1, total back to 0, used back to 100"]:::warn
-  n0 -->|"1. force one"| n1
-  n0 -->|"1. force two"| n2
-  n0 -->|"1. force three"| n3
-  n0 -->|"1. force four"| n4
-  n0 -->|"1. force five"| n5
-  n1 -->|"2. all converge"| n6
-  n2 -->|"2. all converge"| n6
-  n3 -->|"2. all converge"| n6
-  n4 -->|"2. all converge"| n6
-  n5 -->|"2. all converge"| n6
-  n6 -->|"3. write order"| n7
-  n7 -->|"4. record total"| n8
-  n8 -->|"5. consume credit"| n9
-  n9 -->|"6. commit"| n10
-  n10 -->|"7. atomic result"| n11
-  n9 -->|"8. if limit exceeded"| n12
-```
 
 1. **Simple interactions** — An operation that is local to a component, or a few simple interactions, is easier to understand and troubleshoot than a distributed one.
 
@@ -207,34 +103,6 @@ flowchart TD
 ### The monolith solution and its containment
 
 > **Why this matters:** The single component resolves the dark matter forces but risks the dark energy ones; the craft is containing those risks as the app grows.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Single component, single database</b><br/>one deployable unit holds all subdomains"]:::start
-  n1["<b>2. All operations are local</b><br/>interactions are local, efficient, typically ACID"]:::step
-  n2["<b>3. Drawbacks grow with size</b><br/>complexity, less autonomy, slow pipeline, one stack"]:::warn
-  n3["<b>4. Contain with a modular monolith</b><br/>vertical slices of presentation, business, persistence"]:::step
-  n4["<b>5. Detect the dirty module</b><br/>orders changed false becomes true"]:::core
-  n5["<b>6. Incremental build</b><br/>rebuilt_modules empty becomes orders"]:::step
-  n6["<b>7. Skip the clean module</b><br/>skipped_modules 0 becomes 1"]:::step
-  n7["<b>8. Run only orders tests</b><br/>tests_run 200 becomes 20"]:::step
-  n8["<b>9. orders rebuilt, billing skipped</b><br/>one vertical slice localized"]:::stop
-  n9["<b>Layered monolith instead</b><br/>rebuild ALL slices, tests_run 20 becomes 200"]:::warn
-  n0 -->|"1. consequence"| n1
-  n1 -->|"2. as it grows"| n2
-  n2 -->|"3. choose to contain"| n3
-  n3 -->|"4. a file changes"| n4
-  n4 -->|"5. rebuild only it"| n5
-  n5 -->|"6. others skipped"| n6
-  n6 -->|"7. narrow test"| n7
-  n7 -->|"8. fast feedback"| n8
-  n3 -->|"9. if not modular"| n9
-```
 
 1. **Single component, single database** — Structure the application as one deployable/executable component using a single database, containing all subdomains.
 
@@ -305,16 +173,6 @@ flowchart TD
   R -->|"comprises"| P1["reads the response — no network hops inside the app"]
 ```
 
-```mermaid
-flowchart LR
-  CLI["Client"] -->|"POST /orders/PO-2001"| APP["Monolith (one process)"]
-  APP -->|"routes to"| BL["business logic tier"]
-  BL -->|"calls"| DA["data-access layer"]
-  DA -->|"INSERT / query"| DB[("PostgreSQL 16 @ monolith-db-1")]
-  DB -->|"row back"| DA
-  APP -->|"response"| CLI
-```
-
 ```java
 // SYSTEM DESIGN — the monolith is one process with three tiers inside it, all hitting one database: client -> presentation tier -> business logic -> data-access layer -> PostgreSQL 16 @ monolith-db-1
 // PARTIES: CLI = customer client (sends synchronous requests) · APP = the monolith (one process holding the presentation tier, business logic, and data-access layer) · DB = PostgreSQL 16 @ monolith-db-1
@@ -347,15 +205,6 @@ You run an online store as a single Rails app backed by one Postgres database. A
 - Single database — one transaction spans all subdomains
 - Local operation — no network round trips
 - ACID commit — all writes durable together, or none
-
-```mermaid
-flowchart LR
-  P["placeOrder(PO-5002)"] -->|"starts"| T1["BEGIN T1"]
-  T1 -->|"writes"| O["write order row"]
-  T1 -->|"reserves"| C["reserve credit"]
-  O -->|"commits"| CM["COMMIT T1"]
-  C -->|"commits"| CM
-```
 
 ```java
 // DATABASE SIDE — one operation spanning Orders + Credit stays a single ACID transaction in one database
@@ -396,14 +245,6 @@ Your monolith now has five subdomains and six teams. Team Orders commits a one-l
 - Full redeploy — every instance replaced together
 - Six teams — blocked on each other's changes
 
-```mermaid
-flowchart LR
-  C["tax fix in Orders"] -->|"forces"| B["rebuild whole WAR"]
-  B -->|"triggers"| T["rerun 200 tests"]
-  T -->|"gates"| D["redeploy 4 instances"]
-  D -->|"ships"| X["Billing change ships too"]
-```
-
 ```java
 // PIPELINE SIDE — one team's one-line change rebuilds the single shared artifact for everyone
 // PARTIES: TA = Team Orders · TBL = Team Billing · CI = the one pipeline
@@ -440,13 +281,6 @@ An architect weighs splitting the monolith into services. A skeptical reviewer a
 - Efficient interactions — zero network round trips
 - ACID transaction — no saga
 - Low runtime + design-time coupling
-
-```mermaid
-flowchart LR
-  OP["placeOrder + reserveCredit"] -->|"stays"| L["local, 0 hops"]
-  OP -->|"runs in"| A["one ACID txn"]
-  OP -->|"avoids"| NC["no cross-service coupling"]
-```
 
 ```java
 // OPERATION SIDE — the five dark-matter forces keep one operation local, efficient, and ACID
@@ -486,13 +320,6 @@ The monolith is getting painful to build, but the team is not ready to rewrite i
 - Parallelized build + test steps
 - Automated merge queue
 
-```mermaid
-flowchart LR
-  E["edit orders/persistence"] -->|"touches"| S["orders slice"]
-  S -->|rebuild| IB["incremental build"]
-  BL["billing slice"] -.skip.-> IB
-```
-
 ```java
 // SLICE SIDE — a modular monolith packages each subdomain as a vertical slice, containing the change
 // PARTIES: DEV = a developer · CI = the build tool
@@ -527,13 +354,23 @@ _From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-syste
 
 Structure the application as a single deployable/executable component that uses a single database and contains all of the application's subdomains.
 
-```mermaid
-flowchart LR
-  P["placeOrder(PO-5002)"] -->|"starts"| T1["BEGIN T1"]
-  T1 -->|"writes"| O["write order row"]
-  T1 -->|"reserves"| C["reserve credit"]
-  O -->|"commits"| CM["COMMIT T1"]
-  C -->|"commits"| CM
+```java
+// DATABASE SIDE — one operation spanning Orders + Credit stays a single ACID transaction in one database
+// PARTIES: APP = the monolith · DB = PostgreSQL 16 @ monolith-db-1
+// DEF: credit — the Credit subdomain's ledger, keyed by customer id; here credit entity "CUST-9" = {used:100}
+// DEF: order — the Order subdomain's row, keyed by purchase-order id; here order "PO-5002" = {status:"DRAFT", total:0}
+// STATE (before):
+//    order_entities : { "PO-5002": {status:"DRAFT", total:0} }
+//    credit_entities : { "CUST-9": {used:100} }
+// DEF: placeOrder · CALLED BY: APP handling a synchronous client request
+// -> order_id : "PO-5002" · -> customer : "CUST-9" · -> amount : 60
+//    step 1 · BEGIN local transaction T1 on DB   (a single transaction, not a saga)
+//    step 2 · write the order : order_entities["PO-5002"].status : "DRAFT" -> "PLACED"
+//    step 3 · record the total : order_entities["PO-5002"].total : 0 -> 60
+//    step 4 · consume credit : credit_entities["CUST-9"].used : 100 -> 160   BECAUSE both subdomains' rows live in the one database
+//    step 5 · COMMIT T1   -> both writes durable together (atomic)
+// <- result : "COMMITTED" · 0 network hops, no eventual consistency
+//    alt credit limit exceeded : ROLLBACK T1 -> total back to 0, used back to 100 (all-or-nothing)
 ```
 
 

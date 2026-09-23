@@ -116,10 +116,7 @@ registerChapter({
       q: "Why do fixed host:port locations break in a microservice deployment, and what mechanism replaces them?",
       solution: "Instances get dynamic IPs and vary in count under autoscaling, so a fixed location goes stale; clients need a lookup mechanism to reach the changing set of instances.",
       components: ["Dynamic IPs", "Autoscaling group", "Stale fixed endpoint", "Lookup mechanism"],
-      diagram: `flowchart LR
-  CLI["client"] -->|"10.0.3.7"| OLD["dead VM"]
-  AS["autoscaler"] -->|"10.0.3.9"| NEW["new VM"]
-  CLI -. "stale -> connection refused" .-> OLD`,
+      
       code: `// CLIENT SIDE — a hardcoded host:port goes stale the moment instances move, motivating a lookup mechanism
 // PARTIES: CLI = order-service client · SVC = order-service instances
 // DEF: call — one request the client sends to the order-service = call_status "ok", which becomes "connection refused" once the endpoint goes stale
@@ -145,10 +142,7 @@ registerChapter({
       q: "How does the client resolve a logical service name to a concrete instance on every call?",
       solution: "The client queries the service registry, which knows all instance locations, then calls the chosen instance directly — no router in the middle.",
       components: ["Service registry query", "Returned instance set", "Direct call to the instance"],
-      diagram: `flowchart LR
-  C["client"] -->|"queries"| REG["service registry"]
-  REG -->|"10.0.3.7, 10.0.3.8"| C
-  C -->|"direct"| SVC["order-service instance"]`,
+      
       code: `// CLIENT SIDE — resolve a logical name to a concrete instance, then call that instance directly
 // PARTIES: CLI = order-service client · REG = service registry · SVC = order-service instances
 // STATE (before):
@@ -171,11 +165,7 @@ registerChapter({
       q: "How do Eureka and Ribbon turn a logical service name into a network location?",
       solution: "@EnableEurekaClient turns on the Eureka client, and @LoadBalanced makes the RestTemplate use Ribbon, which queries Eureka and rewrites the logical name to a network location.",
       components: ["@EnableEurekaClient", "@LoadBalanced RestTemplate", "Ribbon (queries Eureka)", "Resolved network location"],
-      diagram: `flowchart LR
-  P["proxy"] -->|"logical name"| RBN["Ribbon"]
-  RBN -->|"queries"| EUK["Eureka"]
-  EUK -->|"10.0.4.4:8080"| RBN
-  RBN -->|"rewritten URL"| SVC["registration-service"]`,
+      
       code: `// CLIENT SIDE — the chassis (Spring Cloud) resolves a logical name via Eureka + Ribbon under the hood
 // PARTIES: CLI = RegistrationServiceProxy · RBN = Ribbon (HTTP client) · EUK = Eureka (registry) · SVC = registration-service instance
 // DEF: resttemplate — the Spring HTTP client whose URL host is resolved by Ribbon = restTemplate_target "unresolved", rewritten to "10.0.4.4:8080"
@@ -200,10 +190,7 @@ registerChapter({
       q: "How do the two discovery approaches compare on hops and coupling, and what per-language cost does client-side discovery carry?",
       solution: "Client-side discovery has fewer moving parts and network hops but couples the client to the registry, and discovery logic must be re-implemented per language or framework.",
       components: ["Client-side: 2 hops", "Server-side: 3 hops", "Client coupled to registry", "Per-language discovery logic"],
-      diagram: `flowchart LR
-  CS["client-side"] -->|"2 hops"| D1["registry -> instance"]
-  SS["server-side"] -->|"3 hops"| D2["router -> registry -> instance"]
-  CS -->|"incurs"| COUP["coupled to registry"]`,
+      
       code: `// CLIENT SIDE — hop-count comparison: client-side discovery takes fewer hops and moving parts than server-side
 // PARTIES: CLI = client · REG = registry · SVC = order-service instance · RTR = router (server-side only)
 // STATE (before):
@@ -254,7 +241,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  CLI[\"order-service client\"] -->|\"query order-service\"| REG[(\"service registry Eureka\")]\n  REG -->|\"returns 10.0.1.7:8080, 10.0.1.8:8080\"| CLI\n  CLI -->|\"direct call, client load-balances\"| SVC[\"order-service instance 10.0.1.7:8080\"]",
+    
     program: `// SYSTEM DESIGN — client-side discovery as a pipeline: client -> service registry -> service instances (the client load-balances and calls one instance directly, no router)
 // PARTIES: CLI = order-service client (queries the registry, load-balances, and calls an instance directly) · REG = service registry (Eureka) · SVC = order-service instances (self-register and serve requests)
 // DEF: registry — REG's map of service name -> instances; here {"order-service" -> ["10.0.1.7:8080", "10.0.1.8:8080"]}

@@ -110,10 +110,7 @@ registerChapter({
       q: "What makes a circuit breaker trip, and what happens once it does?",
       solution: "The proxy counts consecutive failures; when the count crosses a threshold it trips, and for the timeout period all attempts fail immediately.",
       components: ["Failure counter", "Threshold", "Tripped (OPEN) state", "Immediate rejection"],
-      diagram: `flowchart LR
-  C["Checkout"] -->|"calls"| P["breaker proxy"]
-  P -->|"fails"| SVC["Payments (down)"]
-  P -->|"trips"| O["OPEN when failures >= threshold"]`,
+      
       code: `// PROXY SIDE — CLOSED state: a breaker trips when consecutive failures cross the threshold
 // PARTIES: CLIENT = caller thread · PROXY = circuit breaker · SVC = remote service (down)
 // STATE (before):
@@ -137,10 +134,7 @@ registerChapter({
       q: "While the breaker is open, what happens to incoming attempts, and why does it stop the cascade?",
       solution: "Attempts fail immediately without calling the service, so threads are not consumed waiting, and the failure of one service no longer drains its callers.",
       components: ["Open breaker", "Fail-fast rejection", "Protected caller threads"],
-      diagram: `flowchart LR
-  C["Checkout"] -->|"calls"| P["breaker (OPEN)"]
-  P -. "fail fast" .-> C
-  P -. "never calls" .- SVC["Payments (down)"]`,
+      
       code: `// PROXY SIDE — OPEN state: while open, every attempt fails immediately, so SVC is never touched
 // PARTIES: CLIENT = caller thread · PROXY = circuit breaker · SVC = remote service (down)
 // STATE (before):
@@ -164,10 +158,7 @@ registerChapter({
       q: "What does the breaker do in the half-open state, and how do the probe's outcomes decide recovery or re-trip?",
       solution: "After the timeout it lets a limited number of test requests through; success resumes normal operation, and a failure restarts the timeout period.",
       components: ["Timeout expiry", "Limited test requests", "Resume on success", "Re-trip on failure"],
-      diagram: `flowchart LR
-  O["OPEN"] -->|"timeout expires"| H["HALF-OPEN"]
-  H -->|"probe succeeds"| C["CLOSED"]
-  H -->|"probe fails"| O`,
+      
       code: `// PROXY SIDE — HALF-OPEN state: after the timeout, one test request is allowed through
 // PARTIES: CLIENT = caller thread · PROXY = circuit breaker · SVC = remote service (recovered)
 // STATE (before):
@@ -191,9 +182,7 @@ registerChapter({
       q: "What is the one hard dial in a circuit breaker, and what are the two failure modes of tuning it wrong?",
       solution: "Choosing timeout values is the challenge: too short creates false positives on a healthy but slow service, and too long hides real outages behind latency.",
       components: ["Timeout threshold", "False positives", "Excessive latency"],
-      diagram: `flowchart LR
-  T["timeout 250ms"] -->|"causes"| FP["false positive (healthy 600ms marked down)"]
-  T2["timeout 5000ms"] -->|"causes"| EL["excessive latency (real outage hidden)"]`,
+      
       code: `// PROXY SIDE — tuning: a too-short timeout marks a healthy but slow service as failed
 // PARTIES: CLIENT = caller thread · PROXY = circuit breaker · SVC = remote service (slow but alive)
 // STATE (before):
@@ -245,7 +234,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  CLIENT[\"caller: client\"] -->|\"call\"| PROXY[\"breaker: circuit breaker proxy\"]\n  PROXY -->|\"forward CLOSED / fail fast OPEN\"| SVC[\"server: downstream service\"]",
+    
     program: `// SYSTEM DESIGN — the circuit breaker as a pipeline: caller -> breaker proxy -> downstream service
 // PARTIES: CLIENT = client (caller: makes remote calls through the breaker) · PROXY = circuit breaker proxy (breaker: trips after a threshold of failures, fails fast, lets test requests through) · SVC = downstream service (server: answers the call)
 // DEF: breaker — the stateful switch between the caller and the service; here { state:"CLOSED", consecutive_failures:0, threshold:4, timeout_ms:250 }

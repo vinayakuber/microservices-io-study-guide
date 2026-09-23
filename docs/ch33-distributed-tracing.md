@@ -10,28 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 33 (p.370) · micr
 
 > **Why this matters:** Requests span multiple services, but external monitoring only reports overall response time and invocation counts — no insight into individual operations. The first fix is to assign each external request a unique id.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. External request arrives</b><br/>GET /orders/PO-2001, no traceparent header"]:::start
-  n1["<b>2. Gateway mints the ids</b><br/>trace_id 4bf92f3577b34da6a3ce90d0e2b88a4d, span_id 6f9a3c1b8e2d4001"]:::step
-  n2["<b>3. Open the root span</b><br/>span 6f9a3c1b8e2d4001, parent empty, start 100"]:::core
-  n3["<b>4. Fill the wire header</b><br/>traceparent 00-4bf92f3577b34da6a3ce90d0e2b88a4d-6f9a3c1b8e2d4001-01"]:::step
-  n4["<b>5. Ship the span to the store</b><br/>span ends at 104, sent via RabbitMQ to Zipkin"]:::step
-  n5["<b>6. First service receives it</b><br/>request carries traceparent, gateway keeps no registry"]:::stop
-  n6["<b>No id assigned</b><br/>later hops cannot be reassembled into one trace"]:::warn
-  n0 -->|"1. request needs a label"| n1
-  n1 -->|"2. ids exist"| n2
-  n2 -->|"3. first unit of work opens"| n3
-  n3 -->|"4. header carries the context"| n4
-  n4 -->|"5. span ships to Zipkin"| n5
-  n1 -->|"6. skipped - request untraceable"| n6
-```
-
 1. **Unique external request id** — Instrument services with code that assigns each external request a unique external request id.
 
 2. **Carry it on the request** — The id is attached to the request as it enters the service graph.
@@ -63,30 +41,6 @@ flowchart TD
 
 > **Why this matters:** The id is useless unless every service that handles the request receives it. Each hop opens a child span naming its parent, so one request becomes a chain of spans.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Request leaves the gateway</b><br/>GW span 6f9a3c1b8e2d4001, parent empty"]:::start
-  n1["<b>2. Header carries the parent span</b><br/>header.span_id : empty becomes 6f9a3c1b8e2d4001"]:::step
-  n2["<b>3. ORD opens a child span</b><br/>6f9a3c1b8e2d4002, parent 6f9a3c1b8e2d4001, start 105"]:::step
-  n3["<b>4. KIT opens the next child</b><br/>6f9a3c1b8e2d4003, parent 6f9a3c1b8e2d4002, start 121"]:::step
-  n4["<b>5. PAY opens the final child</b><br/>6f9a3c1b8e2d4004, parent 6f9a3c1b8e2d4003, start 136"]:::step
-  n5["<b>6. Four spans, one chain</b><br/>all share trace_id 4bf92f3577b34da6a3ce90d0e2b88a4d"]:::core
-  n6["<b>7. Chain rebuilt from parents</b><br/>each parent id names who invoked whom"]:::stop
-  n7["<b>Missing parent</b><br/>a child without a parent id breaks the chain"]:::warn
-  n0 -->|"1. forward to ORD"| n1
-  n1 -->|"2. ORD invoked"| n2
-  n2 -->|"3. ORD calls KIT"| n3
-  n3 -->|"4. KIT calls PAY"| n4
-  n4 -->|"5. spans chained by parent ids"| n5
-  n5 -->|"6. one trace, many operations"| n6
-  n2 -->|"7. parent id lost"| n7
-```
-
 1. **Pass the id** — Pass the external request id to all services involved in handling the request.
 
 2. **Child spans** — Each service opens a span whose parent is the span of the previous hop.
@@ -116,35 +70,6 @@ flowchart TD
 ### Collecting spans in the trace store
 
 > **Why this matters:** Spans must be recorded in a centralized service so the whole request can be reconstructed. The reference example delivers traces to a Zipkin server via RabbitMQ, where Zipkin gathers and displays them.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. WRITER — each service finishes and reports its span</b><br/>GW span done at end 104, reported to the queue"]:::start
-  n1["<b>2. TRANSPORT — RabbitMQ carries the spans</b><br/>async queue decouples writers from the collector, buffers under load"]:::step
-  n2["<b>3. COLLECTOR — Zipkin collector consumes the spans</b><br/>pulls each span off the RabbitMQ queue zipkin"]:::step
-  n3["<b>4. AGGREGATOR — collector writes into the trace store</b><br/>trace_store (MySQL 8 @ zipkin-db-1) : empty becomes one entry per trace_id"]:::core
-  n4["<b>5. All four spans gathered</b><br/>4 spans under trace_id 4bf92f3577b34da6a3ce90d0e2b88a4d"]:::core
-  n5["<b>6. READER — operator queries the Zipkin query UI</b><br/>asks for trace_id 4bf92f3577b34da6a3ce90d0e2b88a4d (read path)"]:::step
-  n6["<b>7. Query UI orders the spans by parent+start</b><br/>timeline : GW@100-104, ORD@105-120, KIT@121-135, PAY@136-150"]:::core
-  n7["<b>8. Slow hop exposed</b><br/>KIT took 135-121 = 14 ms"]:::core
-  n8["<b>9. Round trip complete</b><br/>writer to transport to collector to aggregator to reader"]:::stop
-  n9["<b>Lost span in transit</b><br/>broker drops a span - the trace is incomplete"]:::warn
-  n0 -->|"1. span reported"| n1
-  n1 -->|"2. queue carries it"| n2
-  n2 -->|"3. collector ingests"| n3
-  n3 -->|"4. next span arrives"| n3
-  n3 -->|"5. all spans in"| n4
-  n4 -->|"6. operator queries"| n5
-  n5 -->|"7. order by parent+start"| n6
-  n6 -->|"8. subtract times"| n7
-  n7 -->|"9. reconstruct the request"| n8
-  n1 -->|"10. broker fails"| n9
-```
 
 1. **Record in a central service** — Record information about requests and operations — for example start time and end time — in a centralized service.
 
@@ -183,28 +108,6 @@ flowchart TD
 ### Searching logs by request id
 
 > **Why this matters:** Because the request id is included in every log message, a developer can search aggregated logs for it and see how one request was handled — but aggregating and storing traces can require significant infrastructure.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Each service logs with the trace id</b><br/>log_index : empty becomes 3 lines tagged 4bf92f3577b34da6a3ce90d0e2b88a4d"]:::start
-  n1["<b>2. Operator queries the index</b><br/>search trace_id 4bf92f3577b34da6a3ce90d0e2b88a4d"]:::step
-  n2["<b>3. Matches reassemble the request</b><br/>matches : empty becomes ORD line, KIT line, PAY line"]:::step
-  n3["<b>4. Order the lines by timestamp</b><br/>ORD at 105, KIT at 121, PAY at 136"]:::step
-  n4["<b>5. Slow hop exposed</b><br/>KIT took 135-121 = 14 ms"]:::core
-  n5["<b>6. One search, many machines</b><br/>the id links logs on 3 different machines"]:::stop
-  n6["<b>Infrastructure cost</b><br/>N requests times M spans = N times M stored records"]:::warn
-  n0 -->|"1. logs carry the id"| n1
-  n1 -->|"2. query the index"| n2
-  n2 -->|"3. matched lines"| n3
-  n3 -->|"4. sort by time"| n4
-  n4 -->|"5. latency per hop"| n5
-  n3 -->|"6. at scale - storage grows"| n6
-```
 
 1. **Include id in logs** — Include the external request id in all log messages, per the instrumentation.
 
@@ -285,18 +188,6 @@ flowchart TD
   R -->|"comprises"| P1["reads the timeline, finds the slow hop"]
 ```
 
-```mermaid
-flowchart LR
-  subgraph APP["writer: each service process"]
-    TR["Tracer — mints ids, propagates headers"] -->|"forwards spans"| RP["Reporter — batches spans"] -->|"forwards batches"| SD["Sender — HTTP/Kafka/RabbitMQ"]
-  end
-  SD -->|"publish span"| BRK["transport: RabbitMQ (queue zipkin)"]
-  BRK -->|"consume"| CL["collector: Zipkin collector"]
-  CL -->|"write"| ST[("aggregator: trace store MySQL 8 @ zipkin-db-1")]
-  ST -->|"query trace_id"| QU["reader: Zipkin query UI (Lens)"]
-  QU -->|"timeline"| OP["operator"]
-```
-
 ```java
 // SYSTEM DESIGN — tracing as a pipeline: writer (in-process Tracer -> Reporter -> Sender) -> transport (RabbitMQ) -> collector (Zipkin collector) -> aggregator (trace store MySQL 8 @ zipkin-db-1) -> reader (Zipkin query UI + operator)
 // PARTIES: APP = each service process (writer; internals Tracer -> Reporter -> Sender) · BRK = RabbitMQ broker (transport: queue "zipkin") · ZIP = Zipkin server (collector + storage + query UI) · OP = operator (reader)
@@ -340,18 +231,6 @@ External monitoring reports only overall response time and invocation counts, so
 - Zipkin
 - operator read-back
 
-```mermaid
-flowchart LR
-  C["Client"] -->|"GET /orders/PO-2001"| G["API gateway"]
-  G -->|"mint trace_id 128 bits = 32 hex"| T["trace_id 4bf92f3577b34da6a3ce90d0e2b88a4d"]
-  G -->|"open root span, parent empty"| S["root span 6f9a3c1b8e2d4001"]
-  G -->|"fill header"| H["traceparent 00-4bf92f3577b34da6a3ce90d0e2b88a4d-6f9a3c1b8e2d4001-01"]
-  S -->|"writer reports via RabbitMQ"| Z["Zipkin: collector + store + query"]
-  H -->|"propagates to"| Z
-  Z -->|"operator queries trace_id"| R["4 spans by parent+start"]
-  R -->|"timeline"| O["operator: slow hop KIT 14 ms"]
-```
-
 ```java
 // API GATEWAY SIDE — the gateway mints the ids, opens the root span, and hands the context to the first service
 // PARTIES: GW = API gateway (mints the ids) · SVC = first service process · BRK = RabbitMQ broker (async span transport to the collector) · ZIP = Zipkin distributed tracing system (collector + storage + query UI)
@@ -393,14 +272,6 @@ One request travels GW to Order Service to Kitchen Service to Payment Service. E
 - Kitchen Service
 - Payment Service
 
-```mermaid
-flowchart LR
-  G["GW"] -->|"span 6f9a...001"| O["Order Service"]
-  O -->|"child 6f9a...002"| K["Kitchen Service"]
-  K -->|"child 6f9a...003"| P["Payment Service"]
-  P -->|"child 6f9a...004"| E["replies"]
-```
-
 ```java
 // SERVICE SIDE — each service reads the inbound header, opens a child span of the previous hop, and forwards the updated header
 // PARTIES: GW = API gateway process · ORD = Order Service process · KIT = Kitchen Service process · PAY = Payment Service process
@@ -441,15 +312,6 @@ The four spans from GW, Order, Kitchen, and Payment must land in one place where
 - Zipkin collector
 - trace store MySQL 8 (aggregator)
 - Zipkin query UI (reader)
-
-```mermaid
-flowchart LR
-  W["Writers: GW, Order, Kitchen, Payment"] -->|"report spans"| T["RabbitMQ transport"]
-  T -->|"collector consumes"| C["Zipkin collector"]
-  C -->|"writes spans"| A["trace store MySQL 8 aggregator"]
-  A -->|"query trace_id"| Q["Zipkin query UI reader"]
-  Q -->|"timeline"| O["operator: 4 spans ordered, slow hop KIT 14 ms"]
-```
 
 ```java
 // TRACE STORE SIDE — the system pipeline: writer (each instrumented service) -> transport (RabbitMQ) -> collector (Zipkin collector) -> aggregator (trace store = MySQL 8 @ zipkin-db-1) -> reader (Zipkin query UI + operator); latency = end - start
@@ -497,13 +359,6 @@ An operator debugging one slow order needs to see every log line for it across t
 - trace_id
 - ordered matches
 
-```mermaid
-flowchart LR
-  O["Operator"] -->|"search trace_id"| I["log index"]
-  I -->|"3 lines"| M["ORD@105, KIT@121, PAY@136"]
-  M -->|"order by time"| S["slow hop: KIT 14 ms"]
-```
-
 ```java
 // OPERATOR SIDE — the trace id is printed into every log line, so one search reassembles a request across machines
 // PARTIES: OP = operator (reader) · LOGS = log-aggregation index (Elasticsearch 8 @ logs-es-1) · ZIP = Zipkin distributed tracing system (collector + storage + query UI)
@@ -538,16 +393,25 @@ _From the 28 problems:_ 20-metrics-monitoring
 
 Instrument services to assign each external request a unique id, pass it to all involved services, include it in all log messages, and record operation start and end times in a centralized service.
 
-```mermaid
-flowchart LR
-  C["Client"] -->|"GET /orders/PO-2001"| G["API gateway"]
-  G -->|"mint trace_id 128 bits = 32 hex"| T["trace_id 4bf92f3577b34da6a3ce90d0e2b88a4d"]
-  G -->|"open root span, parent empty"| S["root span 6f9a3c1b8e2d4001"]
-  G -->|"fill header"| H["traceparent 00-4bf92f3577b34da6a3ce90d0e2b88a4d-6f9a3c1b8e2d4001-01"]
-  S -->|"writer reports via RabbitMQ"| Z["Zipkin: collector + store + query"]
-  H -->|"propagates to"| Z
-  Z -->|"operator queries trace_id"| R["4 spans by parent+start"]
-  R -->|"timeline"| O["operator: slow hop KIT 14 ms"]
+```java
+// API GATEWAY SIDE — the gateway mints the ids, opens the root span, and hands the context to the first service
+// PARTIES: GW = API gateway (mints the ids) · SVC = first service process · BRK = RabbitMQ broker (async span transport to the collector) · ZIP = Zipkin distributed tracing system (collector + storage + query UI)
+// DEF: trace_id — 128 random bits encoded as 32 hex chars, one per external request; here "4bf92f3577b34da6a3ce90d0e2b88a4d"
+// DEF: span_id — 64 random bits encoded as 16 hex chars, one per operation; here "6f9a3c1b8e2d4001"
+// DEF: span — one unit of work {span_id, parent, name, start, end}; here ("6f9a3c1b8e2d4001", parent="", name="GET /orders/PO-2001", start=100, end=104)
+// DEF: header — the outbound key-value carrier {trace_id, span_id}; here { trace_id:"4bf92f3577b34da6a3ce90d0e2b88a4d", span_id:"6f9a3c1b8e2d4001" }
+// DEF: traceparent — the wire form of the header = "00-<trace_id>-<span_id>-01"; here "00-4bf92f3577b34da6a3ce90d0e2b88a4d-6f9a3c1b8e2d4001-01"
+// STATE (before):
+//    spans  : []                                // spans opened so far for this request
+//    header : { trace_id: "", span_id: "" }     // the outbound context, empty before GW fills it
+// DEF: receive_request · CALLED BY: the client HTTP request arriving at GW
+// -> request : "GET /orders/PO-2001"
+//    step 1 · GW mints the ids    trace_id = 128 random bits -> 32 hex chars = "4bf92f3577b34da6a3ce90d0e2b88a4d" · span_id = 64 random bits -> 16 hex chars = "6f9a3c1b8e2d4001"
+//    step 2 · GW opens the root span    spans : [] -> [("6f9a3c1b8e2d4001", parent="", name="GET /orders/PO-2001", start=100)]
+//    step 3 · GW fills the header    header : { trace_id:"", span_id:"" } -> { trace_id:"4bf92f3577b34da6a3ce90d0e2b88a4d", span_id:"6f9a3c1b8e2d4001" }   // wire form "00-4bf9...-6f9a...-01"
+//    step 4 · GW reports the span    span : open -> on BRK queue "zipkin" · ZIP collector consumes it and the storage stores it (start=100, end=104)
+// <- outcome : SVC receives traceparent "00-4bf92f3577b34da6a3ce90d0e2b88a4d-6f9a3c1b8e2d4001-01" · ZIP storage holds the root span (GW keeps no registry)
+//    alt B3 header : "X-B3-TraceId: 4bf92f3577b34da6a3ce90d0e2b88a4d" + "X-B3-SpanId: 6f9a3c1b8e2d4001" (same ids, different header names)
 ```
 
 

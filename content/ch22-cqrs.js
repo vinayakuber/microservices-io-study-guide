@@ -119,11 +119,7 @@ registerChapter({
         "Replay — what reads must avoid",
         "CQRS — separates the two models"
       ],
-      diagram: `flowchart LR
-  CMD["Command"] -->|writes| WM["Write model (normalized)"]
-  QRY["Query"] -->|reads| RM["Read model (denormalized)"]
-  WM -.->|replay + join| SLOW["slow reads"]
-  RM -->|precomputed| FAST["fast reads"]`,
+      
       code: `// ORDER SERVICE SIDE — the problem CQRS fixes: reading the current state from a normalized write model means replaying and joining
 // PARTIES: SVC = Order Service · WM = the normalized write model
 // STATE (before):
@@ -149,9 +145,7 @@ registerChapter({
         "Document store — the storage engine",
         "Single lookup — how the read is served"
       ],
-      diagram: `flowchart LR
-  QRY["Query"] -->|single lookup| VDB[("View DB (document)")]
-  VDB -->|returns| DOC["Doc C-42: order + customer + lines"]`,
+      
       code: `// ORDER SERVICE SIDE — the view database serves queries from a denormalized document, one lookup per read
 // PARTIES: QRY = the query · VDB = MongoDB 7 @ orders-view-1 (document store)
 // STATE (before):
@@ -176,10 +170,7 @@ registerChapter({
         "View database — stores the document",
         "Event handler — applies the update"
       ],
-      diagram: `flowchart LR
-  WM["Write model"] -->|total 120.00 to 95.00| EVT["OrderUpdated"]
-  EVT -->|handler updates doc| VDB[("View DB")]
-  VDB -->|doc total 95.00| DOC["Doc C-42"]`,
+      
       code: `// ORDER SERVICE SIDE — the view stays up to date by consuming the write model's domain events
 // PARTIES: WM = the write model · EVT = a domain event · VDB = MongoDB 7 @ orders-view-1
 // STATE (before):
@@ -205,10 +196,7 @@ registerChapter({
         "View handler — applies the event later",
         "Reader — observes the lag"
       ],
-      diagram: `flowchart LR
-  WM["Write model total 95.00"] -->|OrderUpdated| EVT["event"]
-  EVT -->|delayed| VDB[("View DB still 120.00")]
-  VDB -->|reader| READER["sees 120.00 until caught up"]`,
+      
       code: `// ORDER SERVICE SIDE — the view is eventually consistent, so a reader can see the old total during the lag window
 // PARTIES: WM = the write model · VDB = MongoDB 7 @ orders-view-1 · READER = a client querying the view
 // STATE (before):
@@ -259,7 +247,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  SVC[\"Order Service (command side)\"] -->|\"append order_updated\"| ES[\"EventStoreDB 24 @ orders-events-1\"]\n  ES -->|\"publishes\"| BRK[\"Broker\"]\n  BRK -->|\"events\"| OH[\"Order History Service (query side)\"]\n  OH -->|\"folds into\"| VDB[\"MongoDB 7 @ orders-view-1\"]\n  VDB -->|\"serves\"| Q[\"history queries\"]",
+    
     program: `// SYSTEM DESIGN — CQRS: command side -> event store -> projections -> query side, one order updated end to end
 // PARTIES: SVC = Order Service (command side) · ES = EventStoreDB 24 @ orders-events-1 · OH = Order History Service (query side) · VDB = MongoDB 7 @ orders-view-1
 // DEF: event — an append-only fact in the write model; here order_created {"orderId":"O-101","total":120.00} then order_updated {"total":95.00}

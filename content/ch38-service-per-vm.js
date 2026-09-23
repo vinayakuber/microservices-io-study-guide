@@ -102,11 +102,7 @@ registerChapter({
       q: 'How does the Service per VM pattern produce a deployable machine image?',
       solution: 'The image captures the service\'s technology stack such as the JDK and OS, the service code is baked into the image, and the finished image is registered with the IaaS so instances can be launched from it.',
       components: ['Runtime install — JDK and OS', 'Service code — baked in', 'Registered image — the AMI', 'IaaS — launches instances from it'],
-      diagram: `flowchart LR
-  BLD["Build pipeline"] -->|"install JDK 17 + OS"| IMG["catalog:2.3.0 image"]
-  IMG -->|"copy code"| BAKED["self-contained image"]
-  BAKED -->|"register"| IaaS["EC2 IaaS"]
-  IaaS -->|"launch from"| VM["instances"]`,
+      
       code: `// BUILD SIDE — bake the catalog service plus its tech stack into a VM image so every instance boots the same way
 // PARTIES: BLD = build pipeline · IaaS = the EC2 cloud
 // STATE (before):
@@ -128,14 +124,7 @@ registerChapter({
       q: 'How does the Service per VM pattern deploy instances, and what fronts them?',
       solution: 'Each service instance is a separate VM launched from the shared image, an Elastic Load Balancer fronts the instances and spreads traffic, and scaling means launching more instances.',
       components: ['Separate VM — one per instance', 'Shared image — the launch source', 'Elastic Load Balancer — fronts them', 'More instances — the scaling knob'],
-      diagram: `flowchart LR
-  AMI["catalog:2.3.0 image"] -->|"launch"| I1["i-1"]
-  AMI -->|"launch"| I2["i-2"]
-  AMI -->|"launch"| I3["i-3"]
-  I1 -->|"register with"| ELB["Elastic Load Balancer"]
-  I2 -->|"register with"| ELB
-  I3 -->|"register with"| ELB
-  ELB -->|"spread"| T["traffic"]`,
+      
       code: `// RUNTIME SIDE — deploy one catalog instance per VM, all launched from the shared AMI
 // PARTIES: SVC = catalog-service · IaaS = the EC2 cloud
 // STATE (before):
@@ -157,11 +146,7 @@ registerChapter({
       q: 'How does the VM approach scale automatically on load?',
       solution: 'An autoscaling group is bounded by a minimum and maximum number of VMs; when load crosses a threshold the group launches more VMs automatically, and it terminates VMs when load drops.',
       components: ['Autoscaling group — bounded min/max', 'Load threshold — the trigger', 'Auto launch — adds VMs', 'Auto terminate — removes VMs'],
-      diagram: `flowchart LR
-  ASG["Autoscaling group min 2 max 6"] -->|"load 8.0 crosses threshold"| ADD["launch 2 VMs"]
-  ADD -->|"group 2 -> 4"| HEALTHY["4 healthy"]
-  ASG -->|"load drops"| DROP["terminate 2"]
-  DROP -->|"group 4 -> 2"| BACK["2 healthy"]`,
+      
       code: `// RUNTIME SIDE — the catalog service scales automatically as load rises, no manual launch
 // PARTIES: ASG = autoscaling group · SVC = catalog-service
 // STATE (before):
@@ -183,12 +168,7 @@ registerChapter({
       q: 'What mature IaaS features does the VM approach inherit, and what is its main drawback?',
       solution: 'AWS provides mature features such as the Elastic Load Balancer and autoscaling groups; the drawback is that building a VM image is slow and time consuming, while a container packages about 100x faster than an AMI.',
       components: ['Elastic Load Balancer — ready-made', 'Autoscaling groups — ready-made', 'Slow image build — the cost', '~100x faster container — the contrast'],
-      diagram: `flowchart LR
-  VM["VM approach"] -->|"uses"| TOOLS["ELB + ASG"]
-  VM -->|"pays"| BUILD["build 600 s"]
-  BUILD -->|"vs"| CNT["container ~6 s"]
-  TOOLS -->|"wins"| MAT["mature infra"]
-  CNT -->|"wins"| SPD["build speed"]`,
+      
       code: `// TRADEOFF SIDE — mature cloud tooling on one side, slow image builds on the other
 // PARTIES: VM = the VM approach · BLD = the build pipeline
 // STATE (before):
@@ -235,7 +215,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  BLD[\"Build pipeline\"] -->|\"publish AMI catalog:2.3.0\"| IaaS[\"EC2 IaaS\"]\n  IaaS -->|\"provision EC2 instance\"| ASG[\"Auto-scaling group\"]\n  ASG -->|\"boot VM\"| VM[\"instances i-1, i-2, i-3\"]\n  VM -->|\"route\"| ELB[\"Load balancer\"]",
+    
     program: `// SYSTEM DESIGN — service per VM: build pipeline -> image (AMI) -> IaaS -> VM instances
 // PARTIES: BLD = build pipeline (builder) · REG = AMI catalog (image repository) · IaaS = EC2 infrastructure service (provisions VMs) · ASG = auto-scaling group (scheduler) · ELB = load balancer (routing)
 // DEF: image — a baked machine artifact; here AMI catalog:2.3.0 with JDK 17 + OS

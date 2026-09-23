@@ -10,32 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 8 · microservices
 
 > **Why this matters:** Without registration and unregistration, the registry drifts from reality: new instances stay invisible while dead or broken instances keep receiving traffic.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. A second instance boots</b><br/>order-service on 10.0.1.8 port 8080"]:::start
-  n1["<b>2. Register on startup</b><br/>registry order-service gains 10.0.1.8:8080"]:::step
-  n2["<b>3. live_count 1 becomes 2</b><br/>the new instance is discoverable"]:::core
-  n3["<b>4. Crashed without shutdown</b><br/>process dies, no unregister runs"]:::warn
-  n4["<b>5. Running but broken</b><br/>cannot handle requests, entry must go"]:::warn
-  n5["<b>6. Graceful shutdown</b><br/>SVC sends unregister, the entry is removed"]:::step
-  n6["<b>7. Evict the bad entries</b><br/>the registry drops dead or broken instances"]:::step
-  n7["<b>8. Discovery returns only live instances</b><br/>no request routed to a dead host"]:::stop
-  n0 -->|"1. autoscaler adds capacity"| n1
-  n1 -->|"2. registry now holds two entries"| n2
-  n2 -->|"3. hard kill"| n3
-  n2 -->|"4. instance degrades"| n4
-  n2 -->|"5. clean stop"| n5
-  n3 -->|"6. evict stale entry"| n6
-  n4 -->|"7. evict broken entry"| n6
-  n5 -->|"8. remove on shutdown"| n6
-  n6 -->|"9. registry accurate"| n7
-```
-
 1. **Register on startup** — An instance must be added to the registry as soon as it comes up, so discovery can return it.
 
 2. **Unregister on shutdown** — A graceful stop must remove the instance, so no new requests are routed to it.
@@ -66,28 +40,6 @@ flowchart TD
 
 > **Why this matters:** Moving the register/unregister duty out of the service keeps the service simple and language-agnostic, so a non-JVM app can be registered by a sidecar like Netflix Prana.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. A non-JVM service needs registering</b><br/>order-service on host 10.0.1.7"]:::start
-  n1["<b>2. Co-locate a registrar</b><br/>Netflix Prana sidecar, Container buddy, or Registrator"]:::core
-  n2["<b>3. Watch the service process</b><br/>RGR polls the local process every 5 s"]:::step
-  n3["<b>4. Sees START, registers</b><br/>registry order-service empty becomes 10.0.1.7:8080"]:::step
-  n4["<b>5. discoverable false becomes true</b><br/>the registry now holds the entry"]:::step
-  n5["<b>6. Service stays oblivious</b><br/>SVC never calls the registry itself"]:::stop
-  n6["<b>Sees STOP, unregisters</b><br/>registry order-service becomes empty again"]:::warn
-  n0 -->|"1. keep the service simple"| n1
-  n1 -->|"2. registrar watches"| n2
-  n2 -->|"3. process came up"| n3
-  n3 -->|"4. now discoverable"| n4
-  n4 -->|"5. registrar acts on its behalf"| n5
-  n2 -->|"6. process stopped instead"| n6
-```
-
 1. **Co-locate a registrar** — Run it beside the service as a sidecar (Netflix Prana), a parent process (Container buddy), or a Docker helper (Registrator).
 
 2. **Register on startup** — The registrar registers the instance with the registry when the instance starts.
@@ -116,29 +68,6 @@ flowchart TD
 ### Health-check gating and its blind spot
 
 > **Why this matters:** A registrar can probe an instance's health and register or unregister it on the result, but its view may be shallow, so a process that is up yet broken can slip through.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Registrar health-checks SVC</b><br/>GET /health every 10 s"]:::start
-  n1["<b>2. Probe passes</b><br/>200 OK, pass_count 0 becomes 1"]:::step
-  n2["<b>3. Instance stays registered</b><br/>10.0.1.7:8080 remains in the registry"]:::core
-  n3["<b>4. Next probe fails</b><br/>503, health PASS becomes FAIL"]:::step
-  n4["<b>5. Unregister on failure</b><br/>registry order-service becomes empty"]:::step
-  n5["<b>6. Broken instance removed</b><br/>no more traffic to the 503-ing host"]:::stop
-  n6["<b>Superficial state</b><br/>registrar sees only RUNNING, the broken instance stays registered"]:::warn
-  n0 -->|"1. probe answers 200"| n1
-  n1 -->|"2. healthy, keep the entry"| n2
-  n0 -->|"3. probe answers 503"| n3
-  n2 -->|"4. a later probe fails"| n3
-  n3 -->|"5. registrar removes it"| n4
-  n4 -->|"6. entry gone"| n5
-  n0 -->|"7. shallow check only"| n6
-```
 
 1. **Probe health** — The registrar performs a health check on the instance, like Netflix Prana.
 
@@ -207,12 +136,6 @@ flowchart TD
   R -->|"comprises"| P2["serves discovery lookups"]
 ```
 
-```mermaid
-flowchart LR
-  SVC["service: order-service instance"] -->|"runs beside"| RGR["registrar: Netflix Prana sidecar"]
-  RGR -->|"register / unregister"| REG[("registry: Eureka")]
-```
-
 ```java
 // SYSTEM DESIGN — third-party registration as a pipeline: service instance -> third-party registrar -> service registry
 // PARTIES: SVC = order-service instance (service: runs the app and never talks to the registry) · RGR = third-party registrar Netflix Prana (registrar: registers on startup, unregisters on shutdown) · REG = service registry Eureka (registry: stores the reachable endpoints)
@@ -247,13 +170,6 @@ A second order-service instance boots at 10.0.2.6, then gets hard-killed with no
 - Unregister on shutdown
 - Evict crashed instances
 - Evict broken instances
-
-```mermaid
-flowchart LR
-  B["boot 10.0.2.6"] -->|"triggers"| R["register"]
-  K["hard kill"] -->|"leaves"| S["stale entry"]
-  S -->|"causes"| D["client routed to dead host"]
-```
 
 ```java
 // REGISTRY SIDE — why the registration lifecycle exists: stale entries route requests to dead endpoints
@@ -293,13 +209,6 @@ A non-JVM service must appear in the registry, but the team does not want to emb
 - Unregister on shutdown
 - Service stays oblivious
 
-```mermaid
-flowchart LR
-  SVC["order-service (non-JVM)"] -->|"runs beside"| RGR["registrar sidecar"]
-  RGR -->|"register"| REG["registry"]
-  RGR -->|"unregister"| REG
-```
-
 ```java
 // REGISTRAR SIDE — a separate process registers and unregisters the instance on its behalf
 // PARTIES: SVC = order-service instance · RGR = third-party registrar (sidecar) · REG = service registry
@@ -337,13 +246,6 @@ A registrar health-checks its instance: the first probe passes, but the second r
 - Unregister on failure
 - Superficial RUNNING/NOT RUNNING view
 
-```mermaid
-flowchart LR
-  RGR["registrar"] -->|"GET /health -> 200"| SVC["instance"]
-  RGR -->|"GET /health -> 503"| SVC
-  SVC -->|"503"| U["unregister"]
-```
-
 ```java
 // REGISTRAR SIDE — health-check gating decides whether an instance stays registered
 // PARTIES: SVC = order-service instance · RGR = registrar with a health check · REG = registry
@@ -380,12 +282,6 @@ The team runs the registrar themselves rather than relying on Kubernetes or Mara
 - Install/configure/maintain burden
 - High availability requirement
 
-```mermaid
-flowchart LR
-  RGR["registrar (down)"] -. "no register/unregister" .-> REG["registry"]
-  REG -->|"holds"| S["stale registry entries"]
-```
-
 ```java
 // REGISTRAR SIDE — the registrar is a critical component: if it dies, register/unregister stops and the registry drifts
 // PARTIES: RGR = registrar · REG = registry · SVC = order-service instance
@@ -419,11 +315,22 @@ _From the 28 problems:_ 01-scale-from-zero-to-millions
 
 A third-party registrar registers the instance when it starts and unregisters it when it stops, so the service never talks to the registry itself.
 
-```mermaid
-flowchart LR
-  B["boot 10.0.2.6"] -->|"triggers"| R["register"]
-  K["hard kill"] -->|"leaves"| S["stale entry"]
-  S -->|"causes"| D["client routed to dead host"]
+```java
+// REGISTRY SIDE — why the registration lifecycle exists: stale entries route requests to dead endpoints
+// PARTIES: SVC = order-service instance · REG = service registry · CLI = a client resolving order-service
+// STATE (before):
+//    registry : {"order-service" -> [{"host":"10.0.2.5","port":8080}]}
+//    live_count : 1
+// DEF: a second instance boots · CALLED BY: the autoscaler adding capacity
+// -> boot : {"host":"10.0.2.6","port":8080}
+//    step 1 · register on startup : registry["order-service"] : [{"host":"10.0.2.5","port":8080}] -> [{"host":"10.0.2.5","port":8080},{"host":"10.0.2.6","port":8080}]
+//    step 2 · live_count : 1 -> 2   BECAUSE the new instance registered itself on startup
+// DEF: the 10.0.2.6 instance crashes · CALLED BY: a hard kill with no clean shutdown
+// -> crash : "10.0.2.6"
+//    step 1 · process dies : live_count : 2 -> 1   BECAUSE 10.0.2.6 is now a dead process
+//    step 2 · stale entry persists : registry["order-service"] : [2 entries] -> [2 entries, one dead]   BECAUSE no unregister ran
+// <- discovery result : ["10.0.2.5:8080","10.0.2.6:8080"]   (CLI can be routed to the dead host)
+//    alt clean shutdown : SVC sends unregister -> registry["order-service"] : [{"host":"10.0.2.5","port":8080},{"host":"10.0.2.6","port":8080}] -> [{"host":"10.0.2.5","port":8080}]
 ```
 
 

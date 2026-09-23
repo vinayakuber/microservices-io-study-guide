@@ -10,25 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 43 · microservice
 
 > **Why this matters:** A new service has to interoperate with a legacy monolith, but the legacy model's field names, codes and shapes differ from the new service's own vocabulary. Without a boundary, the raw legacy model is copied straight in and pollutes the new service.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. New service needs legacy data</b><br/>NEW reads customer C-1042 from the monolith"]:::start
-  n1["<b>2. Two models disagree</b><br/>legacy has cust_dob and status_cd, the new service has its own vocabulary"]:::warn
-  n2["<b>3. The legacy model leaks in</b><br/>new_customer : empty becomes cust_id C-1042, cust_dob 1987-04-03, status_cd A"]:::warn
-  n3["<b>4. The service adopts the raw code</b><br/>new_customer.status : empty becomes A, the verbatim 1-letter code"]:::stop
-  n4["<b>No boundary exists</b><br/>the raw legacy record is copied straight in"]:::warn
-  n0 -->|"1. fetch the legacy row"| n1
-  n1 -->|"2. names and codes differ"| n2
-  n2 -->|"3. copy it verbatim"| n3
-  n1 -->|"4. missing boundary"| n4
-  n4 -->|"5. pollution spreads"| n3
-```
-
 1. **New service needs legacy data** — The new service must read from or call the legacy monolith to do its job.
 
 2. **Two models disagree** — The legacy model uses its own field names, status codes and date formats, which differ from the new service's vocabulary.
@@ -53,26 +34,6 @@ flowchart TD
 ### The translation boundary
 
 > **Why this matters:** The anti-corruption layer is the fix: a component that sits between the new service and the legacy monolith and translates between the two domain models, so each side keeps its own language.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Define the anti-corruption layer</b><br/>a layer between NEW and the monolith owns all translation"]:::start
-  n1["<b>2. Translate on the way in</b><br/>the legacy record is converted before NEW ever sees it"]:::step
-  n2["<b>3. Translate field by field</b><br/>cust_id becomes id, cust_dob becomes dateOfBirth, status_cd A becomes ACTIVE"]:::core
-  n3["<b>4. Keep the new model clean</b><br/>domain : empty becomes id C-1042, dateOfBirth 1987-04-03, status ACTIVE"]:::core
-  n4["<b>5. Service sees only its own model</b><br/>NEW never references legacy names"]:::stop
-  n5["<b>Field left untranslated</b><br/>a skipped mapping lets a legacy name through"]:::warn
-  n0 -->|"1. place the boundary"| n1
-  n1 -->|"2. translate before the service"| n2
-  n2 -->|"3. rename and translate values"| n3
-  n3 -->|"4. hand over the clean model"| n4
-  n2 -->|"5. missed a field"| n5
-```
 
 1. **Define the anti-corruption layer** — A layer that sits between the new service and the legacy monolith and owns all translation.
 
@@ -100,22 +61,6 @@ flowchart TD
 ### Containing the legacy model
 
 > **Why this matters:** Because the translation lives in one place, the legacy vocabulary stays inside the anti-corruption layer. A change to the legacy model is absorbed at the boundary instead of rippling into the new service.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. One translation point</b><br/>the ACL is the only code that knows the legacy vocabulary"]:::start
-  n1["<b>2. Legacy changes stop here</b><br/>mapping.status_cd : A becomes 1, only the mapping table is updated"]:::core
-  n2["<b>3. The new service stays clean</b><br/>read_status : empty becomes ACTIVE, the rename is confined to the ACL"]:::stop
-  n3["<b>Change bypasses the layer</b><br/>a direct read of the legacy DB reintroduces the pollution"]:::warn
-  n0 -->|"1. a single translation point"| n1
-  n1 -->|"2. retranslate through the table"| n2
-  n0 -->|"3. bypass the layer"| n3
-```
 
 1. **One translation point** — The anti-corruption layer is the only code that knows the legacy model's vocabulary.
 
@@ -178,15 +123,6 @@ flowchart TD
   R -->|"comprises"| P1["Legacy codes — status_cd #quot;A#quot; for active"]
 ```
 
-```mermaid
-flowchart LR
-  NEW["new Customer service"] -->|"needs customer C-1042"| ACL["anti-corruption layer"]
-  ACL -->|"adapter reads"| LEG[("PostgreSQL 14 @ legacy-db-1")]
-  LEG -->|"cust_id, cust_dob, status_cd"| ACL
-  ACL -->|"translator maps A -> ACTIVE"| NEW
-  NEW -->|"stores"| DM["domain: id, dateOfBirth, status"]
-```
-
 ```java
 // SYSTEM DESIGN — anti-corruption layer: new subsystem -> ACL (adapter + translator) -> legacy monolith
 // PARTIES: NEW = new Customer service (the clean subsystem) · ACL = anti-corruption layer (adapter that calls the legacy API + translator that maps the legacy model to the modern model) · LEG = PostgreSQL 14 @ legacy-db-1 (legacy monolith customer table)
@@ -222,13 +158,6 @@ Your new Customer service reads a row straight from the legacy monolith. The rec
 - Legacy codes — adopted verbatim
 - Pollution — the new model leaks in
 
-```mermaid
-flowchart LR
-  LEG["Legacy monolith"] -->|"cust_dob, status_cd"| NEW["New Customer service"]
-  NEW -->|"stores raw"| M["new_customer"]
-  M -->|"polluted"| P["legacy names leak in"]
-```
-
 ```java
 // NEW SERVICE SIDE — a new Customer service reads a record straight from the legacy monolith, with no boundary
 // PARTIES: NEW = new Customer service · LEG = PostgreSQL 14 @ legacy-db-1 (customer table)
@@ -262,13 +191,6 @@ You decide the new Customer service must only ever see its own vocabulary: id, d
 - Field rename — cust_dob to dateOfBirth
 - Value translation — code to word
 - Clean model — only the new vocabulary
-
-```mermaid
-flowchart LR
-  LEG["Legacy monolith"] -->|"cust_id, cust_dob, status_cd"| ACL["Anti-corruption layer"]
-  ACL -->|"id, dateOfBirth, status"| NEW["New Customer service"]
-  ACL -->|"A -> ACTIVE"| MAP["translation"]
-```
 
 ```java
 // ACL SIDE — the anti-corruption layer translates a legacy record into the new service's own model
@@ -304,13 +226,6 @@ The monolith team announces they are renaming status_cd and switching its value 
 - Mapping update — only in the layer
 - Unchanged domain — the service is untouched
 
-```mermaid
-flowchart LR
-  LEG["Legacy monolith"] -->|"stat_code '1'"| ACL["Anti-corruption layer"]
-  ACL -->|"mapping updated"| MAP["status_cd -> stat_code, A -> 1"]
-  MAP -->|"still yields"| NEW["New service status ACTIVE"]
-```
-
 ```java
 // ACL SIDE — the legacy monolith renames its status field and changes its code; the change stops inside the ACL
 // PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = PostgreSQL 14 @ legacy-db-1 (legacy monolith customer table)
@@ -345,14 +260,6 @@ The anti-corruption layer works only if every interaction with the legacy system
 - Pollution — the legacy model returns
 - Discipline — every call through the layer
 
-```mermaid
-flowchart LR
-  DEV["Developer"] -->|"bypasses"| DB["Legacy DB direct"]
-  DB -->|"raw row"| NEW["New service"]
-  NEW -->|"polluted again"| P["legacy names leak in"]
-  DEV -->|"should use"| ACL["Anti-corruption layer"]
-```
-
 ```java
 // BOUNDARY SIDE — one direct read that skips the layer reintroduces the exact pollution the layer stops
 // PARTIES: NEW = new Customer service · ACL = anti-corruption layer · LEG = PostgreSQL 14 @ legacy-db-1 (legacy monolith customer table)
@@ -385,11 +292,18 @@ _From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-syste
 
 Define an anti-corruption layer that translates between the two domain models, so the legacy model is converted into the new service's model at the boundary.
 
-```mermaid
-flowchart LR
-  LEG["Legacy monolith"] -->|"cust_dob, status_cd"| NEW["New Customer service"]
-  NEW -->|"stores raw"| M["new_customer"]
-  M -->|"polluted"| P["legacy names leak in"]
+```java
+// NEW SERVICE SIDE — a new Customer service reads a record straight from the legacy monolith, with no boundary
+// PARTIES: NEW = new Customer service · LEG = PostgreSQL 14 @ legacy-db-1 (customer table)
+// STATE (before):
+//    leg_customer : { "cust_id": "C-3157", "cust_dob": "1999-06-14", "status_cd": "A" }
+//    new_customer : {}
+// DEF: fetch_customer · CALLED BY: NEW when it needs customer 3157
+// -> customer_id : "C-3157"
+//    step 1 · SELECT the legacy row by cust_id   // leg_customer : {} -> { "cust_id": "C-3157", "cust_dob": "1999-06-14", "status_cd": "A" }
+//    step 2 · copy the raw legacy row into the new model   // new_customer : {} -> { "cust_id": "C-3157", "cust_dob": "1999-06-14", "status_cd": "A" }
+//    step 3 · adopt the 1-letter code as its own status   // new_customer.status : "" -> "A"   BECAUSE the code is copied over verbatim
+// <- output : new_customer now holds legacy names "cust_dob" and "status_cd" plus the raw code "A" — the legacy model polluted the new service
 ```
 
 

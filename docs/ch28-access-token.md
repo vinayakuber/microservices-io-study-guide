@@ -10,26 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 28 · microservice
 
 > **Why this matters:** The API gateway is the single entry point for every client request. If each downstream service re-authenticated the same requestor, the cost and the attack surface would multiply; authenticating once at the gateway and minting a portable token buys a single, trusted identity statement for the whole system.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Client reaches the gateway</b><br/>CL posts credentials to the single entry point"]:::start
-  n1["<b>2. Gateway verifies credentials</b><br/>gw_auth : empty becomes alice verified"]:::step
-  n2["<b>3. Build the identity claim</b><br/>payload : empty becomes sub alice"]:::step
-  n3["<b>4. Sign the JSON Web Token</b><br/>token : empty becomes eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"]:::core
-  n4["<b>5. Token returned</b><br/>CL holds it for every later request"]:::stop
-  n5["<b>6. Unknown user</b><br/>gw_auth becomes alice unknown, token stays empty"]:::warn
-  n0 -->|"1. credentials to the one entry point"| n1
-  n1 -->|"2. identity confirmed"| n2
-  n2 -->|"3. claim ready to sign"| n3
-  n3 -->|"4. portable identity minted"| n4
-  n1 -->|"5. verification fails - no token issued"| n5
-```
-
 1. **Client reaches the single entry point** — The client sends its request, with credentials, to the API gateway — the one entry point for all client requests.
 
 2. **The gateway authenticates the request** — The gateway authenticates the request, confirming who the requestor is.
@@ -56,26 +36,6 @@ flowchart TD
 ### Verify identity and authorization at the service
 
 > **Why this matters:** A token only helps if services can trust it. Each service must be able to confirm who made the request and that they are allowed to perform the operation, without a round-trip back to the gateway.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Gateway forwards the request</b><br/>token and operation place_order reach the service"]:::start
-  n1["<b>2. Verify the signature</b><br/>verdict : pending becomes authentic"]:::step
-  n2["<b>3. Read the identity</b><br/>requestor : empty becomes alice"]:::step
-  n3["<b>4. Check the role</b><br/>verdict : authentic becomes authorized, customer may place order"]:::step
-  n4["<b>5. Operation proceeds</b><br/>place_order handled for alice"]:::stop
-  n5["<b>6. Invalid signature</b><br/>verdict : pending becomes rejected, request refused"]:::warn
-  n0 -->|"1. token rides the request"| n1
-  n1 -->|"2. signature valid"| n2
-  n2 -->|"3. who is the requestor"| n3
-  n3 -->|"4. role permits the operation"| n4
-  n1 -->|"5. signature bad - refuse"| n5
-```
 
 1. **The gateway forwards the token** — The gateway passes the access token in each request it forwards to a service.
 
@@ -104,24 +64,6 @@ flowchart TD
 ### Propagate the token across service calls
 
 > **Why this matters:** Requests are not one hop; a service often invokes other services to satisfy a request. Passing the same token onward keeps the requestor's identity intact across the entire call chain, so no service has to re-establish it.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Order Service receives the token</b><br/>incoming : empty becomes the signed token"]:::start
-  n1["<b>2. Attach the same token</b><br/>forwarded : empty becomes the same token on the call to Payment Service"]:::step
-  n2["<b>3. Payment verifies and authorizes</b><br/>pay_verdict : pending becomes authorized"]:::step
-  n3["<b>4. Charge processed</b><br/>alice's card charged, no fresh authentication"]:::stop
-  n4["<b>5. Token dropped</b><br/>identity lost, downstream must re-establish it"]:::warn
-  n0 -->|"1. token arrives on the request"| n1
-  n1 -->|"2. same token rides downstream"| n2
-  n2 -->|"3. identity intact across the chain"| n3
-  n0 -->|"4. service fails to forward"| n4
-```
 
 1. **A service receives the token** — An intermediate service receives a request that carries the access token.
 
@@ -185,14 +127,6 @@ flowchart TD
   R -->|"comprises"| P1["checks role customer against operation place_order"]
 ```
 
-```mermaid
-flowchart LR
-  CL["client app"] -->|"credentials alice"| IDP["identity provider"]
-  IDP -->|"mint JWT"| GW["API gateway"]
-  GW -->|"token on request"| SVC["Order Service"]
-  SVC -->|"verify signature + role"| VER["authorized"]
-```
-
 ```java
 // SYSTEM DESIGN — access token: client -> identity provider (token issuance) -> API gateway (validation) -> service (Order Service verifies + authorizes)
 // PARTIES: CL = client app (requestor) · IDP = identity provider (token issuer) · GW = API gateway (validates and routes) · SVC = Order Service (verifies and authorizes)
@@ -227,14 +161,6 @@ The API gateway is the single entry point for every client request. Instead of h
 - API gateway
 - JSON Web Token
 - identity claim
-
-```mermaid
-flowchart LR
-  C["Client"] -->|"credentials"| G["API gateway"]
-  G -->|"verifies"| A["gw_auth"]
-  G -->|"signs claim"| J["JWT token"]
-  J -->|"returned"| C
-```
 
 ```java
 // API GATEWAY SIDE — authenticate the requestor once and mint a token that carries their identity
@@ -273,14 +199,6 @@ A service receives a forwarded request carrying the token and must decide, witho
 - role map
 - authorization verdict
 
-```mermaid
-flowchart LR
-  G["Gateway"] -->|"token"| S["Order service"]
-  S -->|"verify signature"| V["verdict authentic"]
-  S -->|"read claims"| I["requestor alice"]
-  S -->|"check role"| A["verdict authorized"]
-```
-
 ```java
 // ORDER SERVICE SIDE — verify the requestor identity and authorization straight from the token
 // PARTIES: GW = API Gateway · SVC = order service · CL = client app
@@ -318,13 +236,6 @@ Order Service needs to charge the customer's card, so it calls Payment Service. 
 - forwarded token
 - payment verdict
 
-```mermaid
-flowchart LR
-  O["Order service"] -->|"same token"| P["Payment service"]
-  P -->|"verifies"| V["pay_verdict pending"]
-  V -->|"authorized"| C["charge for alice"]
-```
-
 ```java
 // PAYMENT SERVICE SIDE — a service includes the token when it calls another service
 // PARTIES: SVC = order service · PAY = payment service · CL = client app
@@ -360,14 +271,6 @@ Every service in the chain must now validate the token itself. The team worries 
 - per-service validation
 - distributed authorization
 
-```mermaid
-flowchart LR
-  G["Gateway"] -->|"token on every hop"| A["Service A"]
-  A -->|"token"| B["Service B"]
-  B -->|"validates locally"| V["authorized"]
-  B -.->|"no gateway round-trip"| G
-```
-
 ```java
 // SERVICE SIDE — the token lets each service authorize locally, without a round-trip back to the gateway
 // PARTIES: GW = API gateway · SVCA = order service · SVCB = payment service
@@ -402,12 +305,21 @@ _From the 28 problems:_ 26-payment-system · 27-digital-wallet
 
 The API gateway passes an access token (e.g. a JSON Web Token) that securely identifies the requestor in each request; a service may include it in requests to other services.
 
-```mermaid
-flowchart LR
-  C["Client"] -->|"credentials"| G["API gateway"]
-  G -->|"verifies"| A["gw_auth"]
-  G -->|"signs claim"| J["JWT token"]
-  J -->|"returned"| C
+```java
+// API GATEWAY SIDE — authenticate the requestor once and mint a token that carries their identity
+// PARTIES: CL = client app · GW = API Gateway (single entry point) · SVC = order service
+// DEF: auth — confirming WHO the requestor is, once, at the gateway; here gw_auth = {"alice":"verified"}
+// STATE (before):
+//    gw_auth : {}                              // identities GW has verified this session
+//    payload : ""                              // the identity claim GW will sign into the token
+//    token : ""                                // the access token GW will hand back
+// DEF: authenticate · CALLED BY: CL posting credentials to the login route
+// -> credentials : {"user":"alice","password":"hunter2"}
+//    step 1 · GW verifies the credentials    gw_auth : {} -> {"alice":"verified"}
+//    step 2 · GW builds the identity claim    payload : "" -> {"sub":"alice"}
+//    step 3 · GW signs the claim into a JSON Web Token    token : "" -> "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"  BECAUSE the signature lets any service verify the identity without re-authenticating
+// <- token : "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig" returned to CL for every later request
+//    alt unknown user : gw_auth : {} -> {"alice":"unknown"} · token : "" -> ""  BECAUSE there is no verified identity to sign, so no token is issued
 ```
 
 

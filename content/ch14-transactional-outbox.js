@@ -117,11 +117,7 @@ registerChapter({
         "Local commit — makes both rows durable together",
         "Relay — publishes outbox rows after commit"
       ],
-      diagram: `flowchart LR
-  SVC["Order Service"] -->|INSERT order| DB[("Database")]
-  SVC -->|INSERT outbox row| DB
-  DB -->|COMMIT both or neither| DONE["Both durable"]
-  DB -.->|rollback| UNDO["Both dropped"]`,
+      
       code: `// ORDER SERVICE SIDE — commit a business write and its event together, without 2PC
 // PARTIES: SVC = Order Service · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox tables live in this ONE instance, so a single COMMIT covers both) · BRK = message broker
 // STATE (before):
@@ -150,11 +146,7 @@ registerChapter({
         "Publish step — one row per broker send",
         "Mark-sent — UPDATE per row"
       ],
-      diagram: `flowchart LR
-  DB[("Outbox table")] -->|SELECT sent=false ORDER BY id ASC| RLY["Relay"]
-  RLY -->|publish id 101 first| BRK[("Broker")]
-  RLY -->|publish id 102 second| BRK
-  RLY -->|mark sent| DB`,
+      
       code: `// RELAY SIDE — publish unsent outbox rows to the broker in the order they were inserted
 // PARTIES: RLY = message relay · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox tables live in this ONE instance, so a single COMMIT covers both) · BRK = message broker
 // STATE (before):
@@ -182,12 +174,7 @@ registerChapter({
         "Restart — re-publishes the row",
         "Consumer processed table — dedupes"
       ],
-      diagram: `flowchart LR
-  RLY["Relay"] -->|publish OrderPlaced| BRK[("Broker")]
-  RLY -->|crash before mark| DB[("Outbox row still sent=false")]
-  DB -->|re-select on restart| RLY2["Relay re-publishes"]
-  RLY2 -->|"publishes to"| BRK
-  BRK -->|OrderPlaced x2| CNS["Consumer dedupes"]`,
+      
       code: `// RELAY + CONSUMER SIDE — a crash between publish and mark re-sends the row, so the consumer dedupes
 // PARTIES: RLY = message relay · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox tables live in this ONE instance, so a single COMMIT covers both) · BRK = message broker · CNS = consumer service
 // STATE (before):
@@ -219,11 +206,7 @@ registerChapter({
         "Outbox row id — commit order",
         "Relay — publishes by id"
       ],
-      diagram: `flowchart LR
-  A["Instance A commits T1"] -->|row id 1| DB[("Outbox table")]
-  B["Instance B commits T2"] -->|row id 2| DB
-  DB -->|ORDER BY id| RLY["Relay"]
-  RLY -->|Approved then Shipped| BRK[("Broker")]`,
+      
       code: `// TWO SERVICE INSTANCES SIDE — one aggregate, two commits, and the broker still sees them in order
 // PARTIES: SVC1 = Order Service instance A · SVC2 = Order Service instance B · DB = PostgreSQL 16 @ orders-db-1 (the ONE instance both order-service instances commit to) · BRK = message broker
 // STATE (before):
@@ -282,7 +265,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  SVC[\"order service (application)\"] -->|\"BEGIN ... write order + outbox ... COMMIT\"| DB[(\"PostgreSQL 16 @ orders-db-1\")]\n  DB -->|\"SELECT outbox sent=false\"| RLY[\"relay publisher\"]\n  RLY -->|\"publish OrderPlaced\"| BRK[(\"message broker RabbitMQ\")]\n  RLY -->|\"mark sent=true\"| DB\n  BRK -->|\"consume\"| CNS[\"subscriber\"]",
+    
     program: `// SYSTEM DESIGN — transactional outbox as a pipeline: application tx -> outbox table (same database) -> relay publisher -> broker (reliable, no dual-write)
 // PARTIES: SVC = order service (application) · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox in one instance) · RLY = relay publisher · BRK = message broker (RabbitMQ) · CNS = subscriber
 // DEF: orders — the business table; here [ ("PO-77", "PENDING"), ("PO-2001", "APPROVED") ]

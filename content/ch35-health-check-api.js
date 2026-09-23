@@ -97,11 +97,7 @@ registerChapter({
       q: 'What does the Health Check API pattern expose, and what does the /health endpoint return when a dependency is down?',
       solution: 'The service exposes an HTTP /health endpoint that returns the health of the service; the handler probes its dependencies and returns a DOWN verdict when one is broken.',
       components: ['/health endpoint — the entry point', 'Dependency probe — checks the DB pool', 'Health verdict — UP or DOWN', 'Health check client — polls the endpoint'],
-      diagram: `flowchart LR
-  MON["Monitoring service"] -->|"GET /health every 30 s"| SVC["Order Service /health"]
-  SVC -->|"probes"| DB["Database pool"]
-  DB -->|"exhausted"| SVC
-  SVC -->|"verdict"| R["status DOWN"]`,
+      
       code: `// ORDER SERVICE SIDE — the /health handler probes its database dependency and returns a verdict a client can read
 // PARTIES: SVC = Order Service instance · DB = PostgreSQL 16 @ orders-db-1 · MON = monitoring service
 // STATE (before):
@@ -122,13 +118,7 @@ registerChapter({
       q: 'Which three kinds of checks does the /health handler run, and when does the whole instance report unhealthy?',
       solution: 'The handler checks the status of connections to infrastructure services, the status of the host such as disk space, and application-specific logic; it reports unhealthy if any one of them fails.',
       components: ['Infrastructure connection check', 'Host check — disk space', 'Application-specific logic check', 'Combined verdict — all must pass'],
-      diagram: `flowchart LR
-  H["/health handler"] -->|"checks"| DB["Infra connections"]
-  H -->|"checks"| DSK["Host disk space"]
-  H -->|"checks"| APP["App logic"]
-  DB -->|"UP"| V["Verdict"]
-  DSK -->|"UP"| V
-  APP -->|"DOWN"| V["Verdict DOWN"]`,
+      
       code: `// ORDER SERVICE SIDE — one handler runs three checks: infra connections, host disk, and application logic
 // PARTIES: SVC = Order Service instance · DB = PostgreSQL 16 @ orders-db-1 · HOST = the machine it runs on
 // STATE (before):
@@ -149,11 +139,7 @@ registerChapter({
       q: 'Who acts as the health check client, and how does it catch a transition from healthy to unhealthy?',
       solution: 'A monitoring service, service registry, or load balancer periodically invokes the endpoint on each instance, and it notices when an instance flips from UP to DOWN between two polls.',
       components: ['Health check client — MON/registry/LB', 'Fixed polling interval', 'Previous-result history', 'Flip detection — UP to DOWN'],
-      diagram: `flowchart LR
-  MON["Monitoring service"] -->|"tick 3 poll"| SVC["Instance SVC"]
-  SVC -->|"DOWN"| MON
-  MON -->|"compares"| H["history UP,UP,DOWN"]
-  H -->|"flip detected"| A["Alert"]`,
+      
       code: `// MONITORING SERVICE SIDE — a health-check client polls one instance over three ticks and catches the UP -> DOWN flip
 // PARTIES: MON = monitoring service · SVC = Order Service instance
 // STATE (before):
@@ -174,11 +160,7 @@ registerChapter({
       q: 'How does the load balancer and monitoring system act on the health check verdict, and what happens when the instance recovers?',
       solution: 'The load balancer and service registry stop routing to the failed instance and the monitoring system raises an alert; when the instance reports healthy again, it returns to routing.',
       components: ['Routing pool — per-instance health', 'Load balancer — drops failed instances', 'Monitoring system — raises an alert', 'Recovery — instance returns to the pool'],
-      diagram: `flowchart LR
-  LB["Load balancer"] -->|"SVC2 reports UP again"| CHK["Recheck verdict"]
-  CHK -->|"UP"| POOL["pool SVC1 + SVC2"]
-  CHK -->|"clear"| ALERT["alert cleared"]
-  POOL -->|"traffic resumes"| SVC2["SVC2 instance"]`,
+      
       code: `// LOAD BALANCER SIDE — a failed instance is pulled from routing, and when it recovers it is added back to the pool
 // PARTIES: LB = load balancer · SVC1 = healthy instance · SVC2 = recovering instance
 // STATE (before):
@@ -224,7 +206,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  SVC[\"Order Service\"] -->|\"GET /health\"| MON[\"Monitoring service\"]\n  MON -->|\"probe\"| DB[\"PostgreSQL 16 @ orders-db-1\"]\n  DB -->|\"UP or DOWN\"| MON\n  MON -->|\"mark DOWN\"| LB[\"Load balancer + service registry\"]",
+    
     program: `// SYSTEM DESIGN — health check: service instance -> /health endpoint -> health-check client -> routing/alert
 // PARTIES: SVC = Order Service (instance under check) · MON = monitoring service (health-check client) · DB = PostgreSQL 16 @ orders-db-1 (the checked database) · LB = load balancer (routing) · REG = service registry (registration)
 // DEF: health — the answer /health returns; here "UP" when db, disk, and app all pass

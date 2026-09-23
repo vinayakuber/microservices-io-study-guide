@@ -10,30 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.5 · microservices.
 
 > **Why this matters:** Writing one script per request skips class design entirely, but the moment the logic gets complex those scripts grow into an unmaintainable tangle — the same way a monolith keeps growing. An object model keeps each piece of logic attached to the concept it governs.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Resist the procedural default</b><br/>a script per request tangles as logic grows"]:::start
-  n1["<b>2. Build a network of small classes</b><br/>each class maps to a domain concept, not a table"]:::step
-  n2["<b>3. A class owns state and behavior</b><br/>the hallmark of a well-designed class"]:::core
-  n3["<b>4. Factory constructs the aggregate</b><br/>Order.create with PO-100 and line S1 qty 2 unit 25.00"]:::step
-  n4["<b>5. Attach lines and compute the total</b><br/>total 0.00 becomes 50.00"]:::step
-  n5["<b>6. Thin service delegates</b><br/>OrderService exposes create, revise, cancel but forwards"]:::step
-  n6["<b>7. Aggregate owns data and rules</b><br/>order PO-100 total 50.00"]:::stop
-  n7["<b>Empty order</b><br/>lineItems empty returns an Order with total 0.00 and no lines"]:::warn
-  n0 -->|"1. procedural scripts sprawl"| n1
-  n1 -->|"2. concepts become classes"| n2
-  n2 -->|"3. factory builds the object"| n3
-  n3 -->|"4. lines attached"| n4
-  n4 -->|"5. service only forwards"| n5
-  n5 -->|"6. aggregate complete"| n6
-  n3 -->|"7. no lines - empty order"| n7
-```
-
 1. **Resist the procedural default** — A script per request only works while logic stays simple; its classes split behavior from state and rely on few OOP capabilities.
 
 2. **Build a network of small classes** — Each class corresponds directly to a concept from the problem domain, not to a database table or a request.
@@ -60,28 +36,6 @@ flowchart TD
 
 > **Why this matters:** When behavior sits in a stateless script, the script must reach into the object's fields to change them, so every rule about those fields gets duplicated wherever the object is used. Moving the method onto the object keeps the rule in one place.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Mutation lives on the object</b><br/>the revise method sits on Order, not OrderService"]:::start
-  n1["<b>2. Check the invariant first</b><br/>guard false becomes true, status CREATED is revisable"]:::step
-  n2["<b>3. Mutate the line item</b><br/>qty 2 becomes 5"]:::step
-  n3["<b>4. Re-derive dependent state</b><br/>total 50.00 becomes 125.00 from its own lines"]:::core
-  n4["<b>5. Persist the aggregate</b><br/>the repository saves the changed order"]:::step
-  n5["<b>6. Rule lives in one place</b><br/>no caller duplicates the transition logic"]:::stop
-  n6["<b>Revise a cancelled order</b><br/>guard fails, no mutation, total stays 50.00"]:::warn
-  n0 -->|"1. service delegates to the aggregate"| n1
-  n1 -->|"2. invariant holds"| n2
-  n2 -->|"3. line changes"| n3
-  n3 -->|"4. total recomputed"| n4
-  n4 -->|"5. saved back"| n5
-  n1 -->|"6. guard fails - unchanged"| n6
-```
-
 1. **Put the mutation on the object** — A method such as revise() lives on Order, not in OrderService.
 
 2. **Check the invariant first** — The method tests its own status before touching its data, so invalid transitions are impossible from outside.
@@ -106,26 +60,6 @@ flowchart TD
 ### Guard life-cycle transitions inside the method
 
 > **Why this matters:** A state machine that lives in a script can be bypassed by any caller that sets a field directly. A method like cancel() owns the transition, so the valid from-state and the resulting state are enforced in one place.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Name the valid transition</b><br/>the cancel method is valid only from CREATED"]:::start
-  n1["<b>2. Check the transition</b><br/>guard false becomes true"]:::step
-  n2["<b>3. Flip the state</b><br/>order.status CREATED becomes CANCELLED"]:::step
-  n3["<b>4. Persist the aggregate</b><br/>store gains PO-100 status CANCELLED total 125.00"]:::core
-  n4["<b>5. Transition enforced in one place</b><br/>callers cannot bypass the state machine"]:::stop
-  n5["<b>Already cancelled</b><br/>calling cancel again throws, object left unchanged"]:::warn
-  n0 -->|"1. service locates the aggregate"| n1
-  n1 -->|"2. valid from-state"| n2
-  n2 -->|"3. the method owns the flip"| n3
-  n3 -->|"4. save the object"| n4
-  n1 -->|"5. invalid from-state - throws"| n5
-```
 
 1. **Name the valid transition** — cancel() is only valid from the CREATED state, and the method checks it.
 
@@ -152,30 +86,6 @@ flowchart TD
 ### Mix state-only, behavior-only, and both
 
 > **Why this matters:** Not every concept deserves the full object treatment, and forcing it adds ceremony. The domain model deliberately mixes three kinds of classes so value-like data stays dumb while the aggregate owns its transitions.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Three class roles by concept</b><br/>match the weight to what the concept needs"]:::start
-  n1["<b>2. Value object - state only</b><br/>DeliveryInformation holds deliveryTime and deliveryAddress, no methods"]:::core
-  n2["<b>3. Repository - behavior only</b><br/>OrderRepository exposes findOrderById, no business state"]:::step
-  n3["<b>4. Aggregate - both</b><br/>Order carries orderId and lines plus create, revise, cancel"]:::core
-  n4["<b>5. Roles cooperate on one request</b><br/>service, repository, value object combine"]:::step
-  n5["<b>6. Right weight per concept</b><br/>dumb data stays dumb, the aggregate owns its transitions"]:::stop
-  n6["<b>Forcing full objects</b><br/>ceremony on a dumb value adds cost without benefit"]:::warn
-  n0 -->|"1. split by what the concept needs"| n1
-  n0 -->|"1. split by what the concept needs"| n2
-  n0 -->|"1. split by what the concept needs"| n3
-  n1 -->|"2. state only"| n4
-  n2 -->|"2. behavior only"| n4
-  n3 -->|"2. both"| n4
-  n4 -->|"3. cooperate on one request"| n5
-  n0 -->|"4. over-modeling - wasted ceremony"| n6
-```
 
 1. **Keep value objects as state only** — DeliveryInformation holds deliveryTime and deliveryAddress and no behavior.
 
@@ -255,15 +165,6 @@ flowchart TD
   R -->|"comprises"| P1["single source of truth for orders"]
 ```
 
-```mermaid
-flowchart LR
-  C["client"] -->|"createOrder()"| SVC["OrderService (domain service)"]
-  SVC -->|"delegate"| ORD["Order aggregate: create()/revise()/cancel()"]
-  ORD -->|"holds"| VO["DeliveryInformation (value object)"]
-  SVC -->|"findOrderById / save"| REPO["OrderRepository"]
-  REPO -->|"SQL"| DB[("PostgreSQL 16 @ orders-db-1")]
-```
-
 ```java
 // SYSTEM DESIGN — domain model as a pipeline: client -> domain service (OrderService) -> entities/value objects (Order + DeliveryInformation) -> repository (OrderRepository) -> database (PostgreSQL 16 @ orders-db-1)
 // PARTIES: CLI = client · SVC = OrderService (domain service: behavior only) · ORD = Order aggregate (entity: state + behavior) · VO = DeliveryInformation (state-only value object) · REPO = OrderRepository (repository) · DB = PostgreSQL 16 @ orders-db-1
@@ -297,13 +198,6 @@ Your order service has grown from a simple script into a tangle of procedures th
 - create — a factory method on Order
 - Line items — data passed into the factory
 - Total — computed by the factory
-
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|Order.create| F["Order.create"]
-  F -->|new Order| ORD["Order PO-77"]
-  ORD -->|total 120.00| TOT["computed by the factory"]
-```
 
 ```java
 // ORDER SERVICE SIDE — the domain model uses a factory method to construct a valid order, instead of an ad-hoc script
@@ -339,12 +233,6 @@ A client wants to change the quantity on an existing order, and the new total mu
 - total — recomputed by the method
 - Caller — passes only the new values
 
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|revise qty 3 to 5| ORD["Order PO-77"]
-  ORD -->|recompute total 120.00 to 200.00| TOT["encapsulated in the method"]
-```
-
 ```java
 // ORDER SERVICE SIDE — behavior and state live together: revise mutates the order and recomputes its total
 // PARTIES: SVC = Order Service (caller) · ORD = Order domain object
@@ -377,14 +265,6 @@ An order can only be cancelled from the CREATED state, and a cancel on an alread
 - State check — CREATED allowed
 - Throw — on an illegal transition
 - State — transitions to CANCELLED
-
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|cancel| ORD["Order PO-77"]
-  ORD -->|state CREATED?| CHK["check"]
-  CHK -->|yes| CAN["state to CANCELLED"]
-  CHK -->|no, SHIPPED| ERR["throw"]
-```
 
 ```java
 // ORDER SERVICE SIDE — the domain method guards the life-cycle transition so the object cannot reach an invalid state
@@ -424,13 +304,6 @@ Your model has a repository that loads orders, a delivery-information object tha
 - DeliveryInformation — state-only value object
 - findOrderById — behavior on the repository
 
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|findOrderById| REPO["OrderRepository"]
-  REPO -->|returns| ORD["Order entity: state + behavior"]
-  ORD -->|holds| DLVRY["DeliveryInformation: state only"]
-```
-
 ```java
 // ORDER SERVICE SIDE — the three kinds of classes in a domain model: behavior-only, state-only, and a mix of both
 // PARTIES: SVC = Order Service · REPO = OrderRepository · ORD = Order entity · DLVRY = DeliveryInformation
@@ -461,11 +334,18 @@ _From the 28 problems:_ 03-framework-for-system-design-interviews
 
 Organize business logic as an object model — a network of relatively small classes that correspond directly to concepts from the problem domain, where most classes have both state and behavior.
 
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|Order.create| F["Order.create"]
-  F -->|new Order| ORD["Order PO-77"]
-  ORD -->|total 120.00| TOT["computed by the factory"]
+```java
+// ORDER SERVICE SIDE — the domain model uses a factory method to construct a valid order, instead of an ad-hoc script
+// PARTIES: SVC = Order Service · ORD = the Order domain object · LN = a line item passed to the factory
+// DEF: item — one line supplied to the factory = { sku:"B-9", qty:3, unit_price:40.00 }
+// STATE (before):
+//    orders : {}
+// DEF: create · CALLED BY: SVC when the client places an order
+// -> order_id : "PO-77" · -> customer_id : "CUST-7" · -> item : { sku:"B-9", qty:3, unit_price:40.00 }
+//    step 1 · factory makes the Order : orders : {} -> {"PO-77": { state:"CREATED", total:0.00 }}
+//    step 2 · factory attaches the line : orders["PO-77"].items : [] -> [{ sku:"B-9", qty:3, unit_price:40.00 }]
+//    step 3 · factory computes the total : orders["PO-77"].total : 0.00 -> 120.00   BECAUSE 3 x 40.00 = 120.00
+// <- outcome : orders : { "PO-77" : { state:"CREATED", total:120.00, items:[{ sku:"B-9", qty:3 }] } } · the factory returns a fully-valid order
 ```
 
 

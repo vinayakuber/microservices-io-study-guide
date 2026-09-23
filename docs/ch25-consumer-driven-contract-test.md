@@ -10,26 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. · microservices.i
 
 > **Why this matters:** Every interaction between a pair of services is an agreement; without a test pinning it down, either side can drift and break the other silently.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Consumer-provider relationship</b><br/>API Gateway is the consumer, Order Service is the provider"]:::start
-  n1["<b>2. Pin the expected shape</b><br/>method GET, path /orders/orderId, headers Accept application/json"]:::core
-  n2["<b>3. Expect status 200</b><br/>the proxy needs a success code to parse the body"]:::step
-  n3["<b>4. Expect the body</b><br/>body orderId ORD-4007 state CREATED"]:::step
-  n4["<b>5. Contract recorded</b><br/>method, path, headers, status 200, and body all captured"]:::stop
-  n5["<b>Provider deviates</b><br/>SVC answers 404 because the endpoint changed, suite fails with expected 200 got 404"]:::warn
-  n0 -->|"1. name the pair"| n1
-  n1 -->|"2. status expected"| n2
-  n2 -->|"3. body expected"| n3
-  n3 -->|"4. pinned down"| n4
-  n3 -->|"5. drift - suite fails"| n5
-```
-
 1. **Name the relationship** — Each interacting pair is a **consumer-provider** relationship: API Gateway is a consumer, Order Service is a provider.
 
 2. **Agree on channel and shape** — Services must agree on the event message structure and channel, the REST endpoints, or the command and reply formats.
@@ -54,27 +34,6 @@ flowchart TD
 ### Consumers publish their expectations
 
 > **Why this matters:** Confidence in a dependency comes from the consumer spelling out what it needs, not from hoping the provider guesses it.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Gateway team writes its suite</b><br/>author tests for GET /orders/orderId, test_count 0 becomes 1"]:::start
-  n1["<b>2. Contribute via pull request</b><br/>suites gains owner GW, name gateway-orders, 1 test"]:::step
-  n2["<b>3. Order History team contributes too</b><br/>author a suite for the published events, test_count 1 becomes 2"]:::step
-  n3["<b>4. Second pull request merges</b><br/>suites gains owner OH, name history-events"]:::core
-  n4["<b>5. Provider sees every consumer</b><br/>suites holds 2 entries, owners GW and OH"]:::stop
-  n5["<b>A consumer that never contributes</b><br/>its expectations stay invisible to the provider"]:::warn
-  n0 -->|"1. consumer authors"| n1
-  n1 -->|"2. next consumer"| n2
-  n2 -->|"3. merge into provider"| n3
-  n3 -->|"4. all covered"| n4
-  n3 -->|"5. another consumer contributes"| n2
-  n1 -->|"6. no contribution"| n5
-```
 
 1. **The consumer team writes the suite** — The team that develops the consumer writes a contract test suite for the aspects of the API it uses.
 
@@ -105,28 +64,6 @@ flowchart TD
 
 > **Why this matters:** The provider's deployment pipeline runs all contributed suites, so a breaking change is caught before it ships to any consumer.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Pipeline runs the contributed suites</b><br/>the deployment pipeline executes gateway-orders for Order Service"]:::start
-  n1["<b>2. Invoke the provider</b><br/>actual status 0 becomes 200, SVC serves GET /orders/ORD-4007"]:::step
-  n2["<b>3. Read the body</b><br/>actual body becomes orderId ORD-4007 state CREATED"]:::step
-  n3["<b>4. Compare status</b><br/>matches 0 becomes 1, 200 equals 200"]:::step
-  n4["<b>5. Compare body</b><br/>matches 1 becomes 2, both checks hold"]:::step
-  n5["<b>6. Verdict pass</b><br/>consumer expectations are met"]:::stop
-  n6["<b>Provider breaks the API</b><br/>SVC drops GET /orders/orderId, status 404, verdict fail, producer must fix the API or talk to the consumer team"]:::warn
-  n0 -->|"1. run one test"| n1
-  n1 -->|"2. status 200, read body"| n2
-  n2 -->|"3. check status"| n3
-  n3 -->|"4. check body"| n4
-  n4 -->|"5. both hold"| n5
-  n1 -->|"6. status 404 - fail"| n6
-```
-
 1. **Run the suites in the pipeline** — The contributed test suites are executed by the deployment pipeline for Order Service.
 
 2. **Compare expected versus actual** — Each test checks that the actual response matches the consumer's expected status, headers, and body.
@@ -156,27 +93,6 @@ flowchart TD
 ### Testing by example
 
 > **Why this matters:** Instead of exhaustively testing every input, a contract is defined by a small set of examples of the messages exchanged in one interaction.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. A contract is a set of examples</b><br/>one interaction defined by example messages, not exhaustive inputs"]:::start
-  n1["<b>2. Example request</b><br/>request GET /orders/ORD-4007 with Accept application/json"]:::step
-  n2["<b>3. Example reply</b><br/>reply status 200 body orderId ORD-4007 state CREATED"]:::step
-  n3["<b>4. Two messages, one interaction</b><br/>contract holds the request and the reply pair"]:::core
-  n4["<b>5. A mock controller test</b><br/>a shallow shape check, not full business logic"]:::stop
-  n5["<b>Alt - another example</b><br/>order ORD-4008 needs a second contract, one example per interaction"]:::warn
-  n0 -->|"1. first message"| n1
-  n1 -->|"2. second message"| n2
-  n2 -->|"3. pair them"| n3
-  n3 -->|"4. shallow by design"| n4
-  n4 -->|"5. alt - next example"| n5
-  n5 -->|"6. another order, another example"| n1
-```
 
 1. **Define contracts as examples** — The interaction between a consumer and a provider is defined by a set of examples, known as contracts.
 
@@ -239,15 +155,6 @@ flowchart TD
   R -->|"comprises"| P1["keeps the promise: serves GET /orders/ORD-4007 with status 200"]
 ```
 
-```mermaid
-flowchart LR
-  GW["API Gateway (consumer)"] -->|"defines expectation"| PACT["Pact broker (contract repo)"]
-  PACT -->|"serves contract"| PIPE["deployment pipeline (verifier)"]
-  PIPE -->|"invokes"| SVC["Order Service (provider)"]
-  SVC -->|"actual 200 + JSON body"| PIPE
-  PIPE -->|"verdict pass/fail"| RES["provider keeps promise"]
-```
-
 ```java
 // SYSTEM DESIGN — consumer-driven contract test: consumer (API Gateway) -> contract/expectation (Pact broker) -> provider verification (deployment pipeline) -> provider (Order Service)
 // PARTIES: GW = API Gateway (consumer) · PACT = Pact broker (contract repo, holds the expectation) · PIPE = deployment pipeline (verifier, runs the suite) · SVC = Order Service (provider)
@@ -281,14 +188,6 @@ The API Gateway team's OrderServiceProxy calls GET /orders/{orderId} on Order Se
 - Order Service (provider)
 - contract test
 - OrderServiceProxy
-
-```mermaid
-flowchart LR
-  T["Contract test"] -->|"expects"| S["GET /orders/{orderId}"]
-  T -->|"expects"| H["Accept: application/json"]
-  T -->|"expects"| R["status 200 + JSON body"]
-  T -->|"runs against"| P["Order Service"]
-```
 
 ```java
 // PROVIDER SIDE — the GET /orders/{orderId} contract test enumerates the API shape, not business logic
@@ -324,13 +223,6 @@ Order Service has two consumers — the API Gateway (REST) and Order History Ser
 - Order History Service team
 - Order Service (provider)
 - pull request
-
-```mermaid
-flowchart LR
-  G["API Gateway team"] -->|"PR: gateway-orders"| S["Order Service test suite"]
-  H["Order History team"] -->|"PR: history-events"| S
-  S -->|"holds both suites"| P["provider pipeline"]
-```
 
 ```java
 // PROVIDER SIDE — each consumer team contributes its own suite to Order Service's test suite
@@ -370,14 +262,6 @@ Order Service renamed GET /orders/{orderId} during a refactor. The gateway's con
 - deployment pipeline
 - gateway-orders suite
 - expected vs actual comparison
-
-```mermaid
-flowchart LR
-  P["Pipeline"] -->|"runs suite"| T["gateway-orders"]
-  T -->|"invokes"| S["Order Service"]
-  S -->|"actual 404"| C["compare: expected 200"]
-  C -->|"mismatch"| F["fail the suite"]
-```
 
 ```java
 // PROVIDER SIDE — the deployment pipeline compares the consumer's expected response against the actual
@@ -419,13 +303,6 @@ The gateway team wants to specify the order interaction without exhaustively tes
 - example request
 - example reply
 
-```mermaid
-flowchart LR
-  C["Contract"] -->|"holds"| R["example request: GET /orders/ORD-4007"]
-  C -->|"holds"| P["example reply: 200 + body"]
-  C -->|"is a"| M["mock controller test"]
-```
-
 ```java
 // PROVIDER SIDE — testing by example: a contract is the pair of example messages for ONE interaction
 // PARTIES: GW = API Gateway (consumer) · SVC = Order Service (provider)
@@ -458,12 +335,19 @@ _From the 28 problems:_ 03-framework-for-system-design-interviews
 
 Verify that a service meets the expectations of its clients: each consumer team writes a contract test suite and adds it to the provider's test suite via a pull request.
 
-```mermaid
-flowchart LR
-  T["Contract test"] -->|"expects"| S["GET /orders/{orderId}"]
-  T -->|"expects"| H["Accept: application/json"]
-  T -->|"expects"| R["status 200 + JSON body"]
-  T -->|"runs against"| P["Order Service"]
+```java
+// PROVIDER SIDE — the GET /orders/{orderId} contract test enumerates the API shape, not business logic
+// PARTIES: GW = API Gateway (consumer) · SVC = Order Service (provider) · TST = contract test
+// STATE (before):
+//    shape : { method:"", path:"", headers:{}, status:0, body:{} }
+// DEF: expect_order_endpoint · CALLED BY: GW team encoding what OrderServiceProxy needs
+// -> order_id : "ORD-4007"
+//    step 1 · expected method and path : shape.method : "" -> "GET" · shape.path : "" -> "/orders/{orderId}"  BECAUSE OrderServiceProxy calls GET /orders/{orderId}
+//    step 2 · expected headers : shape.headers : {} -> {"Accept":"application/json"}  BECAUSE the proxy sends Accept and reads JSON
+//    step 3 · expected status : shape.status : 0 -> 200  BECAUSE the proxy needs a success code to parse the body
+//    step 4 · expected body : shape.body : {} -> {"orderId":"ORD-4007","state":"CREATED"}  BECAUSE the proxy reads the order's JSON from the reply
+// <- contract : {"method":"GET","path":"/orders/ORD-4007","headers":{"Accept":"application/json"},"status":200,"body":{"orderId":"ORD-4007","state":"CREATED"}}
+//    alt provider deviates : SVC answers 404  BECAUSE the provider changed the endpoint -> the suite fails with "expected 200, got 404"
 ```
 
 

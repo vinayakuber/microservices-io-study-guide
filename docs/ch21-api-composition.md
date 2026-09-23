@@ -10,28 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 21 · microservice
 
 > **Why this matters:** Once you apply Database per Service, a query that needs data from several services can no longer run as a single SQL JOIN — the rows live in different, service-owned databases.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Apply Database per Service</b><br/>each service owns a private database"]:::start
-  n1["<b>2. One query spans several owners</b><br/>an order page needs the order and the customer name"]:::step
-  n2["<b>3. No shared table to JOIN</b><br/>no single database combines the rows"]:::step
-  n3["<b>4. Fetch each fragment</b><br/>ORD returns total 120.00, CUST returns name Ada"]:::core
-  n4["<b>5. Join in memory</b><br/>result O-101 name Ada total 120.00"]:::step
-  n5["<b>6. One logical result, many owners</b><br/>the single SQL JOIN is gone"]:::stop
-  n6["<b>Monolith alternative</b><br/>one shared database returned this row with one JOIN"]:::warn
-  n0 -->|"1. data scattered"| n1
-  n1 -->|"2. columns split across services"| n2
-  n2 -->|"3. no shared table"| n3
-  n3 -->|"4. two calls, two fragments"| n4
-  n4 -->|"5. merged in memory"| n5
-  n2 -->|"6. pre-microservice - one JOIN sufficed"| n6
-```
-
 1. **Apply Database per service** — Each service owns a private database that no other service may read or write directly.
 
 2. **One query now spans several owners** — A single logical result needs columns that are owned by two or more services.
@@ -59,26 +37,6 @@ flowchart TD
 
 > **Why this matters:** An API Composer invokes the services that own the data and performs an in-memory join of the results, so one endpoint can answer a query that spans services.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Introduce a composer component</b><br/>often the API Gateway owns the joined query"]:::start
-  n1["<b>2. Invoke the owning services</b><br/>call ORD, CUST, INV"]:::step
-  n2["<b>3. Accumulate fragments</b><br/>joined gains total 120.00, name Ada, stock 3"]:::core
-  n3["<b>4. Join the partial results</b><br/>calls 0 becomes 3"]:::step
-  n4["<b>5. One endpoint answers the query</b><br/>composed response for order O-101"]:::stop
-  n5["<b>A service is down</b><br/>INV raises, calls stays at 2, stock missing"]:::warn
-  n0 -->|"1. dedicated component"| n1
-  n1 -->|"2. fan out"| n2
-  n2 -->|"3. each call adds a field"| n3
-  n3 -->|"4. merge the fragments"| n4
-  n1 -->|"5. one owner fails - partial result"| n5
-```
-
 1. **Introduce a composer component** — A dedicated API Composer (often the API Gateway) owns the joined query.
 
 2. **Invoke the owning services** — The composer calls each service that owns a piece of the result.
@@ -103,26 +61,6 @@ flowchart TD
 ### The in-memory join
 
 > **Why this matters:** The join is the pattern's core mechanism: fragments arrive keyed by a shared id, and the composer merges them in memory rather than in SQL.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Fragment by a shared key</b><br/>each partial result keyed by the order id"]:::start
-  n1["<b>2. Match on the key</b><br/>matched O-101 total 120.00"]:::step
-  n2["<b>3. Merge rows in memory</b><br/>attach name Ada to the matched row"]:::core
-  n3["<b>4. Append to the joined list</b><br/>joined gains O-101 total 120.00 name Ada"]:::step
-  n4["<b>5. Emit the assembled response</b><br/>as if one query produced it"]:::stop
-  n5["<b>Key with no match</b><br/>O-102 gets name null, the composer cannot invent it"]:::warn
-  n0 -->|"1. shared id"| n1
-  n1 -->|"2. match the order row"| n2
-  n2 -->|"3. attach the name"| n3
-  n3 -->|"4. add the joined row"| n4
-  n2 -->|"5. no matching row - null field"| n5
-```
 
 1. **Fragment by a shared key** — Each partial result is keyed by the same id, e.g. the order id.
 
@@ -151,26 +89,6 @@ flowchart TD
 ### When it stops being simple
 
 > **Why this matters:** The tradeoff is efficiency: some queries force an in-memory join of large datasets, which is exactly the case where API composition breaks down.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Recognize the large-dataset case</b><br/>some queries pull full history before joining"]:::start
-  n1["<b>2. Pull the big result sets</b><br/>ORD returns 900000 rows, CUST returns 120000 rows"]:::step
-  n2["<b>3. Join happens in the composer's memory</b><br/>900000 rows loaded into RAM"]:::core
-  n3["<b>4. The in-memory cost bites</b><br/>the composer materializes 900000 rows at once"]:::step
-  n4["<b>5. Prefer CQRS for those queries</b><br/>the alternative when the join is too hot"]:::stop
-  n5["<b>Single-row query</b><br/>fetch returns 1 row, the in-memory cost is negligible"]:::warn
-  n0 -->|"1. query asks for the whole set"| n1
-  n1 -->|"2. two big pulls"| n2
-  n2 -->|"3. all rows in RAM"| n3
-  n3 -->|"4. too large - use CQRS"| n4
-  n0 -->|"5. one-row query - still cheap"| n5
-```
 
 1. **Recognize the large-dataset case** — Some queries pull big result sets from several services before joining.
 
@@ -237,16 +155,6 @@ flowchart TD
   R -->|"comprises"| P1["PostgreSQL 16 @ customers-db-1"]
 ```
 
-```mermaid
-flowchart LR
-  CLI["client"] -->|"get order O-101"| CMP["API Composer"]
-  CMP -->|"fetch order"| ORD["Order Service"]
-  CMP -->|"fetch customer"| CUST["Customer Service"]
-  ORD -->|"reads"| ORDDB[("PostgreSQL 16 @ orders-db-1")]
-  CUST -->|"reads"| CUSTDB[("PostgreSQL 16 @ customers-db-1")]
-  CMP -->|"join in memory"| OUT["order + customer name"]
-```
-
 ```java
 // SYSTEM DESIGN — API composition as a pipeline: client -> API composer -> provider services -> their databases
 // PARTIES: CLI = client · CMP = API Composer (query orchestrator) · ORD = Order Service (provider service) · CUST = Customer Service (provider service) · ORDDB = PostgreSQL 16 @ orders-db-1 · CUSTDB = PostgreSQL 16 @ customers-db-1
@@ -281,14 +189,6 @@ Your client needs an order with its customer name, but the order lives in Order 
 - Customer Service — owns the customer
 - API Composer — orchestrates the query
 - In-memory join — done by the composer
-
-```mermaid
-flowchart LR
-  CLIENT["Client"] -->|get order PO-77| AC["API Composer"]
-  AC -->|fetch order| ORD["Order Service"]
-  AC -->|fetch customer| CUST["Customer Service"]
-  AC -->|join in memory| OUT["Order + customer name"]
-```
 
 ```java
 // API COMPOSER SIDE — the problem: a query spans two services, so the composer joins their results in memory
@@ -325,15 +225,6 @@ A client asks for an order plus its customer and payment status, and you want a 
 - Customer Service — provider 2
 - Payment Service — provider 3
 
-```mermaid
-flowchart LR
-  CLIENT["Client"] -->|get order PO-77| AC["API Composer"]
-  AC -->|call 1| ORD["Order Service"]
-  AC -->|call 2| CUST["Customer Service"]
-  AC -->|call 3| PAY["Payment Service"]
-  AC -->|combine| OUT["one response"]
-```
-
 ```java
 // API COMPOSER SIDE — fan out to three providers and combine their results into one response
 // PARTIES: CLIENT = the caller · AC = the API Composer · ORD = Order Service · CUST = Customer Service · PAY = Payment Service
@@ -368,13 +259,6 @@ You are joining the order with its customer, and the composer must match the ord
 - customer.id — the matching key
 - Composer — does the lookup
 - Result — merged on the key
-
-```mermaid
-flowchart LR
-  AC["API Composer"] -->|fetch| ORD["Order PO-77 customer_id CUST-7"]
-  AC -->|fetch| CUST["Customer list"]
-  AC -->|match CUST-7 == id| OUT["Order + customer name"]
-```
 
 ```java
 // API COMPOSER SIDE — the in-memory join matches rows on a shared key instead of a SQL join
@@ -411,14 +295,6 @@ Your composer now joins two large result sets on the same node, and each request
 - In-memory join — the bottleneck
 - CQRS — the alternative at scale
 
-```mermaid
-flowchart LR
-  AC["API Composer"] -->|pull 900000 orders| DB1[("Order DB")]
-  AC -->|pull 120000 customers| DB2[("Customer DB")]
-  AC -->|join in memory| SLOW["inefficient"]
-  SLOW -->|switch| CQRS["CQRS materialized view"]
-```
-
 ```java
 // API COMPOSER SIDE — the pattern degrades at scale: joining huge result sets in memory, where CQRS is the better fit
 // PARTIES: AC = the API Composer · DB1 = PostgreSQL 16 @ orders-db-1 · DB2 = PostgreSQL 16 @ customers-db-1
@@ -450,12 +326,19 @@ _From the 28 problems:_ 01-scale-from-zero-to-millions
 
 An API Composer invokes the services that own the data and performs an in-memory join of the results.
 
-```mermaid
-flowchart LR
-  CLIENT["Client"] -->|get order PO-77| AC["API Composer"]
-  AC -->|fetch order| ORD["Order Service"]
-  AC -->|fetch customer| CUST["Customer Service"]
-  AC -->|join in memory| OUT["Order + customer name"]
+```java
+// API COMPOSER SIDE — the problem: a query spans two services, so the composer joins their results in memory
+// PARTIES: CLIENT = the caller · AC = the API Composer · ORD = Order Service · CUST = Customer Service
+// STATE (before):
+//    order : { id:"PO-77", customer_id:"CUST-7", total:45.00 }
+//    customer : { id:"CUST-7", name:"Ada" }
+//    joined : {}
+// DEF: get_order_details · CALLED BY: CLIENT on AC
+// -> order_id : "PO-77"
+//    step 1 · AC queries ORD : order : "none" -> { id:"PO-77", customer_id:"CUST-7", total:45.00 }
+//    step 2 · AC queries CUST using the foreign key : customer : "none" -> { id:"CUST-7", name:"Ada" }
+//    step 3 · AC joins the two in memory : joined : {} -> { id:"PO-77", customer_id:"CUST-7", total:45.00, customer_name:"Ada" }
+// <- outcome : joined : { id:"PO-77", customer_name:"Ada", total:45.00 } · the client got a joined view without a SQL join
 ```
 
 

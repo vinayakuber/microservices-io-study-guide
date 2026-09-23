@@ -10,31 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 7 · microservices
 
 > **Why this matters:** A cascade starts when a caller keeps waiting on a dead service; the breaker counts failures and opens once they cross a threshold.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Client calls the proxy</b><br/>get-user-1, breaker state CLOSED, threshold 3"]:::start
-  n1["<b>2. Forward the call</b><br/>remote_calls 0 becomes 1"]:::step
-  n2["<b>3. Count the failure</b><br/>SVC is down, consecutive_failures 0 becomes 1"]:::step
-  n3["<b>4. Second call fails too</b><br/>consecutive_failures 1 becomes 2"]:::step
-  n4["<b>5. Third call hits the threshold</b><br/>consecutive_failures 2 becomes 3, at least threshold 3"]:::core
-  n5["<b>6. Open the circuit</b><br/>state CLOSED becomes OPEN"]:::step
-  n6["<b>7. Verdict OPEN at 00:00:02</b><br/>later attempts fail immediately for the timeout"]:::stop
-  n7["<b>Below threshold</b><br/>failures stay under 3, the breaker stays CLOSED"]:::warn
-  n0 -->|"1. proxy forwards the call"| n1
-  n1 -->|"2. remote service is down"| n2
-  n2 -->|"3. another failure"| n3
-  n3 -->|"4. count climbs again"| n3
-  n3 -->|"5. third failure crosses the threshold"| n4
-  n4 -->|"6. trip the breaker"| n5
-  n5 -->|"7. circuit open"| n6
-  n2 -->|"8. count never reaches threshold"| n7
-```
-
 1. **Count consecutive failures** — The proxy increments a counter on each failed call.
 
 2. **Cross the threshold** — When the count crosses the threshold, the breaker trips.
@@ -60,28 +35,6 @@ flowchart TD
 ### Fail fast while open
 
 > **Why this matters:** While open, no thread is wasted on the dead service: attempts fail immediately instead of blocking.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Request arrives while open</b><br/>get-user-2 at 00:00:10, opened_at 00:00:02"]:::start
-  n1["<b>2. Check the window</b><br/>elapsed 0 becomes 8 s, under the 60 s timeout"]:::step
-  n2["<b>3. Reject without calling</b><br/>attempts 0 becomes 1, SVC untouched"]:::step
-  n3["<b>4. Protect the caller</b><br/>svc_calls 0 becomes 0, threads freed at once"]:::core
-  n4["<b>5. Second request fails fast too</b><br/>attempts 1 becomes 2 at 00:00:30"]:::step
-  n5["<b>6. Verdict FAIL_FAST twice</b><br/>the cascade is stopped"]:::stop
-  n6["<b>Window already over</b><br/>elapsed at least 60 s, the breaker moves to half-open"]:::warn
-  n0 -->|"1. inside the timeout"| n1
-  n1 -->|"2. still within 60 s"| n2
-  n2 -->|"3. never touches the dead service"| n3
-  n3 -->|"4. next attempt"| n4
-  n4 -->|"5. two rejections"| n5
-  n1 -->|"6. timeout expired instead"| n6
-```
 
 1. **Reject without calling** — Attempts to invoke the remote service fail immediately.
 
@@ -110,30 +63,6 @@ flowchart TD
 
 > **Why this matters:** After the timeout the breaker lets a limited number of test requests through; their outcome decides recovery or another timeout.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Timeout expires</b><br/>60 s elapsed at 00:01:02"]:::start
-  n1["<b>2. Move to half-open</b><br/>state OPEN becomes HALF-OPEN"]:::step
-  n2["<b>3. Let one test request pass</b><br/>probe_count 0 becomes 1"]:::step
-  n3["<b>4. SVC answers OK</b><br/>reply null becomes user-3"]:::core
-  n4["<b>5. Resume normal operation</b><br/>state HALF-OPEN becomes CLOSED"]:::step
-  n5["<b>6. Reset the failure counter</b><br/>consecutive_failures 3 becomes 0"]:::step
-  n6["<b>7. Verdict CLOSED resumed</b><br/>normal operation restored"]:::stop
-  n7["<b>Test request fails</b><br/>state HALF-OPEN becomes OPEN, the timeout begins again"]:::warn
-  n0 -->|"1. window has passed"| n1
-  n1 -->|"2. allow a probe"| n2
-  n2 -->|"3. probe succeeds"| n3
-  n3 -->|"4. recovery"| n4
-  n4 -->|"5. counter clears"| n5
-  n5 -->|"6. closed again"| n6
-  n2 -->|"7. probe fails instead"| n7
-```
-
 1. **Timeout expires** — The breaker allows a limited number of test requests to pass through.
 
 2. **Success resumes operation** — If those requests succeed, the breaker resumes normal operation.
@@ -160,29 +89,6 @@ flowchart TD
 ### Tune thresholds carefully
 
 > **Why this matters:** Choosing timeout values is hard: too tight creates false positives, too loose hides real outages behind latency.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Request hits a slow-but-alive service</b><br/>get-user-4, avg answer 450 ms"]:::start
-  n1["<b>2. Forward the call</b><br/>remote_calls 0 becomes 1"]:::step
-  n2["<b>3. SVC answers at 450 ms</b><br/>reply null becomes user-4"]:::core
-  n3["<b>4. Too-short timeout trips early</b><br/>200 ms fires first, verdict becomes TIMEOUT"]:::warn
-  n4["<b>5. False positive</b><br/>a healthy service is marked down, failure count 0 becomes 1"]:::warn
-  n5["<b>Too-long timeout</b><br/>5000 ms waits through real outages, hiding the failure"]:::warn
-  n6["<b>6. The one hard dial</b><br/>no value avoids both false positives and excessive latency"]:::stop
-  n0 -->|"1. proxy forwards"| n1
-  n1 -->|"2. service responds slowly"| n2
-  n2 -->|"3. timeout_ms 200 gives up early"| n3
-  n2 -->|"4. timeout_ms 5000 waits too long"| n5
-  n3 -->|"5. healthy service marked down"| n4
-  n4 -->|"6. dial too tight"| n6
-  n5 -->|"7. dial too loose"| n6
-```
 
 1. **False positives** — A too-short timeout trips on a healthy but slow service.
 
@@ -250,12 +156,6 @@ flowchart TD
   R -->|"comprises"| P1["times out when degraded"]
 ```
 
-```mermaid
-flowchart LR
-  CLIENT["caller: client"] -->|"call"| PROXY["breaker: circuit breaker proxy"]
-  PROXY -->|"forward CLOSED / fail fast OPEN"| SVC["server: downstream service"]
-```
-
 ```java
 // SYSTEM DESIGN — the circuit breaker as a pipeline: caller -> breaker proxy -> downstream service
 // PARTIES: CLIENT = client (caller: makes remote calls through the breaker) · PROXY = circuit breaker proxy (breaker: trips after a threshold of failures, fails fast, lets test requests through) · SVC = downstream service (server: answers the call)
@@ -292,13 +192,6 @@ A checkout service calls a payments service that has died. Calls keep arriving, 
 - Tripped (OPEN) state
 - Immediate rejection
 
-```mermaid
-flowchart LR
-  C["Checkout"] -->|"calls"| P["breaker proxy"]
-  P -->|"fails"| SVC["Payments (down)"]
-  P -->|"trips"| O["OPEN when failures >= threshold"]
-```
-
 ```java
 // PROXY SIDE — CLOSED state: a breaker trips when consecutive failures cross the threshold
 // PARTIES: CLIENT = caller thread · PROXY = circuit breaker · SVC = remote service (down)
@@ -334,13 +227,6 @@ The payments service is down and the breaker has tripped. New checkout requests 
 - Open breaker
 - Fail-fast rejection
 - Protected caller threads
-
-```mermaid
-flowchart LR
-  C["Checkout"] -->|"calls"| P["breaker (OPEN)"]
-  P -. "fail fast" .-> C
-  P -. "never calls" .- SVC["Payments (down)"]
-```
 
 ```java
 // PROXY SIDE — OPEN state: while open, every attempt fails immediately, so SVC is never touched
@@ -379,13 +265,6 @@ The payments service has recovered, but the breaker is still open. The timeout i
 - Resume on success
 - Re-trip on failure
 
-```mermaid
-flowchart LR
-  O["OPEN"] -->|"timeout expires"| H["HALF-OPEN"]
-  H -->|"probe succeeds"| C["CLOSED"]
-  H -->|"probe fails"| O
-```
-
 ```java
 // PROXY SIDE — HALF-OPEN state: after the timeout, one test request is allowed through
 // PARTIES: CLIENT = caller thread · PROXY = circuit breaker · SVC = remote service (recovered)
@@ -421,12 +300,6 @@ The team sets a 250 ms timeout, but the payments service reliably answers in abo
 - Timeout threshold
 - False positives
 - Excessive latency
-
-```mermaid
-flowchart LR
-  T["timeout 250ms"] -->|"causes"| FP["false positive (healthy 600ms marked down)"]
-  T2["timeout 5000ms"] -->|"causes"| EL["excessive latency (real outage hidden)"]
-```
 
 ```java
 // PROXY SIDE — tuning: a too-short timeout marks a healthy but slow service as failed
@@ -464,11 +337,21 @@ _From the 28 problems:_ 01-scale-from-zero-to-millions · 03-framework-for-syste
 
 The client invokes a remote service through a proxy that trips after a threshold of consecutive failures, fails fast for a timeout, then lets test requests through.
 
-```mermaid
-flowchart LR
-  C["Checkout"] -->|"calls"| P["breaker proxy"]
-  P -->|"fails"| SVC["Payments (down)"]
-  P -->|"trips"| O["OPEN when failures >= threshold"]
+```java
+// PROXY SIDE — CLOSED state: a breaker trips when consecutive failures cross the threshold
+// PARTIES: CLIENT = caller thread · PROXY = circuit breaker · SVC = remote service (down)
+// STATE (before):
+//    breaker : { state: "CLOSED", consecutive_failures: 0, threshold: 4, timeout_s: 60 }
+//    remote_calls : 0
+// DEF: forward · CALLED BY: CLIENT, four requests in a row at 00:00:00, 00:00:01, 00:00:02, 00:00:03
+// -> request : "charge-card-1"
+//    step 1 · PROXY forwards the call to SVC : remote_calls : 0 -> 1
+//    step 2 · SVC is down; a failure is counted : consecutive_failures : 0 -> 1
+//    step 3 · the second call fails : consecutive_failures : 1 -> 2
+//    step 4 · the third call fails : consecutive_failures : 2 -> 3
+//    step 5 · the fourth call hits the threshold : consecutive_failures : 3 -> 4  BECAUSE 4 >= threshold 4
+//    step 6 · PROXY opens the circuit : state : "CLOSED" -> "OPEN"
+// <- verdict : "OPEN" tripped at 00:00:03 · every later attempt fails immediately for the timeout
 ```
 
 

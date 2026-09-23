@@ -10,25 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns p.390 · microservices
 
 > **Why this matters:** A VM image captures the service plus its technology stack, so every instance boots the same way and the details of the language and framework are hidden.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Install the runtime into the image</b><br/>stack : empty becomes jdk 17 plus os linux"]:::start
-  n1["<b>2. Copy the service code</b><br/>image : null becomes catalog:2.3.0"]:::step
-  n2["<b>3. Register the image</b><br/>ami : 0 becomes 1, one AMI ready to launch"]:::core
-  n3["<b>4. Image ready to launch</b><br/>catalog:2.3.0 launches as N EC2 instances"]:::stop
-  n4["<b>Slow rebuild after a change</b><br/>version : 2.3.0 becomes 2.3.1, build is slow and time consuming"]:::warn
-  n0 -->|"1. capture the tech stack"| n1
-  n1 -->|"2. bake the code in"| n2
-  n2 -->|"3. one AMI registered"| n3
-  n1 -->|"4. a change forces a rebuild"| n4
-  n4 -->|"5. rebuild the image"| n1
-```
-
 1. **Install the runtime into the image** — The image captures the service's technology stack, such as the JDK and OS.
 
 2. **Copy the service code** — The service code is baked into the image so the instance is self-contained.
@@ -53,25 +34,6 @@ flowchart TD
 ### Deploy each instance as a VM
 
 > **Why this matters:** Each service instance is a separate VM, launched from the shared image. Isolation is strong, and scaling means launching more instances.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Launch VMs from the image</b><br/>instances : empty becomes i-1, i-2, i-3 from the shared AMI"]:::start
-  n1["<b>2. Front with a load balancer</b><br/>load_balancer : 0 becomes 1, an Elastic Load Balancer"]:::step
-  n2["<b>3. Add instances for throughput</b><br/>endpoints : 0 becomes 3, three VMs answer for the service"]:::core
-  n3["<b>4. Service is live</b><br/>one EC2 instance per service instance"]:::stop
-  n4["<b>Scale out on demand</b><br/>instance_count : 3 becomes 5 to add throughput"]:::warn
-  n0 -->|"1. spin up the VMs"| n1
-  n1 -->|"2. spread the traffic"| n2
-  n2 -->|"3. VMs serving"| n3
-  n2 -->|"4. need more capacity"| n4
-  n4 -->|"5. launch more instances"| n0
-```
 
 1. **Launch VMs from the image** — Each service instance is a separate VM started from the same image.
 
@@ -98,25 +60,6 @@ flowchart TD
 
 > **Why this matters:** A service must scale with load. The VM approach gets autoscaling almost for free because the IaaS already provides mature autoscaling groups.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Bound the group</b><br/>policy : empty becomes min 2, max 6 VMs"]:::start
-  n1["<b>2. Trigger on load</b><br/>load 8.0 crosses the threshold, group_size : 2 becomes 4"]:::step
-  n2["<b>3. Shrink when load drops</b><br/>group_size : 4 becomes 2, unneeded VMs terminated"]:::warn
-  n3["<b>4. Stabilized at load</b><br/>healthy : 2 becomes 4, the new VMs come up"]:::core
-  n4["<b>5. Scaling handled by the IaaS</b><br/>no manual launch needed"]:::stop
-  n0 -->|"1. set the bounds"| n1
-  n1 -->|"2. load exceeds threshold"| n3
-  n3 -->|"3. group reaches target"| n4
-  n1 -->|"4. load drops instead"| n2
-  n2 -->|"5. remove the VMs"| n4
-```
-
 1. **Bound the group** — An autoscaling group is bounded by a minimum and maximum number of VMs.
 
 2. **Trigger on load** — When load crosses a threshold, the group launches more VMs automatically.
@@ -141,24 +84,6 @@ flowchart TD
 ### Mature IaaS, slow builds
 
 > **Why this matters:** The VM approach inherits a mature, feature-rich IaaS ecosystem, but every image build is slow and time consuming. That tradeoff defines when this pattern wins.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-  n0["<b>1. Use ready-made features</b><br/>tools : 0 becomes 1, the Elastic Load Balancer"]:::start
-  n1["<b>2. Use more ready-made features</b><br/>tools : 1 becomes 2, autoscaling groups"]:::step
-  n2["<b>3. Pay the build cost</b><br/>build_time : 0 becomes 600 s, image build is slow"]:::warn
-  n3["<b>4. Rich but slow</b><br/>mature IaaS, yet each image build is slow and time consuming"]:::stop
-  n4["<b>5. Compare with containers</b><br/>build_time : 600 becomes 6 s, about 100x faster"]:::warn
-  n0 -->|"1. mature load balancer"| n1
-  n1 -->|"2. mature autoscaling"| n2
-  n2 -->|"3. the tradeoff"| n3
-  n2 -->|"4. the lighter alternative"| n4
-```
 
 1. **Use ready-made features** — AWS provides mature infrastructure such as the Elastic Load Balancer and autoscaling groups.
 
@@ -222,14 +147,6 @@ flowchart TD
   R -->|"comprises"| P1["ELB routes to the healthy instances i-1, i-2, i-3"]
 ```
 
-```mermaid
-flowchart LR
-  BLD["Build pipeline"] -->|"publish AMI catalog:2.3.0"| IaaS["EC2 IaaS"]
-  IaaS -->|"provision EC2 instance"| ASG["Auto-scaling group"]
-  ASG -->|"boot VM"| VM["instances i-1, i-2, i-3"]
-  VM -->|"route"| ELB["Load balancer"]
-```
-
 ```java
 // SYSTEM DESIGN — service per VM: build pipeline -> image (AMI) -> IaaS -> VM instances
 // PARTIES: BLD = build pipeline (builder) · REG = AMI catalog (image repository) · IaaS = EC2 infrastructure service (provisions VMs) · ASG = auto-scaling group (scheduler) · ELB = load balancer (routing)
@@ -261,14 +178,6 @@ Your catalog service must boot identically on every instance, hiding the JDK ver
 - Service code — baked in
 - Registered image — the AMI
 - IaaS — launches instances from it
-
-```mermaid
-flowchart LR
-  BLD["Build pipeline"] -->|"install JDK 17 + OS"| IMG["catalog:2.3.0 image"]
-  IMG -->|"copy code"| BAKED["self-contained image"]
-  BAKED -->|"register"| IaaS["EC2 IaaS"]
-  IaaS -->|"launch from"| VM["instances"]
-```
 
 ```java
 // BUILD SIDE — bake the catalog service plus its tech stack into a VM image so every instance boots the same way
@@ -305,17 +214,6 @@ You want each catalog service instance strongly isolated from its neighbors. A s
 - Elastic Load Balancer — fronts them
 - More instances — the scaling knob
 
-```mermaid
-flowchart LR
-  AMI["catalog:2.3.0 image"] -->|"launch"| I1["i-1"]
-  AMI -->|"launch"| I2["i-2"]
-  AMI -->|"launch"| I3["i-3"]
-  I1 -->|"register with"| ELB["Elastic Load Balancer"]
-  I2 -->|"register with"| ELB
-  I3 -->|"register with"| ELB
-  ELB -->|"spread"| T["traffic"]
-```
-
 ```java
 // RUNTIME SIDE — deploy one catalog instance per VM, all launched from the shared AMI
 // PARTIES: SVC = catalog-service · IaaS = the EC2 cloud
@@ -350,14 +248,6 @@ Your catalog service sees a nightly load spike, and you do not want an on-call e
 - Load threshold — the trigger
 - Auto launch — adds VMs
 - Auto terminate — removes VMs
-
-```mermaid
-flowchart LR
-  ASG["Autoscaling group min 2 max 6"] -->|"load 8.0 crosses threshold"| ADD["launch 2 VMs"]
-  ADD -->|"group 2 -> 4"| HEALTHY["4 healthy"]
-  ASG -->|"load drops"| DROP["terminate 2"]
-  DROP -->|"group 4 -> 2"| BACK["2 healthy"]
-```
 
 ```java
 // RUNTIME SIDE — the catalog service scales automatically as load rises, no manual launch
@@ -394,15 +284,6 @@ You must choose between the VM approach and containers. The VM path gives you re
 - Slow image build — the cost
 - ~100x faster container — the contrast
 
-```mermaid
-flowchart LR
-  VM["VM approach"] -->|"uses"| TOOLS["ELB + ASG"]
-  VM -->|"pays"| BUILD["build 600 s"]
-  BUILD -->|"vs"| CNT["container ~6 s"]
-  TOOLS -->|"wins"| MAT["mature infra"]
-  CNT -->|"wins"| SPD["build speed"]
-```
-
 ```java
 // TRADEOFF SIDE — mature cloud tooling on one side, slow image builds on the other
 // PARTIES: VM = the VM approach · BLD = the build pipeline
@@ -435,12 +316,19 @@ _From the 28 problems:_ 01-scale-from-zero-to-millions
 
 Package the service as a virtual machine image and deploy each service instance as a separate VM.
 
-```mermaid
-flowchart LR
-  BLD["Build pipeline"] -->|"install JDK 17 + OS"| IMG["catalog:2.3.0 image"]
-  IMG -->|"copy code"| BAKED["self-contained image"]
-  BAKED -->|"register"| IaaS["EC2 IaaS"]
-  IaaS -->|"launch from"| VM["instances"]
+```java
+// BUILD SIDE — bake the catalog service plus its tech stack into a VM image so every instance boots the same way
+// PARTIES: BLD = build pipeline · IaaS = the EC2 cloud
+// STATE (before):
+//    image : null                       // no VM image yet
+//    stack : {}                         // technology stack captured by the image, empty
+// DEF: bake version 2.3.0 · CALLED BY: BLD on release
+// -> service : "catalog-service" · -> version : "2.3.0"
+//    step 1 · install the runtime   // stack : {} -> {"jdk":"17","os":"linux"}   BECAUSE the image captures the service's technology stack
+//    step 2 · copy the service code   // image : null -> "catalog:2.3.0"   // the code is baked in, so the instance is self-contained
+//    step 3 · register with the IaaS   // ami : 0 -> 1   BECAUSE one AMI is now registered for launch
+// <- ami : "catalog:2.3.0" · one image, ready to launch as N EC2 instances
+//    alt rebuild after a change : version : "2.3.0" -> "2.3.1"   BECAUSE building a VM image is slow and time consuming
 ```
 
 

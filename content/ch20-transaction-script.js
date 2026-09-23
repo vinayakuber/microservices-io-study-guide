@@ -81,10 +81,7 @@ registerChapter({
         "OrderDao — data access object",
         "Database — rows the DAO writes"
       ],
-      diagram: `flowchart LR
-  WEB["create_order request"] -->|"createOrder()"| TS["TransactionScript"]
-  TS -->|save| DAO["OrderDao"]
-  DAO -->|INSERT| DB[("Database")]`,
+      
       code: `// ORDER SERVICE SIDE — the transaction-script pattern: one procedural method per request type, using a DAO for the database
 // PARTIES: WEB = the request handler · TS = the transaction script · DAO = the data access object
 // STATE (before):
@@ -109,11 +106,7 @@ registerChapter({
         "OrderDao — loads and saves the row",
         "Mutate — the script changes the row"
       ],
-      diagram: `flowchart LR
-  TS["Script reviseOrder"] -->|load| DAO["OrderDao"]
-  DAO -->|returns| ROW["Order row qty 3"]
-  TS -->|qty 3 to 5| ROW
-  ROW -->|save| DAO`,
+      
       code: `// ORDER SERVICE SIDE — behavior and state are in separate classes: the script mutates a DAO-loaded data object
 // PARTIES: TS = the transaction script · DAO = the data access object · ROW = the state object
 // STATE (before):
@@ -139,11 +132,7 @@ registerChapter({
         "Flip — CREATED to CANCELLED",
         "Save — the row persists the change"
       ],
-      diagram: `flowchart LR
-  TS["Script cancelOrder"] -->|load| DAO["OrderDao"]
-  DAO -->|state CREATED| TS
-  TS -->|flip to CANCELLED| ROW["Order row"]
-  ROW -->|save| DAO`,
+      
       code: `// ORDER SERVICE SIDE — simple logic is the pattern's sweet spot: a cancel script with one guard
 // PARTIES: TS = the transaction script · DAO = the data access object
 // STATE (before):
@@ -169,10 +158,7 @@ registerChapter({
         "Duplication — rules repeated across scripts",
         "Domain model — the refactor target"
       ],
-      diagram: `flowchart LR
-  A["createOrder + discount"] -->|"adds"| B["+ approval rule"]
-  B -->|"adds"| C["+ split shipment rule"]
-  C -->|too many branches| FIX["refactor to domain model"]`,
+      
       code: `// ORDER SERVICE SIDE — the pattern sprawls as rules multiply: a script that grows a branch per new business rule
 // PARTIES: TS = the transaction script · DAO = the data access object
 // STATE (before):
@@ -227,7 +213,7 @@ registerChapter({
         ]
       }
     ],
-    wiring: "flowchart LR\n  WEB[\"presentation tier\"] -->|\"POST /orders\"| TS[\"transaction script: OrderService.createOrder()\"]\n  TS -->|\"save(Order)\"| DAO[\"DAO: OrderDao\"]\n  DAO -->|\"INSERT / SELECT\"| DB[(\"PostgreSQL 16 @ orders-db-1\")]",
+    
     program: `// SYSTEM DESIGN — transaction script as a pipeline: presentation tier -> transaction script (OrderService) -> DAO (OrderDao) -> database (PostgreSQL 16 @ orders-db-1)
 // PARTIES: WEB = presentation tier (client) · SVC = OrderService (transaction script service class) · DAO = OrderDao (data access object) · DB = PostgreSQL 16 @ orders-db-1
 // DEF: script — one procedural method per request type; here createOrder() runs request "PO-100" top-to-bottom

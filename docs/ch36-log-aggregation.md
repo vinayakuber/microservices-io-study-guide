@@ -10,28 +10,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 36 · microservice
 
 > **Why this matters:** Every instance already writes to its own log file, but those files are scattered across machines. A standardized format, with the request id baked in, is what lets one request be reassembled later.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-n0["<b>1. Request handled</b><br/>SVC handles GET /orders for REQ-3001"]:::start
-  n1["<b>2. Format the line</b><br/>standard shape, severity recorded"]:::step
-  n2["<b>3. Line written</b><br/>10:00:01 INFO order-service REQ-3001 handle /orders"]:::core
-  n3["<b>4. Append to the log file</b><br/>logfile holds the line"]:::step
-  n4["<b>5. Tag downstream</b><br/>hand the same req_id to the next call"]:::step
-  n5["<b>6. Logged and tagged</b><br/>the id rides with the request"]:::stop
-  n6["<b>The call errors</b><br/>line becomes ERROR customer lookup failed"]:::warn
-  n0 -->|"1. request handled"| n1
-  n1 -->|"2. standard shape"| n2
-  n2 -->|"3. append to file"| n3
-  n3 -->|"4. forward the id"| n4
-  n4 -->|"5. logged and tagged"| n5
-  n2 -->|"6. call fails"| n6
-```
-
 1. **Write to a log file** — Each service instance writes information about what it is doing to a log file in a standardized format.
 
 2. **Record the severity** — The log file contains errors, warnings, information, and debug messages.
@@ -55,29 +33,6 @@ n0["<b>1. Request handled</b><br/>SVC handles GET /orders for REQ-3001"]:::start
 ### Ship logs to the centralized service
 
 > **Why this matters:** A log on a local disk cannot be searched across the fleet. Shipping every instance's lines to one centralized logging service is what turns many files into one queryable index.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-n0["<b>1. Collect the fleet's lines</b><br/>batch of 3 log lines tagged REQ-3001"]:::start
-  n1["<b>2. Order Service ships</b><br/>INFO order-service REQ-3001 handle /orders"]:::step
-  n2["<b>3. Customer Service ships</b><br/>INFO customer-service REQ-3001 lookup customer 42"]:::step
-  n3["<b>4. Payment Service ships</b><br/>INFO payment-service REQ-3001 charge 19.00"]:::step
-  n4["<b>5. Index grows</b><br/>index key REQ-3001 holds 3 lines from 3 services"]:::core
-  n5["<b>6. Whole request assembled</b><br/>one key reconstructs the full request"]:::stop
-  n6["<b>Second request</b><br/>REQ-3002 opens its own key with 1 line"]:::warn
-  n0 -->|"1. first instance ships"| n1
-  n1 -->|"2. next instance ships"| n2
-  n2 -->|"3. next instance ships"| n3
-  n3 -->|"4. more lines arrive"| n2
-  n3 -->|"5. all lines in"| n4
-  n4 -->|"6. reassembled"| n5
-  n2 -->|"7. another request"| n6
-```
 
 1. **Point at the logging service** — Use a centralized logging service to aggregate logs from each service instance.
 
@@ -103,26 +58,6 @@ n0["<b>1. Collect the fleet's lines</b><br/>batch of 3 log lines tagged REQ-3001
 
 > **Why this matters:** Understanding behavior means following one request across every service it touched. Search is the operation that turns a request id into the ordered story of that request.
 
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-n0["<b>1. Developer searches</b><br/>DEV types REQ-3001 into the search UI"]:::start
-  n1["<b>2. Match the key</b><br/>REQ-3001 returns 3 hits"]:::step
-  n2["<b>3. Sort by timestamp</b><br/>order unsorted becomes t1, t2, t3"]:::step
-  n3["<b>4. One path rendered</b><br/>order-service, then customer-service, then payment-service"]:::core
-  n4["<b>5. Request story shown</b><br/>3 lines across 3 services, in time order"]:::stop
-  n5["<b>Unknown request id</b><br/>REQ-9999 returns 0 hits, never logged"]:::warn
-  n0 -->|"1. query the index"| n1
-  n1 -->|"2. hits from every instance"| n2
-  n2 -->|"3. order by time"| n3
-  n3 -->|"4. whole path shown"| n4
-  n1 -->|"5. no hits - never logged"| n5
-```
-
 1. **Query by request id** — Users search the aggregated logs, often by the external request id.
 
 2. **Get hits from every instance** — A single query returns matching lines from all the services that handled the request.
@@ -146,28 +81,6 @@ n0["<b>1. Developer searches</b><br/>DEV types REQ-3001 into the search UI"]:::s
 ### Alert on patterns, and pay for volume
 
 > **Why this matters:** You cannot watch logs by hand; alerts fire automatically when a configured message appears. But the volume that makes the index useful is exactly what makes it expensive.
-
-```mermaid
-flowchart TD
-  classDef step fill:#1f6feb,color:#ffffff,stroke:#388bfd,rx:6
-  classDef core fill:#8250df,color:#ffffff,stroke:#8250df,rx:6
-  classDef warn fill:#d29922,color:#ffffff,stroke:#d29922,rx:6
-  classDef start fill:#238636,color:#ffffff,stroke:#2ea043,rx:6
-  classDef stop fill:#b62324,color:#ffffff,stroke:#da3633,rx:6
-n0["<b>1. New line indexed</b><br/>ERROR order-service REQ-3001 customer lookup failed"]:::start
-  n1["<b>2. Rule matches</b><br/>the configured rule ERROR matches this line"]:::step
-  n2["<b>3. Count to threshold</b><br/>ERROR count 0 becomes 1"]:::step
-  n3["<b>4. Fire and notify</b><br/>rule fired, alert goes to DEV"]:::core
-  n4["<b>5. Alert delivered</b><br/>1 notification for this pattern"]:::stop
-  n5["<b>Plain INFO line</b><br/>no match, count stays 0, no alert"]:::warn
-  n6["<b>Volume cost</b><br/>large volume of logs needs substantial infrastructure"]:::warn
-  n0 -->|"1. evaluate the rule"| n1
-  n1 -->|"2. matched"| n2
-  n2 -->|"3. threshold reached"| n3
-  n3 -->|"4. notify the on-call"| n4
-  n1 -->|"5. no match - no alert"| n5
-  n3 -->|"6. at scale - storage grows"| n6
-```
 
 1. **Configure alerts** — Users configure alerts that are triggered when certain messages appear in the logs.
 
@@ -229,15 +142,6 @@ flowchart TD
   R -->|"comprises"| P1["reads the 3 correlated lines from the index"]
 ```
 
-```mermaid
-flowchart LR
-  SVC1["Order Service"] -->|"ship log"| LOG["Central logging service"]
-  SVC2["Customer Service"] -->|"ship log"| LOG
-  SVC3["Payment Service"] -->|"ship log"| LOG
-  LOG -->|"index by request id"| IDX["aggregated index REQ-3001"]
-  IDX -->|"search"| DEV["Developer reader"]
-```
-
 ```java
 // SYSTEM DESIGN — log aggregation: writer -> transport -> collector -> aggregator/store -> reader
 // PARTIES: SVC1 = Order Service (writer) · SVC2 = Customer Service (writer) · SVC3 = Payment Service (writer) · LOG = central logging service (collector + aggregator) · DEV = developer (reader)
@@ -269,14 +173,6 @@ A request to your order service fans out to the customer service, and each write
 - Standardized format — same shape
 - Severity — error/warning/info/debug
 - External request id — the join key
-
-```mermaid
-flowchart LR
-  SVC1["Order Service"] -->|"INFO ... REQ-3001"| F1["logfile 1"]
-  SVC2["Customer Service"] -->|"INFO ... REQ-3001"| F2["logfile 2"]
-  F1 -->|"same id"| J["Join key REQ-3001"]
-  F2 -->|"same id"| J
-```
 
 ```java
 // ORDER SERVICE SIDE — a request crossing two services writes a line in each, all tagged with the same request id
@@ -314,14 +210,6 @@ A log on a local disk cannot be searched across the fleet. You have a centralize
 - Request-id index
 - One key — one request
 
-```mermaid
-flowchart LR
-  SVC["Order Service"] -->|"line1"| LOG["Central logging service"]
-  SVC -->|"line2"| LOG
-  SVC -->|"line3"| LOG
-  LOG -->|"files under"| IDX["index by request id"]
-```
-
 ```java
 // AGGREGATOR SIDE — one instance ships three lines as they are written, and the central service files them under two request ids
 // PARTIES: SVC = Order Service · LOG = central logging service
@@ -355,13 +243,6 @@ A request crossed three services and you need to see the whole path. You type th
 - Request-id query
 - Hit set — lines from all instances
 - Time sort — rebuilds the path
-
-```mermaid
-flowchart LR
-  DEV["Developer"] -->|"query REQ-3001"| LOG["Central logging service"]
-  LOG -->|"3 hits"| SORT["Sort by timestamp"]
-  SORT -->|"ordered path"| VIEW["order -> customer -> payment"]
-```
 
 ```java
 // DEVELOPER SIDE — one request-id query pulls hits from three instances and returns them in time order
@@ -397,13 +278,6 @@ You cannot watch logs by hand, so you configure an alert that fires when ERROR a
 - Notification to on-call
 - Growing index volume
 
-```mermaid
-flowchart LR
-  LOG["Central logging service"] -->|"line ERROR ..."| RULE["rule ERROR threshold 1"]
-  RULE -->|"match fires"| DEV["On-call developer"]
-  LOG -->|"each line adds"| VOL["index volume 400001"]
-```
-
 ```java
 // LOG SERVICE SIDE — an alert fires on a configured message, and each new line adds to the volume that demands infrastructure
 // PARTIES: LOG = central logging service · DEV = on-call developer
@@ -437,12 +311,20 @@ _From the 28 problems:_ 20-metrics-monitoring
 
 Use a centralized logging service that aggregates logs from each service instance; users can search and analyze the logs.
 
-```mermaid
-flowchart LR
-  SVC1["Order Service"] -->|"INFO ... REQ-3001"| F1["logfile 1"]
-  SVC2["Customer Service"] -->|"INFO ... REQ-3001"| F2["logfile 2"]
-  F1 -->|"same id"| J["Join key REQ-3001"]
-  F2 -->|"same id"| J
+```java
+// ORDER SERVICE SIDE — a request crossing two services writes a line in each, all tagged with the same request id
+// PARTIES: SVC1 = Order Service · SVC2 = Customer Service · U1 = the user whose request this is
+// STATE (before):
+//    logfile_1 : []   // SVC1's local file
+//    logfile_2 : []   // SVC2's local file
+// DEF: log_across_services · CALLED BY: SVC1 then SVC2 for request REQ-3001
+// -> req_id : "REQ-3001"
+//    step 1 · SVC1 formats its line with severity INFO   // line1 : null -> "INFO order-service REQ-3001 handle /orders"
+//    step 2 · SVC1 appends, then forwards the SAME id to SVC2   // logfile_1 : [] -> ["INFO order-service REQ-3001 handle /orders"]
+//    step 3 · SVC2 formats its own line with the SAME id   // line2 : null -> "INFO customer-service REQ-3001 lookup customer 42"
+//    step 4 · SVC2 appends   // logfile_2 : [] -> ["INFO customer-service REQ-3001 lookup customer 42"]
+// <- two lines : logfile_1 has 1 line, logfile_2 has 1 line, both tagged "REQ-3001" · one id joins two files
+//    alt no shared id : line2 : null -> "INFO customer-service ??? lookup customer 42" -> the two lines can never be joined
 ```
 
 
