@@ -1,0 +1,46 @@
+direction: down
+
+R: {
+  label: |md
+    **Build pipeline — the baker**
+  |
+  shape: rectangle
+  style: {
+    fill: "#238636"
+    stroke: "#2ea043"
+    font-color: "#FFFFFF"
+    border-radius: 8
+    font-size: 16
+  }
+}
+
+P0: {
+  label: |md
+    bakes JDK 17 + OS into one machine image
+  |
+  shape: rectangle
+  style: {
+    fill: "#1f6feb"
+    stroke: "#388bfd"
+    font-color: "#FFFFFF"
+    border-radius: 6
+    font-size: 15
+  }
+}
+
+P1: {
+  label: |md
+    publishes the AMI catalog:2.3.0
+  |
+  shape: rectangle
+  style: {
+    fill: "#1f6feb"
+    stroke: "#388bfd"
+    font-color: "#FFFFFF"
+    border-radius: 6
+    font-size: 15
+  }
+}
+
+R -> P0: "1. comprises"
+R -> P1: "2. comprises"

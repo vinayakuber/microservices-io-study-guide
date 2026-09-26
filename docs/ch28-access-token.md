@@ -98,34 +98,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 28 · microservice
 
 _Role: identity provider (token issuance)_
 
-```mermaid
-flowchart TD
-  R["identity provider — the token issuer"]
-  R -->|"comprises"| P0["authenticates the requestor (alice)"]
-  R -->|"comprises"| P1["mints the JWT #quot;eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig#quot;"]
-```
+![identity provider — the token issuer](../diagrams/d2/decomp/ch28-0.png)
 
 ### API gateway — the single entry point
 
 _Role: API gateway (validation)_
 
-```mermaid
-flowchart TD
-  R["API gateway — the single entry point"]
-  R -->|"comprises"| P0["validates the token signature"]
-  R -->|"comprises"| P1["routes the request to the service with the token attached"]
-```
+![API gateway — the single entry point](../diagrams/d2/decomp/ch28-1.png)
 
 ### Order Service — the verifier
 
 _Role: service_
 
-```mermaid
-flowchart TD
-  R["Order Service — the verifier"]
-  R -->|"comprises"| P0["verifies the signature locally"]
-  R -->|"comprises"| P1["checks role customer against operation place_order"]
-```
+![Order Service — the verifier](../diagrams/d2/decomp/ch28-2.png)
 
 ```java
 // SYSTEM DESIGN — access token: client -> identity provider (token issuance) -> API gateway (validation) -> service (Order Service verifies + authorizes)

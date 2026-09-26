@@ -118,36 +118,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 23 · microservice
 
 _Role: client_
 
-```mermaid
-flowchart TD
-  R["Clients — the callers"]
-  R -->|"comprises"| P0["CLI — a command-line client"]
-  R -->|"comprises"| P1["MOB — the mobile client"]
-  R -->|"comprises"| P2["WEB — the web client"]
-```
+![Clients — the callers](../diagrams/d2/decomp/ch23-0.png)
 
 ### API Gateway — the single entry point
 
 _Role: gateway_
 
-```mermaid
-flowchart TD
-  R["API Gateway — the single entry point"]
-  R -->|"comprises"| P0["request routing — looks up the route table"]
-  R -->|"comprises"| P1["API composition — assembles product + price + reviews"]
-```
+![API Gateway — the single entry point](../diagrams/d2/decomp/ch23-1.png)
 
 ### Upstream services — the backends
 
 _Role: upstream services_
 
-```mermaid
-flowchart TD
-  R["Upstream services — the backends"]
-  R -->|"comprises"| P0["PROD — product service"]
-  R -->|"comprises"| P1["PRI — pricing service"]
-  R -->|"comprises"| P2["REV — reviews service"]
-```
+![Upstream services — the backends](../diagrams/d2/decomp/ch23-2.png)
 
 ```java
 // SYSTEM DESIGN — API gateway: client -> gateway -> upstream services, one product request composed end to end

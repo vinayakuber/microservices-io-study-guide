@@ -121,46 +121,25 @@ _Also known as: Chris Richardson · Microservice Patterns · microservices.io /p
 
 _Role: command side / event store_
 
-```mermaid
-flowchart TD
-  R["Order Service command side — appends events"]
-  R -->|"comprises"| P0["append — one atomic write per state change"]
-  R -->|"comprises"| P1["event store — EventStoreDB 24 @ orders-events-1"]
-  R -->|"comprises"| P2["delivers each saved event to subscribers like a broker"]
-```
+![Order Service command side — appends events](../diagrams/d2/decomp/ch19-0.png)
 
 ### projector / event handler
 
 _Role: projector/event handler_
 
-```mermaid
-flowchart TD
-  R["projector / event handler"]
-  R -->|"comprises"| P0["consume — receives each saved event"]
-  R -->|"comprises"| P1["fold — apply() of each event into the read model"]
-```
+![projector / event handler](../diagrams/d2/decomp/ch19-1.png)
 
 ### read model database
 
 _Role: read model DB_
 
-```mermaid
-flowchart TD
-  R["read model database"]
-  R -->|"comprises"| P0["PostgreSQL 16 @ orders-view-1"]
-  R -->|"comprises"| P1["holds the precomputed current state the projector folded"]
-```
+![read model database](../diagrams/d2/decomp/ch19-2.png)
 
 ### query side
 
 _Role: query side_
 
-```mermaid
-flowchart TD
-  R["query side"]
-  R -->|"comprises"| P0["reads the current state directly"]
-  R -->|"comprises"| P1["no replay at query time"]
-```
+![query side](../diagrams/d2/decomp/ch19-3.png)
 
 ```java
 // SYSTEM DESIGN — event sourcing as a pipeline: command -> event store (append) -> projector/event handler -> read model -> query

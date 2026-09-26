@@ -137,34 +137,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 5 · microservices
 
 _Role: writer (producer)_
 
-```mermaid
-flowchart TD
-  R["the sender — e.g. Order Service"]
-  R -->|"comprises"| P0["builds the message — OrderCreated(PO-2001)"]
-  R -->|"comprises"| P1["sends it to the channel and returns at once"]
-```
+![the sender — e.g. Order Service](../diagrams/d2/decomp/ch05-0.png)
 
 ### the message channel — the broker
 
 _Role: transport_
 
-```mermaid
-flowchart TD
-  R["the message channel — the broker"]
-  R -->|"comprises"| P0["RabbitMQ broker holding the queue"]
-  R -->|"comprises"| P1["buffers messages until the consumer is ready"]
-```
+![the message channel — the broker](../diagrams/d2/decomp/ch05-1.png)
 
 ### the receiver — e.g. Kitchen consumer
 
 _Role: reader (consumer)_
 
-```mermaid
-flowchart TD
-  R["the receiver — e.g. Kitchen consumer"]
-  R -->|"comprises"| P0["subscribes to the channel"]
-  R -->|"comprises"| P1["handles each message — starts cooking"]
-```
+![the receiver — e.g. Kitchen consumer](../diagrams/d2/decomp/ch05-2.png)
 
 ```java
 // SYSTEM DESIGN — messaging as a pipeline: sender/producer (builds the message, sends it) -> transport (RabbitMQ channel) -> receiver/consumer (subscribes, handles the message)

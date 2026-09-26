@@ -1,0 +1,46 @@
+direction: down
+
+R: {
+  label: |md
+    **Order Service — the writer**
+  |
+  shape: rectangle
+  style: {
+    fill: "#238636"
+    stroke: "#2ea043"
+    font-color: "#FFFFFF"
+    border-radius: 8
+    font-size: 16
+  }
+}
+
+P0: {
+  label: |md
+    counter increments on create\_order completion
+  |
+  shape: rectangle
+  style: {
+    fill: "#1f6feb"
+    stroke: "#388bfd"
+    font-color: "#FFFFFF"
+    border-radius: 6
+    font-size: 15
+  }
+}
+
+P1: {
+  label: |md
+    histogram observes each request duration
+  |
+  shape: rectangle
+  style: {
+    fill: "#1f6feb"
+    stroke: "#388bfd"
+    font-color: "#FFFFFF"
+    border-radius: 6
+    font-size: 15
+  }
+}
+
+R -> P0: "1. comprises"
+R -> P1: "2. comprises"

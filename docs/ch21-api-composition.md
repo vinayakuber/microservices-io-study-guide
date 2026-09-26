@@ -124,36 +124,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 21 · microservice
 
 _Role: API composer_
 
-```mermaid
-flowchart TD
-  R["API Composer"]
-  R -->|"comprises"| P0["query — invokes each provider service that owns a fragment"]
-  R -->|"comprises"| P1["join — merges fragments in memory on a shared key"]
-  R -->|"comprises"| P2["returns one combined response"]
-```
+![API Composer](../diagrams/d2/decomp/ch21-0.png)
 
 ### provider services
 
 _Role: provider services_
 
-```mermaid
-flowchart TD
-  R["provider services"]
-  R -->|"comprises"| P0["Order Service — owns the order rows"]
-  R -->|"comprises"| P1["Customer Service — owns the customer rows"]
-  R -->|"comprises"| P2["Inventory Service — owns the stock rows"]
-```
+![provider services](../diagrams/d2/decomp/ch21-1.png)
 
 ### their databases
 
 _Role: databases_
 
-```mermaid
-flowchart TD
-  R["their databases"]
-  R -->|"comprises"| P0["PostgreSQL 16 @ orders-db-1"]
-  R -->|"comprises"| P1["PostgreSQL 16 @ customers-db-1"]
-```
+![their databases](../diagrams/d2/decomp/ch21-2.png)
 
 ```java
 // SYSTEM DESIGN — API composition as a pipeline: client -> API composer -> provider services -> their databases

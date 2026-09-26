@@ -94,34 +94,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 43 · microservice
 
 _Role: subsystem_
 
-```mermaid
-flowchart TD
-  R["new Customer service — the subsystem that keeps its own clean model"]
-  R -->|"comprises"| P0["Domain model — id, dateOfBirth, status"]
-  R -->|"comprises"| P1["Consumer — reads only what the ACL hands it"]
-```
+![new Customer service — the subsystem that keeps its own clean model](../diagrams/d2/decomp/ch43-0.png)
 
 ### anti-corruption layer — the translation boundary
 
 _Role: ACL (adapter + translator)_
 
-```mermaid
-flowchart TD
-  R["anti-corruption layer — the translation boundary"]
-  R -->|"comprises"| P0["Adapter — calls the legacy API / table"]
-  R -->|"comprises"| P1["Translator — maps legacy names and codes to the modern model"]
-```
+![anti-corruption layer — the translation boundary](../diagrams/d2/decomp/ch43-1.png)
 
 ### legacy monolith — the old system being shielded
 
 _Role: legacy monolith_
 
-```mermaid
-flowchart TD
-  R["legacy monolith — the old system being shielded"]
-  R -->|"comprises"| P0["customer table — cust_id, cust_dob, status_cd on PostgreSQL 14 @ legacy-db-1"]
-  R -->|"comprises"| P1["Legacy codes — status_cd #quot;A#quot; for active"]
-```
+![legacy monolith — the old system being shielded](../diagrams/d2/decomp/ch43-2.png)
 
 ```java
 // SYSTEM DESIGN — anti-corruption layer: new subsystem -> ACL (adapter + translator) -> legacy monolith

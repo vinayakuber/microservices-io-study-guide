@@ -122,34 +122,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 24 · microservice
 
 _Role: client_
 
-```mermaid
-flowchart TD
-  R["Clients — two device shapes"]
-  R -->|"comprises"| P0["WEB — desktop client needing 5 fields"]
-  R -->|"comprises"| P1["MOB — mobile client needing 2 fields"]
-```
+![Clients — two device shapes](../diagrams/d2/decomp/ch24-0.png)
 
 ### Per-client gateways — the BFFs
 
 _Role: per-client gateway_
 
-```mermaid
-flowchart TD
-  R["Per-client gateways — the BFFs"]
-  R -->|"comprises"| P0["GW-W — web gateway, owned by the public API team"]
-  R -->|"comprises"| P1["GW-M — mobile gateway, owned by the mobile team"]
-```
+![Per-client gateways — the BFFs](../diagrams/d2/decomp/ch24-1.png)
 
 ### Upstream services + shared library
 
 _Role: upstream services_
 
-```mermaid
-flowchart TD
-  R["Upstream services + shared library"]
-  R -->|"comprises"| P0["PROD — product service"]
-  R -->|"comprises"| P1["LIB — shared library with verify_access_token"]
-```
+![Upstream services + shared library](../diagrams/d2/decomp/ch24-2.png)
 
 ```java
 // SYSTEM DESIGN — BFF: client -> per-client gateway -> upstream services, one product fetched for two devices

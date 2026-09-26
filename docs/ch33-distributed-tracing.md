@@ -145,48 +145,25 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 33 (p.370) · micr
 
 _Role: writer_
 
-```mermaid
-flowchart TD
-  R["each service process (GW, Order, Kitchen, Payment) — the writer"]
-  R -->|"comprises"| P0["Tracer — mints trace/span ids, propagates B3/W3C headers"]
-  R -->|"comprises"| P1["Reporter — batches finished spans"]
-  R -->|"comprises"| P2["Sender — transport adapter: HTTP / Kafka / RabbitMQ"]
-```
+![each service process (GW, Order, Kitchen, Payment) — the writer](../diagrams/d2/decomp/ch33-0.png)
 
 ### RabbitMQ broker — the transport
 
 _Role: transport_
 
-```mermaid
-flowchart TD
-  R["RabbitMQ broker — the transport"]
-  R -->|"comprises"| P0["queue #quot;zipkin#quot; — the span channel"]
-  R -->|"comprises"| P1["decouples writers from the collector, buffers under load"]
-```
+![RabbitMQ broker — the transport](../diagrams/d2/decomp/ch33-1.png)
 
 ### Zipkin server (one central process, NOT per-host) — collector + aggregator + reader
 
 _Role: collector + aggregator/store + reader_
 
-```mermaid
-flowchart TD
-  R["Zipkin server (one central process, NOT per-host) — collector + aggregator + reader"]
-  R -->|"comprises"| P0["Collector — ingests spans (HTTP POST /api/v2/spans, or Kafka/RabbitMQ)"]
-  R -->|"comprises"| P1["Storage — MySQL 8 @ zipkin-db-1, Cassandra, or Elasticsearch (the trace store)"]
-  R -->|"comprises"| P2["Query API — REST: fetch a trace by id"]
-  R -->|"comprises"| P3["UI — Zipkin Lens (the timeline browser)"]
-```
+![Zipkin server (one central process, NOT per-host) — collector + aggregator + reader](../diagrams/d2/decomp/ch33-2.png)
 
 ### operator — the reader
 
 _Role: reader_
 
-```mermaid
-flowchart TD
-  R["operator — the reader"]
-  R -->|"comprises"| P0["queries a trace id"]
-  R -->|"comprises"| P1["reads the timeline, finds the slow hop"]
-```
+![operator — the reader](../diagrams/d2/decomp/ch33-3.png)
 
 ```java
 // SYSTEM DESIGN — tracing as a pipeline: writer (in-process Tracer -> Reporter -> Sender) -> transport (RabbitMQ) -> collector (Zipkin collector) -> aggregator (trace store MySQL 8 @ zipkin-db-1) -> reader (Zipkin query UI + operator)

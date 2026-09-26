@@ -1,0 +1,46 @@
+direction: down
+
+R: {
+  label: |md
+    **Order Service — the verifier**
+  |
+  shape: rectangle
+  style: {
+    fill: "#238636"
+    stroke: "#2ea043"
+    font-color: "#FFFFFF"
+    border-radius: 8
+    font-size: 16
+  }
+}
+
+P0: {
+  label: |md
+    verifies the signature locally
+  |
+  shape: rectangle
+  style: {
+    fill: "#1f6feb"
+    stroke: "#388bfd"
+    font-color: "#FFFFFF"
+    border-radius: 6
+    font-size: 15
+  }
+}
+
+P1: {
+  label: |md
+    checks role customer against operation place\_order
+  |
+  shape: rectangle
+  style: {
+    fill: "#1f6feb"
+    stroke: "#388bfd"
+    font-color: "#FFFFFF"
+    border-radius: 6
+    font-size: 15
+  }
+}
+
+R -> P0: "1. comprises"
+R -> P1: "2. comprises"

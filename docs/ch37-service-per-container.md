@@ -118,34 +118,19 @@ _Also known as: Chris Richardson · Microservice Patterns p.393 · microservices
 
 _Role: build pipeline_
 
-```mermaid
-flowchart TD
-  R["Build pipeline — the builder"]
-  R -->|"comprises"| P0["compiles the code into a container image"]
-  R -->|"comprises"| P1["tags the image rsvc:1.4.2 and pushes it"]
-```
+![Build pipeline — the builder](../diagrams/d2/decomp/ch37-0.png)
 
 ### Container registry — the image repository
 
 _Role: registry_
 
-```mermaid
-flowchart TD
-  R["Container registry — the image repository"]
-  R -->|"comprises"| P0["holds the built images"]
-  R -->|"comprises"| P1["serves rsvc:1.4.2 back to the cluster"]
-```
+![Container registry — the image repository](../diagrams/d2/decomp/ch37-1.png)
 
 ### Kubernetes cluster — the scheduler
 
 _Role: cluster_
 
-```mermaid
-flowchart TD
-  R["Kubernetes cluster — the scheduler"]
-  R -->|"comprises"| P0["pulls the image and schedules containers"]
-  R -->|"comprises"| P1["scales replicas from 2 to 4, cpu cap 0.5"]
-```
+![Kubernetes cluster — the scheduler](../diagrams/d2/decomp/ch37-2.png)
 
 ```java
 // SYSTEM DESIGN — service per container: build pipeline -> registry -> cluster -> container

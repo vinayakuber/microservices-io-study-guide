@@ -134,46 +134,25 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 2 · microservices
 
 _Role: client_
 
-```mermaid
-flowchart TD
-  R["the client"]
-  R -->|"comprises"| P0["sends a request to the API gateway"]
-  R -->|"comprises"| P1["reads the composed response"]
-```
+![the client](../diagrams/d2/decomp/ch02-0.png)
 
 ### the API gateway
 
 _Role: gateway (the entry point)_
 
-```mermaid
-flowchart TD
-  R["the API gateway"]
-  R -->|"comprises"| P0["routes the request to one or more services"]
-  R -->|"comprises"| P1["composes the responses into one page"]
-```
+![the API gateway](../diagrams/d2/decomp/ch02-1.png)
 
 ### each microservice — e.g. the order service
 
 _Role: service_
 
-```mermaid
-flowchart TD
-  R["each microservice — e.g. the order service"]
-  R -->|"comprises"| P0["own business logic — implements one or more subdomains"]
-  R -->|"comprises"| P1["own database — PostgreSQL 16 @ order-db-1"]
-  R -->|"comprises"| P2["communicates over HTTP or messaging"]
-```
+![each microservice — e.g. the order service](../diagrams/d2/decomp/ch02-2.png)
 
 ### the service database
 
 _Role: store_
 
-```mermaid
-flowchart TD
-  R["the service database"]
-  R -->|"comprises"| P0["PostgreSQL 16 @ order-db-1 — one engine and instance per service"]
-  R -->|"comprises"| P1["no single ACID commit spans two services"]
-```
+![the service database](../diagrams/d2/decomp/ch02-3.png)
 
 ```java
 // SYSTEM DESIGN — microservices: client -> API gateway -> microservices (own business logic + own database) -> service databases; a distributed command becomes a saga of local transactions

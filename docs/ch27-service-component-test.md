@@ -128,34 +128,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. · microservices.i
 
 _Role: test harness_
 
-```mermaid
-flowchart TD
-  R["test harness"]
-  R -->|"comprises"| P0["drives the service in-process (no network)"]
-  R -->|"comprises"| P1["asserts the response against the double's canned reply"]
-```
+![test harness](../diagrams/d2/decomp/ch27-0.png)
 
 ### Order Service — the service under test
 
 _Role: service under test (in-process)_
 
-```mermaid
-flowchart TD
-  R["Order Service — the service under test"]
-  R -->|"comprises"| P0["real wiring: its controller and outbound call run for real"]
-  R -->|"comprises"| P1["in-memory database instead of the production store"]
-```
+![Order Service — the service under test](../diagrams/d2/decomp/ch27-1.png)
 
 ### Kitchen Service double
 
 _Role: stubbed dependency_
 
-```mermaid
-flowchart TD
-  R["Kitchen Service double"]
-  R -->|"comprises"| P0["returns the canned ticket #quot;T-88#quot;"]
-  R -->|"comprises"| P1["stands in for the real Kitchen Service"]
-```
+![Kitchen Service double](../diagrams/d2/decomp/ch27-2.png)
 
 ```java
 // SYSTEM DESIGN — service component test: test harness -> service under test (Order Service, in-process) -> stubbed dependency (Kitchen Service double)

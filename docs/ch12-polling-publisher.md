@@ -101,45 +101,25 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.12 · microservices
 
 _Role: source database_
 
-```mermaid
-flowchart TD
-  R["source database (outbox table) — the source database"]
-  R -->|"comprises"| P0["Holds the outbox rows with a sent flag"]
-  R -->|"comprises"| P1["Answers the unsent-row SELECT"]
-```
+![source database (outbox table) — the source database](../diagrams/d2/decomp/ch12-0.png)
 
 ### polling publisher relay — the relay
 
 _Role: polling publisher_
 
-```mermaid
-flowchart TD
-  R["polling publisher relay — the relay"]
-  R -->|"comprises"| P0["Polls SELECT ... WHERE sent=false ORDER BY id"]
-  R -->|"comprises"| P1["Publishes each row to the broker"]
-  R -->|"comprises"| P2["Marks the row sent=true"]
-```
+![polling publisher relay — the relay](../diagrams/d2/decomp/ch12-1.png)
 
 ### message broker (RabbitMQ) — the broker
 
 _Role: broker_
 
-```mermaid
-flowchart TD
-  R["message broker (RabbitMQ) — the broker"]
-  R -->|"comprises"| P0["Receives published events in id order"]
-  R -->|"comprises"| P1["Holds them for subscribers"]
-```
+![message broker (RabbitMQ) — the broker](../diagrams/d2/decomp/ch12-2.png)
 
 ### subscriber — the consumer
 
 _Role: subscriber_
 
-```mermaid
-flowchart TD
-  R["subscriber — the consumer"]
-  R -->|"comprises"| P0["Consumes each event off the broker"]
-```
+![subscriber — the consumer](../diagrams/d2/decomp/ch12-3.png)
 
 ```java
 // SYSTEM DESIGN — polling publisher as a pipeline: source database (outbox table) -> polling publisher relay -> message broker -> subscriber (consumer)

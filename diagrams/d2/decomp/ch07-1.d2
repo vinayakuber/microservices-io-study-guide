@@ -1,0 +1,61 @@
+direction: down
+
+R: {
+  label: |md
+    **the breaker proxy**
+  |
+  shape: rectangle
+  style: {
+    fill: "#238636"
+    stroke: "#2ea043"
+    font-color: "#FFFFFF"
+    border-radius: 8
+    font-size: 16
+  }
+}
+
+P0: {
+  label: |md
+    failure counter (trips at threshold 4)
+  |
+  shape: rectangle
+  style: {
+    fill: "#1f6feb"
+    stroke: "#388bfd"
+    font-color: "#FFFFFF"
+    border-radius: 6
+    font-size: 15
+  }
+}
+
+P1: {
+  label: |md
+    timeout timer (250 ms)
+  |
+  shape: rectangle
+  style: {
+    fill: "#1f6feb"
+    stroke: "#388bfd"
+    font-color: "#FFFFFF"
+    border-radius: 6
+    font-size: 15
+  }
+}
+
+P2: {
+  label: |md
+    state machine CLOSED / OPEN / HALF-OPEN
+  |
+  shape: rectangle
+  style: {
+    fill: "#1f6feb"
+    stroke: "#388bfd"
+    font-color: "#FFFFFF"
+    border-radius: 6
+    font-size: 15
+  }
+}
+
+R -> P0: "1. comprises"
+R -> P1: "2. comprises"
+R -> P2: "3. comprises"

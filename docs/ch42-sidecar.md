@@ -117,36 +117,19 @@ _Also known as: Chris Richardson · Microservice Patterns p.410 · microservices
 
 _Role: application container_
 
-```mermaid
-flowchart TD
-  R["application container — the Order Service that owns the business logic"]
-  R -->|"comprises"| P0["Order Service — runs the business code"]
-  R -->|"comprises"| P1["Sends calls — outbound traffic passes through the sidecar"]
-```
+![application container — the Order Service that owns the business logic](../diagrams/d2/decomp/ch42-0.png)
 
 ### sidecar container — the concern-carrying twin
 
 _Role: sidecar container_
 
-```mermaid
-flowchart TD
-  R["sidecar container — the concern-carrying twin"]
-  R -->|"comprises"| P0["Proxy — intercepts outbound traffic and stamps a trace id"]
-  R -->|"comprises"| P1["Log-shipper — forwards the logs from the shared volume"]
-  R -->|"comprises"| P2["Config-reloader — watches and reloads config"]
-  R -->|"comprises"| P3["Shares the pod — mounts the same volume and network namespace"]
-```
+![sidecar container — the concern-carrying twin](../diagrams/d2/decomp/ch42-1.png)
 
 ### shared resources — what both containers share
 
 _Role: shared resources_
 
-```mermaid
-flowchart TD
-  R["shared resources — what both containers share"]
-  R -->|"comprises"| P0["Network namespace — one IP for app and sidecar"]
-  R -->|"comprises"| P1["Volume — shared-logs mounted by both"]
-```
+![shared resources — what both containers share](../diagrams/d2/decomp/ch42-2.png)
 
 ```java
 // SYSTEM DESIGN — sidecar: application container -> sidecar container -> shared resources

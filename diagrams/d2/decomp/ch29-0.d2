@@ -1,0 +1,46 @@
+direction: down
+
+R: {
+  label: |md
+    **Order Service — the consumer of config**
+  |
+  shape: rectangle
+  style: {
+    fill: "#238636"
+    stroke: "#2ea043"
+    font-color: "#FFFFFF"
+    border-radius: 8
+    font-size: 16
+  }
+}
+
+P0: {
+  label: |md
+    pulls config at startup (DB\_URL, DB\_PASSWORD)
+  |
+  shape: rectangle
+  style: {
+    fill: "#1f6feb"
+    stroke: "#388bfd"
+    font-color: "#FFFFFF"
+    border-radius: 6
+    font-size: 15
+  }
+}
+
+P1: {
+  label: |md
+    refreshes when the config changes
+  |
+  shape: rectangle
+  style: {
+    fill: "#1f6feb"
+    stroke: "#388bfd"
+    font-color: "#FFFFFF"
+    border-radius: 6
+    font-size: 15
+  }
+}
+
+R -> P0: "1. comprises"
+R -> P1: "2. comprises"

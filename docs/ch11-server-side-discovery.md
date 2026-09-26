@@ -131,46 +131,25 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 11 · microservice
 
 _Role: client_
 
-```mermaid
-flowchart TD
-  R["client — calls only the router"]
-  R -->|"comprises"| P0["Dials the router at a well-known address"]
-  R -->|"comprises"| P1["Never performs discovery itself"]
-```
+![client — calls only the router](../diagrams/d2/decomp/ch11-0.png)
 
 ### router / load balancer — the router
 
 _Role: router / load balancer_
 
-```mermaid
-flowchart TD
-  R["router / load balancer — the router"]
-  R -->|"comprises"| P0["Queries the registry for available instances"]
-  R -->|"comprises"| P1["Picks one instance"]
-  R -->|"comprises"| P2["Forwards the request to it"]
-```
+![router / load balancer — the router](../diagrams/d2/decomp/ch11-1.png)
 
 ### service registry (Eureka) — the registry
 
 _Role: registry_
 
-```mermaid
-flowchart TD
-  R["service registry (Eureka) — the registry"]
-  R -->|"comprises"| P0["Holds the name -&gt; instances map"]
-  R -->|"comprises"| P1["Returns instance locations on query"]
-```
+![service registry (Eureka) — the registry](../diagrams/d2/decomp/ch11-2.png)
 
 ### order-service instances — the instances
 
 _Role: service instances_
 
-```mermaid
-flowchart TD
-  R["order-service instances — the instances"]
-  R -->|"comprises"| P0["Self-register on startup"]
-  R -->|"comprises"| P1["Serve the forwarded request"]
-```
+![order-service instances — the instances](../diagrams/d2/decomp/ch11-3.png)
 
 ```java
 // SYSTEM DESIGN — server-side discovery as a pipeline: client -> router/load balancer -> service registry -> service instances (the client never discovers)

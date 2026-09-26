@@ -134,35 +134,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 3 · microservices
 
 _Role: business capability_
 
-```mermaid
-flowchart TD
-  R["a business capability — e.g. product catalog"]
-  R -->|"comprises"| P0["something the business does to generate value"]
-  R -->|"comprises"| P1["maps to a business object — Product"]
-```
+![a business capability — e.g. product catalog](../diagrams/d2/decomp/ch03-0.png)
 
 ### the service — e.g. the catalog service
 
 _Role: service (owns its data)_
 
-```mermaid
-flowchart TD
-  R["the service — e.g. the catalog service"]
-  R -->|"comprises"| P0["owns the capability business object and its data"]
-  R -->|"comprises"| P1["owns its database — PostgreSQL 16 @ catalog-db-1"]
-  R -->|"comprises"| P2["hides its implementation behind an API"]
-```
+![the service — e.g. the catalog service](../diagrams/d2/decomp/ch03-1.png)
 
 ### the autonomous team
 
 _Role: team (owns the service)_
 
-```mermaid
-flowchart TD
-  R["the autonomous team"]
-  R -->|"comprises"| P0["a two-pizza team of 6-10 people"]
-  R -->|"comprises"| P1["develops, tests and deploys the service alone"]
-```
+![the autonomous team](../diagrams/d2/decomp/ch03-2.png)
 
 ```java
 // SYSTEM DESIGN — decompose by business capability: business capability (Product) -> service (catalog, owns its data) -> autonomous two-pizza team (owns the service)

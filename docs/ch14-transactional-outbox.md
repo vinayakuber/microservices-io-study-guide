@@ -128,46 +128,25 @@ _Also known as: Application events · Chris Richardson · Microservice Patterns 
 
 _Role: application_
 
-```mermaid
-flowchart TD
-  R["order service (application) — the application"]
-  R -->|"comprises"| P0["Writes the order row"]
-  R -->|"comprises"| P1["Writes the outbox event row in the same tx"]
-```
+![order service (application) — the application](../diagrams/d2/decomp/ch14-0.png)
 
 ### orders + outbox table (PostgreSQL 16 @ orders-db-1) — the database
 
 _Role: database_
 
-```mermaid
-flowchart TD
-  R["orders + outbox table (PostgreSQL 16 @ orders-db-1) — the database"]
-  R -->|"comprises"| P0["Keeps business rows and outbox rows in one instance"]
-  R -->|"comprises"| P1["Commits both writes atomically"]
-```
+![orders + outbox table (PostgreSQL 16 @ orders-db-1) — the database](../diagrams/d2/decomp/ch14-1.png)
 
 ### relay publisher — the relay
 
 _Role: relay_
 
-```mermaid
-flowchart TD
-  R["relay publisher — the relay"]
-  R -->|"comprises"| P0["Reads outbox rows not yet relayed"]
-  R -->|"comprises"| P1["Publishes them to the broker"]
-  R -->|"comprises"| P2["Marks each row relayed"]
-```
+![relay publisher — the relay](../diagrams/d2/decomp/ch14-2.png)
 
 ### message broker (RabbitMQ) — the broker
 
 _Role: broker_
 
-```mermaid
-flowchart TD
-  R["message broker (RabbitMQ) — the broker"]
-  R -->|"comprises"| P0["Holds published events"]
-  R -->|"comprises"| P1["Delivers them to subscribers"]
-```
+![message broker (RabbitMQ) — the broker](../diagrams/d2/decomp/ch14-3.png)
 
 ```java
 // SYSTEM DESIGN — transactional outbox as a pipeline: application tx -> outbox table (same database) -> relay publisher -> broker (reliable, no dual-write)

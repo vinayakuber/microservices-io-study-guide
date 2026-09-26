@@ -117,34 +117,19 @@ _Also known as: Chris Richardson · Microservice Patterns p.387 · microservices
 
 _Role: build pipeline_
 
-```mermaid
-flowchart TD
-  R["Deployment pipeline — the builder"]
-  R -->|"comprises"| P0["compiles the service into one runnable JAR"]
-  R -->|"comprises"| P1["produces restaurant-service-3.1.0.jar"]
-```
+![Deployment pipeline — the builder](../diagrams/d2/decomp/ch39-0.png)
 
 ### Machine — the runtime host
 
 _Role: machine (runtime)_
 
-```mermaid
-flowchart TD
-  R["Machine — the runtime host"]
-  R -->|"comprises"| P0["installs JDK 17 and Tomcat 10"]
-  R -->|"comprises"| P1["boots the packaged service"]
-```
+![Machine — the runtime host](../diagrams/d2/decomp/ch39-1.png)
 
 ### JVM process — the running service
 
 _Role: JVM process_
 
-```mermaid
-flowchart TD
-  R["JVM process — the running service"]
-  R -->|"comprises"| P0["loads the JAR and serves traffic"]
-  R -->|"comprises"| P1["runs as jvm-8121"]
-```
+![JVM process — the running service](../diagrams/d2/decomp/ch39-2.png)
 
 ```java
 // SYSTEM DESIGN — language-specific packaging: build pipeline -> package -> machine (runtime) -> JVM process

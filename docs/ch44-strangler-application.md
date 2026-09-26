@@ -99,34 +99,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 44 · microservice
 
 _Role: legacy monolith_
 
-```mermaid
-flowchart TD
-  R["legacy monolith — the running system that still serves unmigrated paths"]
-  R -->|"comprises"| P0["checkout + accounts — features not yet moved"]
-  R -->|"comprises"| P1["Serves — any path the route table still points at it"]
-```
+![legacy monolith — the running system that still serves unmigrated paths](../diagrams/d2/decomp/ch44-0.png)
 
 ### strangler façade / router — fronts both systems and decides per request
 
 _Role: router_
 
-```mermaid
-flowchart TD
-  R["strangler façade / router — fronts both systems and decides per request"]
-  R -->|"comprises"| P0["Route by path — looks up each path in the route table"]
-  R -->|"comprises"| P1["Incrementally replace — moves one feature at a time"]
-```
+![strangler façade / router — fronts both systems and decides per request](../diagrams/d2/decomp/ch44-1.png)
 
 ### new microservices — the growing strangler application
 
 _Role: new microservices_
 
-```mermaid
-flowchart TD
-  R["new microservices — the growing strangler application"]
-  R -->|"comprises"| P0["Migrated features — catalog, search re-implemented"]
-  R -->|"comprises"| P1["New features — recommendations, wishlist with no monolith twin"]
-```
+![new microservices — the growing strangler application](../diagrams/d2/decomp/ch44-2.png)
 
 ```java
 // SYSTEM DESIGN — strangler application: legacy monolith -> strangler façade/router -> new microservices

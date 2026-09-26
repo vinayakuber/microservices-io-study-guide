@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Refuse a commit if the explain-program gate fails (R1-R16) or any mermaid
-# block fails to parse/validate.
+# Refuse a commit if the explain-program gate fails (R1-R16) or the diagram
+# pipeline is broken (a mermaid fence still in docs, or a D2/PNG pair missing).
 set -e
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
@@ -10,8 +10,8 @@ node tools/explain_program_gate.js || {
   exit 1
 }
 
-node tools/validate_mermaid.js || {
-  echo "COMMIT BLOCKED: a mermaid diagram failed validation. Fix the reported block, then re-commit." >&2
+node tools/validate_diagrams.js || {
+  echo "COMMIT BLOCKED: a diagram failed validation. Fix the reported block, then re-commit." >&2
   exit 1
 }
 

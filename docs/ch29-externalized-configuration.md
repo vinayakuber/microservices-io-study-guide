@@ -101,34 +101,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 29 · microservice
 
 _Role: service_
 
-```mermaid
-flowchart TD
-  R["Order Service — the consumer of config"]
-  R -->|"comprises"| P0["pulls config at startup (DB_URL, DB_PASSWORD)"]
-  R -->|"comprises"| P1["refreshes when the config changes"]
-```
+![Order Service — the consumer of config](../diagrams/d2/decomp/ch29-0.png)
 
 ### Spring Cloud Config server
 
 _Role: config server_
 
-```mermaid
-flowchart TD
-  R["Spring Cloud Config server"]
-  R -->|"comprises"| P0["serves configuration over HTTP"]
-  R -->|"comprises"| P1["versions each property change"]
-```
+![Spring Cloud Config server](../diagrams/d2/decomp/ch29-1.png)
 
 ### git repository — the config source
 
 _Role: config repository (git/VCS)_
 
-```mermaid
-flowchart TD
-  R["git repository — the config source"]
-  R -->|"comprises"| P0["stores the property files per environment"]
-  R -->|"comprises"| P1["is the versioned source of truth"]
-```
+![git repository — the config source](../diagrams/d2/decomp/ch29-2.png)
 
 ```java
 // SYSTEM DESIGN — externalized configuration: service (Order Service) -> config server (Spring Cloud Config) -> config repository (git/VCS)

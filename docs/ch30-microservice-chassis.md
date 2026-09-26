@@ -129,34 +129,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 30 (p.379) · micr
 
 _Role: service_
 
-```mermaid
-flowchart TD
-  R["Order Service — the new service"]
-  R -->|"comprises"| P0["adopts the chassis via a Gradle plugin"]
-  R -->|"comprises"| P1["inherits the cross-cutting wiring"]
-```
+![Order Service — the new service](../diagrams/d2/decomp/ch30-0.png)
 
 ### chassis framework 2.4.0 — the shared libraries
 
 _Role: chassis framework (libraries)_
 
-```mermaid
-flowchart TD
-  R["chassis framework 2.4.0 — the shared libraries"]
-  R -->|"comprises"| P0["externalized configuration + health-check URL"]
-  R -->|"comprises"| P1["logging, metrics (counter: orders_created), and tracing"]
-```
+![chassis framework 2.4.0 — the shared libraries](../diagrams/d2/decomp/ch30-1.png)
 
 ### the cross-cutting concerns
 
 _Role: cross-cutting concerns_
 
-```mermaid
-flowchart TD
-  R["the cross-cutting concerns"]
-  R -->|"comprises"| P0["security via an Access Token"]
-  R -->|"comprises"| P1["service registration/discovery + circuit breakers"]
-```
+![the cross-cutting concerns](../diagrams/d2/decomp/ch30-2.png)
 
 ```java
 // SYSTEM DESIGN — microservice chassis: service (Order Service) -> chassis framework (shared libraries) -> cross-cutting concerns (security, config, logging, health, metrics, tracing)

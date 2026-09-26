@@ -97,45 +97,25 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 32 (p.377) · micr
 
 _Role: service (business op + audit record)_
 
-```mermaid
-flowchart TD
-  R["Order Service — the writer"]
-  R -->|"comprises"| P0["performs the business op (view/create/pay order)"]
-  R -->|"comprises"| P1["writes one audit row per action"]
-```
+![Order Service — the writer](../diagrams/d2/decomp/ch32-0.png)
 
 ### audit log store
 
 _Role: audit log (store)_
 
-```mermaid
-flowchart TD
-  R["audit log store"]
-  R -->|"comprises"| P0["PostgreSQL 16 @ audit-db-1"]
-  R -->|"comprises"| P1["holds rows (id, user, action, target, at)"]
-```
+![audit log store](../diagrams/d2/decomp/ch32-1.png)
 
 ### log aggregator
 
 _Role: log aggregator_
 
-```mermaid
-flowchart TD
-  R["log aggregator"]
-  R -->|"comprises"| P0["collects audit rows across services"]
-  R -->|"comprises"| P1["indexes them for query"]
-```
+![log aggregator](../diagrams/d2/decomp/ch32-2.png)
 
 ### reader (auditor queries)
 
 _Role: reader_
 
-```mermaid
-flowchart TD
-  R["reader (auditor queries)"]
-  R -->|"comprises"| P0["support/compliance/security query the log"]
-  R -->|"comprises"| P1["reconstructs what a user did"]
-```
+![reader (auditor queries)](../diagrams/d2/decomp/ch32-3.png)
 
 ```java
 // SYSTEM DESIGN — audit logging pipeline: service (Order Service, business op + audit record) -> audit log (PostgreSQL 16 @ audit-db-1) -> log aggregator -> reader (support/compliance/security)

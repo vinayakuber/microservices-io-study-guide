@@ -136,35 +136,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 9 · microservices
 
 _Role: client_
 
-```mermaid
-flowchart TD
-  R["order-service client — the client"]
-  R -->|"comprises"| P0["Queries the registry for a service name"]
-  R -->|"comprises"| P1["Selects one instance from the returned set"]
-  R -->|"comprises"| P2["Load-balances across the instances"]
-```
+![order-service client — the client](../diagrams/d2/decomp/ch09-0.png)
 
 ### service registry (Eureka) — the store of locations
 
 _Role: service registry_
 
-```mermaid
-flowchart TD
-  R["service registry (Eureka) — the store of locations"]
-  R -->|"comprises"| P0["Keeps the name -&gt; instances map"]
-  R -->|"comprises"| P1["Returns instance locations on query"]
-```
+![service registry (Eureka) — the store of locations](../diagrams/d2/decomp/ch09-1.png)
 
 ### order-service instances — the targets
 
 _Role: service instances_
 
-```mermaid
-flowchart TD
-  R["order-service instances — the targets"]
-  R -->|"comprises"| P0["Self-register on startup"]
-  R -->|"comprises"| P1["Serve the direct request"]
-```
+![order-service instances — the targets](../diagrams/d2/decomp/ch09-2.png)
 
 ```java
 // SYSTEM DESIGN — client-side discovery as a pipeline: client -> service registry -> service instances (the client load-balances and calls one instance directly, no router)

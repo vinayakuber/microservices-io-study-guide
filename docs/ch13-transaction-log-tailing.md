@@ -109,45 +109,25 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.13 · microservices
 
 _Role: source database_
 
-```mermaid
-flowchart TD
-  R["source database (transaction log) — the source database"]
-  R -->|"comprises"| P0["Appends every committed change to the log"]
-  R -->|"comprises"| P1["Exposes the log to the tailer"]
-```
+![source database (transaction log) — the source database](../diagrams/d2/decomp/ch13-0.png)
 
 ### log tailer / miner — the tailer
 
 _Role: log tailer_
 
-```mermaid
-flowchart TD
-  R["log tailer / miner — the tailer"]
-  R -->|"comprises"| P0["Tails the transaction log"]
-  R -->|"comprises"| P1["Converts log records into domain events"]
-  R -->|"comprises"| P2["Publishes each event to the broker"]
-```
+![log tailer / miner — the tailer](../diagrams/d2/decomp/ch13-1.png)
 
 ### message broker (RabbitMQ) — the broker
 
 _Role: broker_
 
-```mermaid
-flowchart TD
-  R["message broker (RabbitMQ) — the broker"]
-  R -->|"comprises"| P0["Receives the events in commit order"]
-  R -->|"comprises"| P1["Holds them for subscribers"]
-```
+![message broker (RabbitMQ) — the broker](../diagrams/d2/decomp/ch13-2.png)
 
 ### subscriber — the consumer
 
 _Role: subscriber_
 
-```mermaid
-flowchart TD
-  R["subscriber — the consumer"]
-  R -->|"comprises"| P0["Consumes each event off the broker"]
-```
+![subscriber — the consumer](../diagrams/d2/decomp/ch13-3.png)
 
 ```java
 // SYSTEM DESIGN — transaction log tailing as a pipeline: database transaction log -> log tailer/miner -> message broker -> subscriber (consumer)

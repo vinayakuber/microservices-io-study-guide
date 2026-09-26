@@ -120,34 +120,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 34 · microservice
 
 _Role: service (source)_
 
-```mermaid
-flowchart TD
-  R["Order Service — the thrower"]
-  R -->|"comprises"| P0["throws the exception EX-1001 with msg #quot;customer is null#quot;"]
-  R -->|"comprises"| P1["reports the stack trace SVC.doGet line 42"]
-```
+![Order Service — the thrower](../diagrams/d2/decomp/ch34-0.png)
 
 ### Exception tracking service — collect, dedup, aggregate
 
 _Role: exception tracker_
 
-```mermaid
-flowchart TD
-  R["Exception tracking service — collect, dedup, aggregate"]
-  R -->|"comprises"| P0["normalizes each throw into a fingerprint"]
-  R -->|"comprises"| P1["PostgreSQL 16 @ exc-db-1 — folds repeats by fingerprint and bumps the count"]
-```
+![Exception tracking service — collect, dedup, aggregate](../diagrams/d2/decomp/ch34-1.png)
 
 ### Developer — the reader
 
 _Role: reader_
 
-```mermaid
-flowchart TD
-  R["Developer — the reader"]
-  R -->|"comprises"| P0["sees one deduplicated issue, not a flood"]
-  R -->|"comprises"| P1["triages the issue FP-77A3 against a threshold of 1"]
-```
+![Developer — the reader](../diagrams/d2/decomp/ch34-2.png)
 
 ```java
 // SYSTEM DESIGN — exception tracking: service -> exception tracker (collect/dedup/aggregate) -> developer reader

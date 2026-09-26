@@ -113,34 +113,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 35 · microservice
 
 _Role: service instance_
 
-```mermaid
-flowchart TD
-  R["Order Service — the instance under check"]
-  R -->|"comprises"| P0["exposes GET /health"]
-  R -->|"comprises"| P1["probes its db, disk, and app dependencies"]
-```
+![Order Service — the instance under check](../diagrams/d2/decomp/ch35-0.png)
 
 ### Monitoring service — the health-check client
 
 _Role: health-check client_
 
-```mermaid
-flowchart TD
-  R["Monitoring service — the health-check client"]
-  R -->|"comprises"| P0["polls /health every 30s"]
-  R -->|"comprises"| P1["marks the instance UP or DOWN"]
-```
+![Monitoring service — the health-check client](../diagrams/d2/decomp/ch35-1.png)
 
 ### Load balancer + registry — routing/alert
 
 _Role: routing/alert_
 
-```mermaid
-flowchart TD
-  R["Load balancer + registry — routing/alert"]
-  R -->|"comprises"| P0["LB stops routing to a DOWN instance"]
-  R -->|"comprises"| P1["REG de-registers the unhealthy instance"]
-```
+![Load balancer + registry — routing/alert](../diagrams/d2/decomp/ch35-2.png)
 
 ```java
 // SYSTEM DESIGN — health check: service instance -> /health endpoint -> health-check client -> routing/alert

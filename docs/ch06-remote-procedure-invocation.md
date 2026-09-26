@@ -131,34 +131,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 6 · microservices
 
 _Role: caller_
 
-```mermaid
-flowchart TD
-  R["the caller — Registration Service"]
-  R -->|"comprises"| P0["builds the request { email: #quot;bob@example.com#quot; }"]
-  R -->|"comprises"| P1["waits synchronously for the reply"]
-```
+![the caller — Registration Service](../diagrams/d2/decomp/ch06-0.png)
 
 ### the client stub/proxy — RegistrationServiceProxy
 
 _Role: interface (client proxy)_
 
-```mermaid
-flowchart TD
-  R["the client stub/proxy — RegistrationServiceProxy"]
-  R -->|"comprises"| P0["serializes the request over HTTP"]
-  R -->|"comprises"| P1["hides the transport from the caller"]
-```
+![the client stub/proxy — RegistrationServiceProxy](../diagrams/d2/decomp/ch06-1.png)
 
 ### the server — User Registration instance
 
 _Role: server_
 
-```mermaid
-flowchart TD
-  R["the server — User Registration instance"]
-  R -->|"comprises"| P0["runs the business logic"]
-  R -->|"comprises"| P1["stores the row and returns the reply"]
-```
+![the server — User Registration instance](../diagrams/d2/decomp/ch06-2.png)
 
 ```java
 // SYSTEM DESIGN — RPI as a pipeline: caller -> client stub/proxy -> transport (HTTP) -> server skeleton -> business logic -> reply

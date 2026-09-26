@@ -118,47 +118,25 @@ _Also known as: Chris Richardson · Microservice Patterns p.416 · microservices
 
 _Role: client_
 
-```mermaid
-flowchart TD
-  R["client — the HTTP caller that sends the request"]
-  R -->|"comprises"| P0["Browser / app — issues GET /restaurants/42"]
-  R -->|"comprises"| P1["Waits — for the HTTP response to come back"]
-```
+![client — the HTTP caller that sends the request](../diagrams/d2/decomp/ch41-0.png)
 
 ### API gateway — the HTTP entry that maps requests to functions
 
 _Role: gateway_
 
-```mermaid
-flowchart TD
-  R["API gateway — the HTTP entry that maps requests to functions"]
-  R -->|"comprises"| P0["Request transform — turns HTTP into an event object"]
-  R -->|"comprises"| P1["Invoke — calls the function with the event"]
-  R -->|"comprises"| P2["Response — builds the HTTP reply from the result"]
-```
+![API gateway — the HTTP entry that maps requests to functions](../diagrams/d2/decomp/ch41-1.png)
 
 ### function runtime — the serverless infrastructure (AWS Lambda)
 
 _Role: function runtime_
 
-```mermaid
-flowchart TD
-  R["function runtime — the serverless infrastructure (AWS Lambda)"]
-  R -->|"comprises"| P0["Load function — unpacks the uploaded ZIP restaurant.zip"]
-  R -->|"comprises"| P1["Cold start — launches instance i-1 when none is idle"]
-  R -->|"comprises"| P2["Scale to zero — frees idle instances when traffic stops"]
-```
+![function runtime — the serverless infrastructure (AWS Lambda)](../diagrams/d2/decomp/ch41-2.png)
 
 ### the function — the stateless handler that runs the code
 
 _Role: function_
 
-```mermaid
-flowchart TD
-  R["the function — the stateless handler that runs the code"]
-  R -->|"comprises"| P0["index.handler — the named entrypoint"]
-  R -->|"comprises"| P1["Stateless — runs only in response to an event"]
-```
+![the function — the stateless handler that runs the code](../diagrams/d2/decomp/ch41-3.png)
 
 ```java
 // SYSTEM DESIGN — serverless: client request -> API gateway -> function runtime -> function

@@ -118,36 +118,19 @@ _Also known as: Chris Richardson · Microservice Patterns p.380 · microservices
 
 _Role: service_
 
-```mermaid
-flowchart TD
-  R["Order Service — the business service whose traffic the mesh mediates"]
-  R -->|"comprises"| P0["Application code — sends queries and receives replies"]
-  R -->|"comprises"| P1["Traffic — every in/out call is routed through the sidecar proxy"]
-```
+![Order Service — the business service whose traffic the mesh mediates](../diagrams/d2/decomp/ch40-0.png)
 
 ### sidecar proxy — the per-service data plane
 
 _Role: data plane_
 
-```mermaid
-flowchart TD
-  R["sidecar proxy — the per-service data plane"]
-  R -->|"comprises"| P0["Interceptor — sees each call before it leaves the service"]
-  R -->|"comprises"| P1["mTLS — encrypts service-to-service traffic with a distributed cert"]
-  R -->|"comprises"| P2["Retry / circuit-breaker — retries and trips circuits on failures"]
-  R -->|"comprises"| P3["Metrics — counts requests and answers health pings"]
-```
+![sidecar proxy — the per-service data plane](../diagrams/d2/decomp/ch40-1.png)
 
 ### control plane — the mesh brain that pushes policy to every proxy
 
 _Role: control plane_
 
-```mermaid
-flowchart TD
-  R["control plane — the mesh brain that pushes policy to every proxy"]
-  R -->|"comprises"| P0["Route config — distributes route rules to the proxies"]
-  R -->|"comprises"| P1["Cert distribution — hands each proxy its mTLS identity"]
-```
+![control plane — the mesh brain that pushes policy to every proxy](../diagrams/d2/decomp/ch40-2.png)
 
 ```java
 // SYSTEM DESIGN — service mesh: service -> sidecar proxy (data plane) -> control plane

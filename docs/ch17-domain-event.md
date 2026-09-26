@@ -97,36 +97,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.17 (p.160) · micro
 
 _Role: aggregate/publisher_
 
-```mermaid
-flowchart TD
-  R["Order aggregate (in Order Service) — the publisher"]
-  R -->|"comprises"| P0["change state — flips order state #quot;NEW#quot; -&gt; #quot;PLACED#quot;"]
-  R -->|"comprises"| P1["emit DomainEvent — produces #quot;OrderPlaced#quot; { order_id:#quot;PO-2001#quot; }"]
-  R -->|"comprises"| P2["Transactional Outbox — writes the event row in the same DB transaction"]
-  R -->|"comprises"| P3["Relay — polls the outbox after commit and publishes to the broker"]
-```
+![Order aggregate (in Order Service) — the publisher](../diagrams/d2/decomp/ch17-0.png)
 
 ### message broker — the transport
 
 _Role: broker/transport_
 
-```mermaid
-flowchart TD
-  R["message broker — the transport"]
-  R -->|"comprises"| P0["carries #quot;OrderPlaced#quot; from the publisher to every subscriber"]
-  R -->|"comprises"| P1["decouples the aggregate from the consumers"]
-```
+![message broker — the transport](../diagrams/d2/decomp/ch17-1.png)
 
 ### CQRS view updater — the subscriber/consumer
 
 _Role: subscriber/consumer_
 
-```mermaid
-flowchart TD
-  R["CQRS view updater — the subscriber/consumer"]
-  R -->|"comprises"| P0["consume — receives #quot;OrderPlaced#quot; off the broker"]
-  R -->|"comprises"| P1["react — updates its read model order_count 0 -&gt; 1"]
-```
+![CQRS view updater — the subscriber/consumer](../diagrams/d2/decomp/ch17-2.png)
 
 ```java
 // SYSTEM DESIGN — domain event as a pipeline: aggregate (publisher) -> event broker (transport) -> subscriber (consumer)

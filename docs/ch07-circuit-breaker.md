@@ -126,35 +126,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 7 · microservices
 
 _Role: caller_
 
-```mermaid
-flowchart TD
-  R["the caller"]
-  R -->|"comprises"| P0["makes remote calls through the breaker"]
-  R -->|"comprises"| P1["gets a fail-fast verdict while the breaker is OPEN"]
-```
+![the caller](../diagrams/d2/decomp/ch07-0.png)
 
 ### the breaker proxy
 
 _Role: breaker_
 
-```mermaid
-flowchart TD
-  R["the breaker proxy"]
-  R -->|"comprises"| P0["failure counter (trips at threshold 4)"]
-  R -->|"comprises"| P1["timeout timer (250 ms)"]
-  R -->|"comprises"| P2["state machine CLOSED / OPEN / HALF-OPEN"]
-```
+![the breaker proxy](../diagrams/d2/decomp/ch07-1.png)
 
 ### the downstream service
 
 _Role: server_
 
-```mermaid
-flowchart TD
-  R["the downstream service"]
-  R -->|"comprises"| P0["answers calls while healthy"]
-  R -->|"comprises"| P1["times out when degraded"]
-```
+![the downstream service](../diagrams/d2/decomp/ch07-2.png)
 
 ```java
 // SYSTEM DESIGN — the circuit breaker as a pipeline: caller -> breaker proxy -> downstream service

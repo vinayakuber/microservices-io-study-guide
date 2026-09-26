@@ -105,36 +105,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 8 · microservices
 
 _Role: service_
 
-```mermaid
-flowchart TD
-  R["the service instance"]
-  R -->|"comprises"| P0["starts and stops the app"]
-  R -->|"comprises"| P1["never talks to the registry itself"]
-```
+![the service instance](../diagrams/d2/decomp/ch08-0.png)
 
 ### the third-party registrar
 
 _Role: registrar_
 
-```mermaid
-flowchart TD
-  R["the third-party registrar"]
-  R -->|"comprises"| P0["Netflix Prana sidecar"]
-  R -->|"comprises"| P1["observes / polls the instance"]
-  R -->|"comprises"| P2["registers on startup, unregisters on shutdown"]
-```
+![the third-party registrar](../diagrams/d2/decomp/ch08-1.png)
 
 ### the service registry
 
 _Role: registry_
 
-```mermaid
-flowchart TD
-  R["the service registry"]
-  R -->|"comprises"| P0["Eureka"]
-  R -->|"comprises"| P1["stores the reachable endpoints"]
-  R -->|"comprises"| P2["serves discovery lookups"]
-```
+![the service registry](../diagrams/d2/decomp/ch08-2.png)
 
 ```java
 // SYSTEM DESIGN — third-party registration as a pipeline: service instance -> third-party registrar -> service registry

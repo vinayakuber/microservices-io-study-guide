@@ -123,34 +123,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. · microservices.i
 
 _Role: consumer (test)_
 
-```mermaid
-flowchart TD
-  R["OrderServiceProxy — the consumer under test"]
-  R -->|"comprises"| P0["builds the request: GET /orders/ORD-4007 + Accept header"]
-  R -->|"comprises"| P1["parses the reply into orderId and state"]
-```
+![OrderServiceProxy — the consumer under test](../diagrams/d2/decomp/ch26-0.png)
 
 ### mock provider stub
 
 _Role: mock provider (contract)_
 
-```mermaid
-flowchart TD
-  R["mock provider stub"]
-  R -->|"comprises"| P0["returns the canned reply: status 200 + JSON body"]
-  R -->|"comprises"| P1["stands in for the real Order Service during the test"]
-```
+![mock provider stub](../diagrams/d2/decomp/ch26-1.png)
 
 ### Order Service — the real provider
 
 _Role: provider service_
 
-```mermaid
-flowchart TD
-  R["Order Service — the real provider"]
-  R -->|"comprises"| P0["owns the real contract: GET /orders/{orderId}"]
-  R -->|"comprises"| P1["answers the well-formed request in production"]
-```
+![Order Service — the real provider](../diagrams/d2/decomp/ch26-2.png)
 
 ```java
 // SYSTEM DESIGN — consumer-side contract test: consumer (OrderServiceProxy) -> mock provider (contract stub) -> provider service (real Order Service)

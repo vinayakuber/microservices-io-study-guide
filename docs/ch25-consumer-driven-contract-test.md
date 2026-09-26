@@ -126,34 +126,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. · microservices.i
 
 _Role: consumer_
 
-```mermaid
-flowchart TD
-  R["API Gateway — the consumer"]
-  R -->|"comprises"| P0["OrderServiceProxy — calls GET /orders/{orderId}"]
-  R -->|"comprises"| P1["contract suite — defines the expectation and generates the contract"]
-```
+![API Gateway — the consumer](../diagrams/d2/decomp/ch25-0.png)
 
 ### Pact broker — the contract repo
 
 _Role: contract broker/repo_
 
-```mermaid
-flowchart TD
-  R["Pact broker — the contract repo"]
-  R -->|"comprises"| P0["stores the example request/reply contract"]
-  R -->|"comprises"| P1["serves the contract back to the provider pipeline"]
-```
+![Pact broker — the contract repo](../diagrams/d2/decomp/ch25-1.png)
 
 ### Order Service — the provider
 
 _Role: provider verification + provider_
 
-```mermaid
-flowchart TD
-  R["Order Service — the provider"]
-  R -->|"comprises"| P0["verifies the actual response against the contract"]
-  R -->|"comprises"| P1["keeps the promise: serves GET /orders/ORD-4007 with status 200"]
-```
+![Order Service — the provider](../diagrams/d2/decomp/ch25-2.png)
 
 ```java
 // SYSTEM DESIGN — consumer-driven contract test: consumer (API Gateway) -> contract/expectation (Pact broker) -> provider verification (deployment pipeline) -> provider (Order Service)

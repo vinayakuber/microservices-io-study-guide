@@ -95,56 +95,31 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 31 (p.373) · micr
 
 _Role: writer (instrumented service)_
 
-```mermaid
-flowchart TD
-  R["Order Service — the writer"]
-  R -->|"comprises"| P0["counter increments on create_order completion"]
-  R -->|"comprises"| P1["histogram observes each request duration"]
-```
+![Order Service — the writer](../diagrams/d2/decomp/ch31-0.png)
 
 ### push/pull transport
 
 _Role: transport (push/pull)_
 
-```mermaid
-flowchart TD
-  R["push/pull transport"]
-  R -->|"comprises"| P0["push: the service POSTs metrics"]
-  R -->|"comprises"| P1["pull: the metrics service GETs /metrics"]
-```
+![push/pull transport](../diagrams/d2/decomp/ch31-1.png)
 
 ### Prometheus — the collector
 
 _Role: collector (metrics service)_
 
-```mermaid
-flowchart TD
-  R["Prometheus — the collector"]
-  R -->|"comprises"| P0["scrapes or receives the metrics"]
-  R -->|"comprises"| P1["provides reporting and alerting"]
-```
+![Prometheus — the collector](../diagrams/d2/decomp/ch31-2.png)
 
 ### time-series registry — the aggregator
 
 _Role: aggregator/store (registry)_
 
-```mermaid
-flowchart TD
-  R["time-series registry — the aggregator"]
-  R -->|"comprises"| P0["holds each series keyed by metric name"]
-  R -->|"comprises"| P1["stores orders_created and request_ms"]
-```
+![time-series registry — the aggregator](../diagrams/d2/decomp/ch31-3.png)
 
 ### dashboard — the reader
 
 _Role: reader (dashboard)_
 
-```mermaid
-flowchart TD
-  R["dashboard — the reader"]
-  R -->|"comprises"| P0["queries the stored series"]
-  R -->|"comprises"| P1["renders the counts and latencies"]
-```
+![dashboard — the reader](../diagrams/d2/decomp/ch31-4.png)
 
 ```java
 // SYSTEM DESIGN — application metrics pipeline: writer (Order Service, instrumented) -> transport (push/pull) -> collector (Prometheus metrics service) -> aggregator (time-series registry) -> reader (dashboard)

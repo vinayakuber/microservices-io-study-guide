@@ -123,47 +123,25 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.5 · microservices.
 
 _Role: domain service_
 
-```mermaid
-flowchart TD
-  R["OrderService — the domain service"]
-  R -->|"comprises"| P0["createOrder() — delegates to the Order.create() factory"]
-  R -->|"comprises"| P1["reviseOrder()/cancelOrder() — routes commands to the aggregate"]
-  R -->|"comprises"| P2["holds no business state (behavior only)"]
-```
+![OrderService — the domain service](../diagrams/d2/decomp/ch18-0.png)
 
 ### Order aggregate + DeliveryInformation — entities/value objects
 
 _Role: entities/value objects_
 
-```mermaid
-flowchart TD
-  R["Order aggregate + DeliveryInformation — entities/value objects"]
-  R -->|"comprises"| P0["Order — entity with state (orderId, lineItems) and behavior create()/revise()/cancel()"]
-  R -->|"comprises"| P1["DeliveryInformation — state-only value object (deliveryTime, deliveryAddress)"]
-  R -->|"comprises"| P2["business rules — guard the CREATED -&gt; CANCELLED transition and recompute the total"]
-```
+![Order aggregate + DeliveryInformation — entities/value objects](../diagrams/d2/decomp/ch18-1.png)
 
 ### OrderRepository — the repository
 
 _Role: repository_
 
-```mermaid
-flowchart TD
-  R["OrderRepository — the repository"]
-  R -->|"comprises"| P0["findOrderById() — loads the aggregate"]
-  R -->|"comprises"| P1["save() — persists the aggregate back"]
-```
+![OrderRepository — the repository](../diagrams/d2/decomp/ch18-2.png)
 
 ### PostgreSQL 16 @ orders-db-1 — the database
 
 _Role: database_
 
-```mermaid
-flowchart TD
-  R["PostgreSQL 16 @ orders-db-1 — the database"]
-  R -->|"comprises"| P0["stores the aggregate rows"]
-  R -->|"comprises"| P1["single source of truth for orders"]
-```
+![PostgreSQL 16 @ orders-db-1 — the database](../diagrams/d2/decomp/ch18-3.png)
 
 ```java
 // SYSTEM DESIGN — domain model as a pipeline: client -> domain service (OrderService) -> entities/value objects (Order + DeliveryInformation) -> repository (OrderRepository) -> database (PostgreSQL 16 @ orders-db-1)

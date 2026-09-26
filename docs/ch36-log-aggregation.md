@@ -113,34 +113,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 36 · microservice
 
 _Role: writer_
 
-```mermaid
-flowchart TD
-  R["Three services — the writers"]
-  R -->|"comprises"| P0["Order Service — writes a log line tagged REQ-3001"]
-  R -->|"comprises"| P1["Customer Service and Payment Service — write their own lines for REQ-3001"]
-```
+![Three services — the writers](../diagrams/d2/decomp/ch36-0.png)
 
 ### Central logging service — collector + aggregator/store
 
 _Role: collector / aggregator/store_
 
-```mermaid
-flowchart TD
-  R["Central logging service — collector + aggregator/store"]
-  R -->|"comprises"| P0["collects the lines shipped by each service"]
-  R -->|"comprises"| P1["indexes them by request id into {#quot;REQ-3001#quot;:[1,2,3]}"]
-```
+![Central logging service — collector + aggregator/store](../diagrams/d2/decomp/ch36-1.png)
 
 ### Developer — the reader
 
 _Role: reader_
 
-```mermaid
-flowchart TD
-  R["Developer — the reader"]
-  R -->|"comprises"| P0["searches REQ-3001"]
-  R -->|"comprises"| P1["reads the 3 correlated lines from the index"]
-```
+![Developer — the reader](../diagrams/d2/decomp/ch36-2.png)
 
 ```java
 // SYSTEM DESIGN — log aggregation: writer -> transport -> collector -> aggregator/store -> reader

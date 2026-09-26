@@ -109,44 +109,25 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.16 (p.150) · micro
 
 _Role: client_
 
-```mermaid
-flowchart TD
-  R["client — calls the aggregate"]
-  R -->|"comprises"| P0["Sends a command to the aggregate"]
-  R -->|"comprises"| P1["Treats the aggregate as one unit"]
-```
+![client — calls the aggregate](../diagrams/d2/decomp/ch16-0.png)
 
 ### order aggregate root (order + line items) — the aggregate
 
 _Role: aggregate root_
 
-```mermaid
-flowchart TD
-  R["order aggregate root (order + line items) — the aggregate"]
-  R -->|"comprises"| P0["Enforces invariants on the order"]
-  R -->|"comprises"| P1["Adds the line item and recomputes the total"]
-```
+![order aggregate root (order + line items) — the aggregate](../diagrams/d2/decomp/ch16-1.png)
 
 ### repository — the repository
 
 _Role: repository_
 
-```mermaid
-flowchart TD
-  R["repository — the repository"]
-  R -->|"comprises"| P0["Loads the aggregate"]
-  R -->|"comprises"| P1["Persists the aggregate after the command"]
-```
+![repository — the repository](../diagrams/d2/decomp/ch16-2.png)
 
 ### PostgreSQL 16 @ orders-db-1 — the database
 
 _Role: database_
 
-```mermaid
-flowchart TD
-  R["PostgreSQL 16 @ orders-db-1 — the database"]
-  R -->|"comprises"| P0["Stores the aggregate as one consistency boundary"]
-```
+![PostgreSQL 16 @ orders-db-1 — the database](../diagrams/d2/decomp/ch16-3.png)
 
 ```java
 // SYSTEM DESIGN — aggregate as a pipeline: client -> aggregate root (domain objects) -> repository -> database (one unit of consistency per command)

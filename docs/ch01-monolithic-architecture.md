@@ -142,36 +142,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 1 · microservices
 
 _Role: application (all three tiers in one process)_
 
-```mermaid
-flowchart TD
-  R["the monolith — one deployable process holding every subdomain"]
-  R -->|"comprises"| P0["presentation tier — receives client requests, returns responses"]
-  R -->|"comprises"| P1["business logic — implements business rules, mutates entities"]
-  R -->|"comprises"| P2["data-access layer — reads and writes the single database"]
-```
+![the monolith — one deployable process holding every subdomain](../diagrams/d2/decomp/ch01-0.png)
 
 ### the single relational database
 
 _Role: store_
 
-```mermaid
-flowchart TD
-  R["the single relational database"]
-  R -->|"comprises"| P0["PostgreSQL 16 @ monolith-db-1 — the one engine and instance"]
-  R -->|"comprises"| P1["holds the rows of every subdomain in one schema"]
-  R -->|"comprises"| P2["one ACID transaction spans the Orders and Credit subdomains"]
-```
+![the single relational database](../diagrams/d2/decomp/ch01-1.png)
 
 ### the client
 
 _Role: client_
 
-```mermaid
-flowchart TD
-  R["the client"]
-  R -->|"comprises"| P0["sends a synchronous request to the monolith"]
-  R -->|"comprises"| P1["reads the response — no network hops inside the app"]
-```
+![the client](../diagrams/d2/decomp/ch01-2.png)
 
 ```java
 // SYSTEM DESIGN — the monolith is one process with three tiers inside it, all hitting one database: client -> presentation tier -> business logic -> data-access layer -> PostgreSQL 16 @ monolith-db-1

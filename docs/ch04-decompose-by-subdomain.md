@@ -129,35 +129,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 4 · microservices
 
 _Role: domain_
 
-```mermaid
-flowchart TD
-  R["the domain — the business problem space"]
-  R -->|"comprises"| P0["the business DDD models — e.g. food delivery"]
-  R -->|"comprises"| P1["splits into multiple subdomains"]
-```
+![the domain — the business problem space](../diagrams/d2/decomp/ch04-0.png)
 
 ### a subdomain — a distinct part of the business
 
 _Role: subdomain (core/supporting/generic)_
 
-```mermaid
-flowchart TD
-  R["a subdomain — a distinct part of the business"]
-  R -->|"comprises"| P0["classified core (key differentiator), supporting, or generic"]
-  R -->|"comprises"| P1["often has a key domain object — Order"]
-```
+![a subdomain — a distinct part of the business](../diagrams/d2/decomp/ch04-1.png)
 
 ### the service — one per subdomain
 
 _Role: service (owns its data)_
 
-```mermaid
-flowchart TD
-  R["the service — one per subdomain"]
-  R -->|"comprises"| P0["owns the subdomain model and its data"]
-  R -->|"comprises"| P1["owns its database — PostgreSQL 16 @ order-db-1"]
-  R -->|"comprises"| P2["cohesive, loosely coupled behind an API"]
-```
+![the service — one per subdomain](../diagrams/d2/decomp/ch04-2.png)
 
 ```java
 // SYSTEM DESIGN — decompose by subdomain: domain (food delivery) -> subdomain (core/supporting/generic) -> service (owns its subdomain data)

@@ -130,34 +130,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 22 · microservice
 
 _Role: command side_
 
-```mermaid
-flowchart TD
-  R["Order Service — command side"]
-  R -->|"comprises"| P0["createOrder handler — appends order_created to the event stream"]
-  R -->|"comprises"| P1["updateOrder handler — appends order_updated for the total change"]
-```
+![Order Service — command side](../diagrams/d2/decomp/ch22-0.png)
 
 ### Event store — the write model
 
 _Role: event store_
 
-```mermaid
-flowchart TD
-  R["Event store — the write model"]
-  R -->|"comprises"| P0["EventStoreDB 24 @ orders-events-1 — append-only source of truth"]
-  R -->|"comprises"| P1["publishes each event to the broker BRK"]
-```
+![Event store — the write model](../diagrams/d2/decomp/ch22-1.png)
 
 ### Order History Service — query side
 
 _Role: projections + query side_
 
-```mermaid
-flowchart TD
-  R["Order History Service — query side"]
-  R -->|"comprises"| P0["projector — folds events into the view model"]
-  R -->|"comprises"| P1["MongoDB 7 @ orders-view-1 — serves the history queries"]
-```
+![Order History Service — query side](../diagrams/d2/decomp/ch22-2.png)
 
 ```java
 // SYSTEM DESIGN — CQRS: command side -> event store -> projections -> query side, one order updated end to end

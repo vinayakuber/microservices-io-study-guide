@@ -89,46 +89,25 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.5 · microservices.
 
 _Role: presentation tier_
 
-```mermaid
-flowchart TD
-  R["presentation tier"]
-  R -->|"comprises"| P0["receives the HTTP request POST /orders"]
-  R -->|"comprises"| P1["maps it to OrderService.createOrder()"]
-```
+![presentation tier](../diagrams/d2/decomp/ch20-0.png)
 
 ### OrderService — the transaction script
 
 _Role: transaction script (service class)_
 
-```mermaid
-flowchart TD
-  R["OrderService — the transaction script"]
-  R -->|"comprises"| P0["createOrder() — one procedural method per request type"]
-  R -->|"comprises"| P1["reviseOrder()/cancelOrder() — each runs its whole transaction"]
-  R -->|"comprises"| P2["mutates a pure-data Order object step by step"]
-```
+![OrderService — the transaction script](../diagrams/d2/decomp/ch20-1.png)
 
 ### OrderDao — the DAO
 
 _Role: DAO_
 
-```mermaid
-flowchart TD
-  R["OrderDao — the DAO"]
-  R -->|"comprises"| P0["save(Order) — writes the row"]
-  R -->|"comprises"| P1["findOrderById() — reads the row back"]
-```
+![OrderDao — the DAO](../diagrams/d2/decomp/ch20-2.png)
 
 ### PostgreSQL 16 @ orders-db-1 — the database
 
 _Role: database_
 
-```mermaid
-flowchart TD
-  R["PostgreSQL 16 @ orders-db-1 — the database"]
-  R -->|"comprises"| P0["holds the Order rows"]
-  R -->|"comprises"| P1["written by save(Order), read by findOrderById()"]
-```
+![PostgreSQL 16 @ orders-db-1 — the database](../diagrams/d2/decomp/ch20-3.png)
 
 ```java
 // SYSTEM DESIGN — transaction script as a pipeline: presentation tier -> transaction script (OrderService) -> DAO (OrderDao) -> database (PostgreSQL 16 @ orders-db-1)

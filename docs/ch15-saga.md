@@ -144,45 +144,25 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.15 (p.114) · micro
 
 _Role: orchestrator_
 
-```mermaid
-flowchart TD
-  R["saga orchestrator — the orchestrator"]
-  R -->|"comprises"| P0["Orders each participant to act"]
-  R -->|"comprises"| P1["Tracks the saga state"]
-  R -->|"comprises"| P2["Triggers compensations on failure"]
-```
+![saga orchestrator — the orchestrator](../diagrams/d2/decomp/ch15-0.png)
 
 ### order service — the participant
 
 _Role: participant service_
 
-```mermaid
-flowchart TD
-  R["order service — the participant"]
-  R -->|"comprises"| P0["Executes its step"]
-  R -->|"comprises"| P1["Publishes its outcome event"]
-```
+![order service — the participant](../diagrams/d2/decomp/ch15-1.png)
 
 ### customer service — the participant
 
 _Role: participant service_
 
-```mermaid
-flowchart TD
-  R["customer service — the participant"]
-  R -->|"comprises"| P0["Reserves credit for the order"]
-  R -->|"comprises"| P1["Publishes CreditReserved"]
-```
+![customer service — the participant](../diagrams/d2/decomp/ch15-2.png)
 
 ### event / message broker (RabbitMQ) — the broker
 
 _Role: broker_
 
-```mermaid
-flowchart TD
-  R["event / message broker (RabbitMQ) — the broker"]
-  R -->|"comprises"| P0["Carries step results back to the orchestrator"]
-```
+![event / message broker (RabbitMQ) — the broker](../diagrams/d2/decomp/ch15-3.png)
 
 ```java
 // SYSTEM DESIGN — saga (orchestrated) as a pipeline: orchestrator -> participant services -> event/message broker (each step executes + records state, compensations on failure)
