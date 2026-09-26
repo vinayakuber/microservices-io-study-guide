@@ -93,7 +93,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 32 (p.377) · micr
 
 **The pipeline:** service → audit log (store) → log aggregator → reader
 
-![system design pipeline](../diagrams/d2/decomp/ch32-0.png)
+<a href="../diagrams/d2/decomp/ch32-0.png"><img src="../diagrams/d2/decomp/ch32-0.png" alt="system design pipeline" width="200"></a>
 
 ### Order Service — the writer
 

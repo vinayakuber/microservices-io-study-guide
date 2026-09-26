@@ -126,7 +126,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 22 · microservice
 
 **The pipeline:** command side → event store → projections → query side
 
-![system design pipeline](../diagrams/d2/decomp/ch22-0.png)
+<a href="../diagrams/d2/decomp/ch22-0.png"><img src="../diagrams/d2/decomp/ch22-0.png" alt="system design pipeline" width="198"></a>
 
 ### Order Service — command side
 

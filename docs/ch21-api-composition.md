@@ -120,7 +120,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 21 · microservice
 
 **The pipeline:** client → API composer → provider services → their databases
 
-![system design pipeline](../diagrams/d2/decomp/ch21-0.png)
+<a href="../diagrams/d2/decomp/ch21-0.png"><img src="../diagrams/d2/decomp/ch21-0.png" alt="system design pipeline" width="217"></a>
 
 ### API Composer
 

@@ -130,7 +130,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 3 · microservices
 
 **The pipeline:** business capability → service → autonomous team
 
-![system design pipeline](../diagrams/d2/decomp/ch03-0.png)
+<a href="../diagrams/d2/decomp/ch03-0.png"><img src="../diagrams/d2/decomp/ch03-0.png" alt="system design pipeline" width="231"></a>
 
 ### a business capability — e.g. product catalog
 

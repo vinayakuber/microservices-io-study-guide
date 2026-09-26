@@ -117,7 +117,7 @@ _Also known as: Chris Richardson · Microservice Patterns · microservices.io /p
 
 **The pipeline:** command → event store (append) → projector/event handler → read model → query
 
-![system design pipeline](../diagrams/d2/decomp/ch19-0.png)
+<a href="../diagrams/d2/decomp/ch19-0.png"><img src="../diagrams/d2/decomp/ch19-0.png" alt="system design pipeline" width="266"></a>
 
 ### Order Service command side — appends events
 

@@ -118,7 +118,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 24 · microservice
 
 **The pipeline:** client → per-client gateway → upstream services
 
-![system design pipeline](../diagrams/d2/decomp/ch24-0.png)
+<a href="../diagrams/d2/decomp/ch24-0.png"><img src="../diagrams/d2/decomp/ch24-0.png" alt="system design pipeline" width="229"></a>
 
 ### Clients — two device shapes
 

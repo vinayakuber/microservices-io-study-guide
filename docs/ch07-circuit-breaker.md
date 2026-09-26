@@ -122,7 +122,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 7 · microservices
 
 **The pipeline:** caller → breaker proxy → downstream service
 
-![system design pipeline](../diagrams/d2/decomp/ch07-0.png)
+<a href="../diagrams/d2/decomp/ch07-0.png"><img src="../diagrams/d2/decomp/ch07-0.png" alt="system design pipeline" width="239"></a>
 
 ### the caller
 

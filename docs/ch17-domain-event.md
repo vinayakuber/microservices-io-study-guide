@@ -93,7 +93,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.17 (p.160) · micro
 
 **The pipeline:** aggregate (publisher) → event broker (transport) → subscriber/consumer
 
-![system design pipeline](../diagrams/d2/decomp/ch17-0.png)
+<a href="../diagrams/d2/decomp/ch17-0.png"><img src="../diagrams/d2/decomp/ch17-0.png" alt="system design pipeline" width="246"></a>
 
 ### Order aggregate (in Order Service) — the publisher
 

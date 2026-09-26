@@ -127,7 +127,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 6 · microservices
 
 **The pipeline:** caller → client stub/proxy → transport (HTTP) → server skeleton → business logic → reply
 
-![system design pipeline](../diagrams/d2/decomp/ch06-0.png)
+<a href="../diagrams/d2/decomp/ch06-0.png"><img src="../diagrams/d2/decomp/ch06-0.png" alt="system design pipeline" width="217"></a>
 
 ### the caller — Registration Service
 

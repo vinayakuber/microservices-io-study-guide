@@ -133,7 +133,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 5 · microservices
 
 **The pipeline:** sender/producer → message channel (broker) → receiver/consumer
 
-![system design pipeline](../diagrams/d2/decomp/ch05-0.png)
+<a href="../diagrams/d2/decomp/ch05-0.png"><img src="../diagrams/d2/decomp/ch05-0.png" alt="system design pipeline" width="229"></a>
 
 ### the sender — e.g. Order Service
 

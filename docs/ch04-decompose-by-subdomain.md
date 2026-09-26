@@ -125,7 +125,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 4 · microservices
 
 **The pipeline:** domain → subdomain (core/supporting/generic) → service
 
-![system design pipeline](../diagrams/d2/decomp/ch04-0.png)
+<a href="../diagrams/d2/decomp/ch04-0.png"><img src="../diagrams/d2/decomp/ch04-0.png" alt="system design pipeline" width="259"></a>
 
 ### the domain — the business problem space
 

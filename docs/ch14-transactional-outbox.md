@@ -124,7 +124,7 @@ _Also known as: Application events · Chris Richardson · Microservice Patterns 
 
 **The pipeline:** application tx → outbox table → relay publisher → broker
 
-![system design pipeline](../diagrams/d2/decomp/ch14-0.png)
+<a href="../diagrams/d2/decomp/ch14-0.png"><img src="../diagrams/d2/decomp/ch14-0.png" alt="system design pipeline" width="203"></a>
 
 ### order service (application) — the application
 

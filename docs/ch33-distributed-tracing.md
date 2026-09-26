@@ -141,7 +141,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 33 (p.370) · micr
 
 **The pipeline:** writer → transport → collector → aggregator/store → reader
 
-![system design pipeline](../diagrams/d2/decomp/ch33-0.png)
+<a href="../diagrams/d2/decomp/ch33-0.png"><img src="../diagrams/d2/decomp/ch33-0.png" alt="system design pipeline" width="216"></a>
 
 ### each service process (GW, Order, Kitchen, Payment) — the writer
 

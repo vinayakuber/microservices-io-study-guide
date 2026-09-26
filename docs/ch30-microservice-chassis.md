@@ -125,7 +125,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 30 (p.379) · micr
 
 **The pipeline:** service → chassis framework (libraries) → cross-cutting concerns
 
-![system design pipeline](../diagrams/d2/decomp/ch30-0.png)
+<a href="../diagrams/d2/decomp/ch30-0.png"><img src="../diagrams/d2/decomp/ch30-0.png" alt="system design pipeline" width="256"></a>
 
 ### Order Service — the new service
 

@@ -113,7 +113,7 @@ _Also known as: Chris Richardson · Microservice Patterns p.410 · microservices
 
 **The pipeline:** application container → sidecar container → shared resources
 
-![system design pipeline](../diagrams/d2/decomp/ch42-0.png)
+<a href="../diagrams/d2/decomp/ch42-0.png"><img src="../diagrams/d2/decomp/ch42-0.png" alt="system design pipeline" width="248"></a>
 
 ### application container — the Order Service that owns the business logic
 

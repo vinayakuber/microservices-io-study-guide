@@ -116,7 +116,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 34 · microservice
 
 **The pipeline:** service → exception tracker (collect/dedup/aggregate) → developer reader
 
-![system design pipeline](../diagrams/d2/decomp/ch34-0.png)
+<a href="../diagrams/d2/decomp/ch34-0.png"><img src="../diagrams/d2/decomp/ch34-0.png" alt="system design pipeline" width="262"></a>
 
 ### Order Service — the thrower
 

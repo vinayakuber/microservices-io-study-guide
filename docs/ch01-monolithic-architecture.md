@@ -138,7 +138,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 1 · microservices
 
 **The pipeline:** client → monolithic application (presentation → business logic → data access) → single relational database
 
-![system design pipeline](../diagrams/d2/decomp/ch01-0.png)
+<a href="../diagrams/d2/decomp/ch01-0.png"><img src="../diagrams/d2/decomp/ch01-0.png" alt="system design pipeline" width="392"></a>
 
 ### the monolith — one deployable process holding every subdomain
 

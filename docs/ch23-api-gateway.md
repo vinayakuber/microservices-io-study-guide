@@ -114,7 +114,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 23 · microservice
 
 **The pipeline:** client → gateway → upstream services
 
-![system design pipeline](../diagrams/d2/decomp/ch23-0.png)
+<a href="../diagrams/d2/decomp/ch23-0.png"><img src="../diagrams/d2/decomp/ch23-0.png" alt="system design pipeline" width="224"></a>
 
 ### Clients — the callers
 

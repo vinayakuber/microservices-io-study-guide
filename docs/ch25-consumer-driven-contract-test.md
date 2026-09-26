@@ -122,7 +122,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. · microservices.i
 
 **The pipeline:** consumer → contract/expectation → provider verification → provider
 
-![system design pipeline](../diagrams/d2/decomp/ch25-0.png)
+<a href="../diagrams/d2/decomp/ch25-0.png"><img src="../diagrams/d2/decomp/ch25-0.png" alt="system design pipeline" width="246"></a>
 
 ### API Gateway — the consumer
 

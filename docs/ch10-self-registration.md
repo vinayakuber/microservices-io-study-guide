@@ -98,7 +98,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 10 · microservice
 
 **The pipeline:** service instance → self-registrar → service registry
 
-![system design pipeline](../diagrams/d2/decomp/ch10-0.png)
+<a href="../diagrams/d2/decomp/ch10-0.png"><img src="../diagrams/d2/decomp/ch10-0.png" alt="system design pipeline" width="209"></a>
 
 ### order-service instance — the service instance
 

@@ -113,7 +113,7 @@ _Also known as: Chris Richardson · Microservice Patterns p.387 · microservices
 
 **The pipeline:** build pipeline → package → machine (runtime) → JVM process
 
-![system design pipeline](../diagrams/d2/decomp/ch39-0.png)
+<a href="../diagrams/d2/decomp/ch39-0.png"><img src="../diagrams/d2/decomp/ch39-0.png" alt="system design pipeline" width="193"></a>
 
 ### Deployment pipeline — the builder
 

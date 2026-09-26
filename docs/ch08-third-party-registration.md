@@ -101,7 +101,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 8 · microservices
 
 **The pipeline:** service instance → third-party registrar → service registry
 
-![system design pipeline](../diagrams/d2/decomp/ch08-0.png)
+<a href="../diagrams/d2/decomp/ch08-0.png"><img src="../diagrams/d2/decomp/ch08-0.png" alt="system design pipeline" width="240"></a>
 
 ### the service instance
 

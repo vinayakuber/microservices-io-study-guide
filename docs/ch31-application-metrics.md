@@ -91,7 +91,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 31 (p.373) · micr
 
 **The pipeline:** writer (instrumented service) → transport (push/pull) → collector (metrics service) → aggregator (store/registry) → reader (dashboard)
 
-![system design pipeline](../diagrams/d2/decomp/ch31-0.png)
+<a href="../diagrams/d2/decomp/ch31-0.png"><img src="../diagrams/d2/decomp/ch31-0.png" alt="system design pipeline" width="237"></a>
 
 ### Order Service — the writer
 

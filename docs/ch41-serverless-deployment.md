@@ -114,7 +114,7 @@ _Also known as: Chris Richardson · Microservice Patterns p.416 · microservices
 
 **The pipeline:** client request → API gateway → function runtime → function
 
-![system design pipeline](../diagrams/d2/decomp/ch41-0.png)
+<a href="../diagrams/d2/decomp/ch41-0.png"><img src="../diagrams/d2/decomp/ch41-0.png" alt="system design pipeline" width="216"></a>
 
 ### client — the HTTP caller that sends the request
 

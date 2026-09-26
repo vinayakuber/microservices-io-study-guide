@@ -140,7 +140,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.15 (p.114) · micro
 
 **The pipeline:** orchestrator → participant services → event/message broker
 
-![system design pipeline](../diagrams/d2/decomp/ch15-0.png)
+<a href="../diagrams/d2/decomp/ch15-0.png"><img src="../diagrams/d2/decomp/ch15-0.png" alt="system design pipeline" width="254"></a>
 
 ### saga orchestrator — the orchestrator
 

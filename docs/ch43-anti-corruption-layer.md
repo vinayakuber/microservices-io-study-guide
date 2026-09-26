@@ -90,7 +90,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 43 · microservice
 
 **The pipeline:** subsystem → ACL (adapter + translator) → legacy monolith
 
-![system design pipeline](../diagrams/d2/decomp/ch43-0.png)
+<a href="../diagrams/d2/decomp/ch43-0.png"><img src="../diagrams/d2/decomp/ch43-0.png" alt="system design pipeline" width="229"></a>
 
 ### new Customer service — the subsystem that keeps its own clean model
 

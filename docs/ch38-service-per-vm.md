@@ -114,7 +114,7 @@ _Also known as: Chris Richardson · Microservice Patterns p.390 · microservices
 
 **The pipeline:** build pipeline → image (AMI) → IaaS → VM instances
 
-![system design pipeline](../diagrams/d2/decomp/ch38-0.png)
+<a href="../diagrams/d2/decomp/ch38-0.png"><img src="../diagrams/d2/decomp/ch38-0.png" alt="system design pipeline" width="193"></a>
 
 ### Build pipeline — the baker
 

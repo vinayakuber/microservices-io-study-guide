@@ -94,7 +94,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 28 · microservice
 
 **The pipeline:** client → identity provider (token issuance) → API gateway (validation) → service
 
-![system design pipeline](../diagrams/d2/decomp/ch28-0.png)
+<a href="../diagrams/d2/decomp/ch28-0.png"><img src="../diagrams/d2/decomp/ch28-0.png" alt="system design pipeline" width="216"></a>
 
 ### identity provider — the token issuer
 

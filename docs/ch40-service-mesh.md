@@ -114,7 +114,7 @@ _Also known as: Chris Richardson · Microservice Patterns p.380 · microservices
 
 **The pipeline:** service → sidecar proxy (data plane) → control plane
 
-![system design pipeline](../diagrams/d2/decomp/ch40-0.png)
+<a href="../diagrams/d2/decomp/ch40-0.png"><img src="../diagrams/d2/decomp/ch40-0.png" alt="system design pipeline" width="192"></a>
 
 ### Order Service — the business service whose traffic the mesh mediates
 

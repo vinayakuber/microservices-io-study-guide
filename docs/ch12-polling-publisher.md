@@ -97,7 +97,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.12 · microservices
 
 **The pipeline:** source database → polling publisher (relay) → message broker → subscriber
 
-![system design pipeline](../diagrams/d2/decomp/ch12-0.png)
+<a href="../diagrams/d2/decomp/ch12-0.png"><img src="../diagrams/d2/decomp/ch12-0.png" alt="system design pipeline" width="216"></a>
 
 ### source database (outbox table) — the source database
 

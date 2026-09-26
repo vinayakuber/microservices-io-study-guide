@@ -119,7 +119,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.5 · microservices.
 
 **The pipeline:** client → domain service → entities/value objects → repository → database
 
-![system design pipeline](../diagrams/d2/decomp/ch18-0.png)
+<a href="../diagrams/d2/decomp/ch18-0.png"><img src="../diagrams/d2/decomp/ch18-0.png" alt="system design pipeline" width="248"></a>
 
 ### OrderService — the domain service
 

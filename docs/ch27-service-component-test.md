@@ -124,7 +124,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. · microservices.i
 
 **The pipeline:** test harness → service under test (in-process) → stubbed dependencies
 
-![system design pipeline](../diagrams/d2/decomp/ch27-0.png)
+<a href="../diagrams/d2/decomp/ch27-0.png"><img src="../diagrams/d2/decomp/ch27-0.png" alt="system design pipeline" width="255"></a>
 
 ### test harness
 

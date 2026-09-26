@@ -85,7 +85,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.5 · microservices.
 
 **The pipeline:** presentation tier → transaction script (OrderService) → DAO (OrderDao) → database
 
-![system design pipeline](../diagrams/d2/decomp/ch20-0.png)
+<a href="../diagrams/d2/decomp/ch20-0.png"><img src="../diagrams/d2/decomp/ch20-0.png" alt="system design pipeline" width="221"></a>
 
 ### presentation tier
 

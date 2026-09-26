@@ -119,7 +119,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. · microservices.i
 
 **The pipeline:** consumer → mock provider (contract) → provider service
 
-![system design pipeline](../diagrams/d2/decomp/ch26-0.png)
+<a href="../diagrams/d2/decomp/ch26-0.png"><img src="../diagrams/d2/decomp/ch26-0.png" alt="system design pipeline" width="210"></a>
 
 ### OrderServiceProxy — the consumer under test
 

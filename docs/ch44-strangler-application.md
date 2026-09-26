@@ -95,7 +95,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 44 · microservice
 
 **The pipeline:** legacy monolith → strangler façade/router → new microservices
 
-![system design pipeline](../diagrams/d2/decomp/ch44-0.png)
+<a href="../diagrams/d2/decomp/ch44-0.png"><img src="../diagrams/d2/decomp/ch44-0.png" alt="system design pipeline" width="262"></a>
 
 ### legacy monolith — the running system that still serves unmigrated paths
 

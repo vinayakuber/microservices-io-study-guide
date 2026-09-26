@@ -109,7 +109,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 35 · microservice
 
 **The pipeline:** service instance → /health endpoint → health-check client → routing/alert
 
-![system design pipeline](../diagrams/d2/decomp/ch35-0.png)
+<a href="../diagrams/d2/decomp/ch35-0.png"><img src="../diagrams/d2/decomp/ch35-0.png" alt="system design pipeline" width="231"></a>
 
 ### Order Service — the instance under check
 

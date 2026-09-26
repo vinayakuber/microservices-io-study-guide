@@ -105,7 +105,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.13 · microservices
 
 **The pipeline:** database transaction log → log tailer/miner → message broker → subscriber
 
-![system design pipeline](../diagrams/d2/decomp/ch13-0.png)
+<a href="../diagrams/d2/decomp/ch13-0.png"><img src="../diagrams/d2/decomp/ch13-0.png" alt="system design pipeline" width="271"></a>
 
 ### source database (transaction log) — the source database
 

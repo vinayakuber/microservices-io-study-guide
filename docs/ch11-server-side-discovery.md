@@ -127,7 +127,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 11 · microservice
 
 **The pipeline:** client → router / load balancer → service registry → service instances
 
-![system design pipeline](../diagrams/d2/decomp/ch11-0.png)
+<a href="../diagrams/d2/decomp/ch11-0.png"><img src="../diagrams/d2/decomp/ch11-0.png" alt="system design pipeline" width="249"></a>
 
 ### client — calls only the router
 
