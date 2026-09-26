@@ -90,23 +90,28 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 43 · microservice
 
 **The pipeline:** subsystem → ACL (adapter + translator) → legacy monolith
 
+![system design pipeline](../diagrams/d2/decomp/ch43-0.png)
+
 ### new Customer service — the subsystem that keeps its own clean model
 
 _Role: subsystem_
 
-![new Customer service — the subsystem that keeps its own clean model](../diagrams/d2/decomp/ch43-0.png)
+- Domain model — id, dateOfBirth, status
+- Consumer — reads only what the ACL hands it
 
 ### anti-corruption layer — the translation boundary
 
 _Role: ACL (adapter + translator)_
 
-![anti-corruption layer — the translation boundary](../diagrams/d2/decomp/ch43-1.png)
+- Adapter — calls the legacy API / table
+- Translator — maps legacy names and codes to the modern model
 
 ### legacy monolith — the old system being shielded
 
 _Role: legacy monolith_
 
-![legacy monolith — the old system being shielded](../diagrams/d2/decomp/ch43-2.png)
+- customer table — cust_id, cust_dob, status_cd on PostgreSQL 14 @ legacy-db-1
+- Legacy codes — status_cd "A" for active
 
 ```java
 // SYSTEM DESIGN — anti-corruption layer: new subsystem -> ACL (adapter + translator) -> legacy monolith

@@ -1,22 +1,22 @@
 direction: down
 
-R: {
+S0: {
   label: |md
-    **the service instance**
+    **service instance**
   |
   shape: rectangle
   style: {
     fill: "#238636"
     stroke: "#2ea043"
     font-color: "#FFFFFF"
-    border-radius: 8
+    border-radius: 6
     font-size: 16
   }
 }
 
-P0: {
+S1: {
   label: |md
-    starts and stops the app
+    **third-party registrar**
   |
   shape: rectangle
   style: {
@@ -24,23 +24,23 @@ P0: {
     stroke: "#388bfd"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-P1: {
+S2: {
   label: |md
-    never talks to the registry itself
+    **service registry**
   |
   shape: rectangle
   style: {
-    fill: "#1f6feb"
-    stroke: "#388bfd"
+    fill: "#8250df"
+    stroke: "#8250df"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-R -> P0: "1. comprises"
-R -> P1: "2. comprises"
+S0 -> S1: "1. service instance"
+S1 -> S2: "2. third-party registrar"

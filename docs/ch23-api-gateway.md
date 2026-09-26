@@ -114,23 +114,30 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 23 · microservice
 
 **The pipeline:** client → gateway → upstream services
 
+![system design pipeline](../diagrams/d2/decomp/ch23-0.png)
+
 ### Clients — the callers
 
 _Role: client_
 
-![Clients — the callers](../diagrams/d2/decomp/ch23-0.png)
+- CLI — a command-line client
+- MOB — the mobile client
+- WEB — the web client
 
 ### API Gateway — the single entry point
 
 _Role: gateway_
 
-![API Gateway — the single entry point](../diagrams/d2/decomp/ch23-1.png)
+- request routing — looks up the route table
+- API composition — assembles product + price + reviews
 
 ### Upstream services — the backends
 
 _Role: upstream services_
 
-![Upstream services — the backends](../diagrams/d2/decomp/ch23-2.png)
+- PROD — product service
+- PRI — pricing service
+- REV — reviews service
 
 ```java
 // SYSTEM DESIGN — API gateway: client -> gateway -> upstream services, one product request composed end to end

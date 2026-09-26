@@ -125,23 +125,28 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 30 (p.379) · micr
 
 **The pipeline:** service → chassis framework (libraries) → cross-cutting concerns
 
+![system design pipeline](../diagrams/d2/decomp/ch30-0.png)
+
 ### Order Service — the new service
 
 _Role: service_
 
-![Order Service — the new service](../diagrams/d2/decomp/ch30-0.png)
+- adopts the chassis via a Gradle plugin
+- inherits the cross-cutting wiring
 
 ### chassis framework 2.4.0 — the shared libraries
 
 _Role: chassis framework (libraries)_
 
-![chassis framework 2.4.0 — the shared libraries](../diagrams/d2/decomp/ch30-1.png)
+- externalized configuration + health-check URL
+- logging, metrics (counter: orders_created), and tracing
 
 ### the cross-cutting concerns
 
 _Role: cross-cutting concerns_
 
-![the cross-cutting concerns](../diagrams/d2/decomp/ch30-2.png)
+- security via an Access Token
+- service registration/discovery + circuit breakers
 
 ```java
 // SYSTEM DESIGN — microservice chassis: service (Order Service) -> chassis framework (shared libraries) -> cross-cutting concerns (security, config, logging, health, metrics, tracing)

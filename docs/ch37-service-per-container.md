@@ -114,23 +114,28 @@ _Also known as: Chris Richardson · Microservice Patterns p.393 · microservices
 
 **The pipeline:** build pipeline → registry → cluster → container
 
+![system design pipeline](../diagrams/d2/decomp/ch37-0.png)
+
 ### Build pipeline — the builder
 
 _Role: build pipeline_
 
-![Build pipeline — the builder](../diagrams/d2/decomp/ch37-0.png)
+- compiles the code into a container image
+- tags the image rsvc:1.4.2 and pushes it
 
 ### Container registry — the image repository
 
 _Role: registry_
 
-![Container registry — the image repository](../diagrams/d2/decomp/ch37-1.png)
+- holds the built images
+- serves rsvc:1.4.2 back to the cluster
 
 ### Kubernetes cluster — the scheduler
 
 _Role: cluster_
 
-![Kubernetes cluster — the scheduler](../diagrams/d2/decomp/ch37-2.png)
+- pulls the image and schedules containers
+- scales replicas from 2 to 4, cpu cap 0.5
 
 ```java
 // SYSTEM DESIGN — service per container: build pipeline -> registry -> cluster -> container

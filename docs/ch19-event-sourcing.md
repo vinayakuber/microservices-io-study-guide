@@ -117,29 +117,36 @@ _Also known as: Chris Richardson · Microservice Patterns · microservices.io /p
 
 **The pipeline:** command → event store (append) → projector/event handler → read model → query
 
+![system design pipeline](../diagrams/d2/decomp/ch19-0.png)
+
 ### Order Service command side — appends events
 
 _Role: command side / event store_
 
-![Order Service command side — appends events](../diagrams/d2/decomp/ch19-0.png)
+- append — one atomic write per state change
+- event store — EventStoreDB 24 @ orders-events-1
+- delivers each saved event to subscribers like a broker
 
 ### projector / event handler
 
 _Role: projector/event handler_
 
-![projector / event handler](../diagrams/d2/decomp/ch19-1.png)
+- consume — receives each saved event
+- fold — apply() of each event into the read model
 
 ### read model database
 
 _Role: read model DB_
 
-![read model database](../diagrams/d2/decomp/ch19-2.png)
+- PostgreSQL 16 @ orders-view-1
+- holds the precomputed current state the projector folded
 
 ### query side
 
 _Role: query side_
 
-![query side](../diagrams/d2/decomp/ch19-3.png)
+- reads the current state directly
+- no replay at query time
 
 ```java
 // SYSTEM DESIGN — event sourcing as a pipeline: command -> event store (append) -> projector/event handler -> read model -> query

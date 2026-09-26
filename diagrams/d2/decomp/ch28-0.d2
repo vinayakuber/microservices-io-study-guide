@@ -1,22 +1,24 @@
 direction: down
 
-R: {
+S0: {
   label: |md
-    **identity provider — the token issuer**
+    **client**
   |
   shape: rectangle
   style: {
     fill: "#238636"
     stroke: "#2ea043"
     font-color: "#FFFFFF"
-    border-radius: 8
+    border-radius: 6
     font-size: 16
   }
 }
 
-P0: {
+S1: {
   label: |md
-    authenticates the requestor (alice)
+    **identity provider**
+
+    token issuance
   |
   shape: rectangle
   style: {
@@ -24,13 +26,15 @@ P0: {
     stroke: "#388bfd"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-P1: {
+S2: {
   label: |md
-    mints the JWT "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"
+    **API gateway**
+
+    validation
   |
   shape: rectangle
   style: {
@@ -38,9 +42,24 @@ P1: {
     stroke: "#388bfd"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-R -> P0: "1. comprises"
-R -> P1: "2. comprises"
+S3: {
+  label: |md
+    **service**
+  |
+  shape: rectangle
+  style: {
+    fill: "#8250df"
+    stroke: "#8250df"
+    font-color: "#FFFFFF"
+    border-radius: 6
+    font-size: 16
+  }
+}
+
+S0 -> S1: "1. client"
+S1 -> S2: "2. token issuance"
+S2 -> S3: "3. validation"

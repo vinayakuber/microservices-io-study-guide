@@ -93,23 +93,30 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.17 (p.160) · micro
 
 **The pipeline:** aggregate (publisher) → event broker (transport) → subscriber/consumer
 
+![system design pipeline](../diagrams/d2/decomp/ch17-0.png)
+
 ### Order aggregate (in Order Service) — the publisher
 
 _Role: aggregate/publisher_
 
-![Order aggregate (in Order Service) — the publisher](../diagrams/d2/decomp/ch17-0.png)
+- change state — flips order state "NEW" -> "PLACED"
+- emit DomainEvent — produces "OrderPlaced" { order_id:"PO-2001" }
+- Transactional Outbox — writes the event row in the same DB transaction
+- Relay — polls the outbox after commit and publishes to the broker
 
 ### message broker — the transport
 
 _Role: broker/transport_
 
-![message broker — the transport](../diagrams/d2/decomp/ch17-1.png)
+- carries "OrderPlaced" from the publisher to every subscriber
+- decouples the aggregate from the consumers
 
 ### CQRS view updater — the subscriber/consumer
 
 _Role: subscriber/consumer_
 
-![CQRS view updater — the subscriber/consumer](../diagrams/d2/decomp/ch17-2.png)
+- consume — receives "OrderPlaced" off the broker
+- react — updates its read model order_count 0 -> 1
 
 ```java
 // SYSTEM DESIGN — domain event as a pipeline: aggregate (publisher) -> event broker (transport) -> subscriber (consumer)

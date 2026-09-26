@@ -1,22 +1,22 @@
 direction: down
 
-R: {
+S0: {
   label: |md
-    **OrderService — the domain service**
+    **client**
   |
   shape: rectangle
   style: {
     fill: "#238636"
     stroke: "#2ea043"
     font-color: "#FFFFFF"
-    border-radius: 8
+    border-radius: 6
     font-size: 16
   }
 }
 
-P0: {
+S1: {
   label: |md
-    createOrder() — delegates to the Order.create() factory
+    **domain service**
   |
   shape: rectangle
   style: {
@@ -24,13 +24,13 @@ P0: {
     stroke: "#388bfd"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-P1: {
+S2: {
   label: |md
-    reviseOrder()/cancelOrder() — routes commands to the aggregate
+    **entities/value objects**
   |
   shape: rectangle
   style: {
@@ -38,13 +38,13 @@ P1: {
     stroke: "#388bfd"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-P2: {
+S3: {
   label: |md
-    holds no business state (behavior only)
+    **repository**
   |
   shape: rectangle
   style: {
@@ -52,10 +52,25 @@ P2: {
     stroke: "#388bfd"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-R -> P0: "1. comprises"
-R -> P1: "2. comprises"
-R -> P2: "3. comprises"
+S4: {
+  label: |md
+    **database**
+  |
+  shape: rectangle
+  style: {
+    fill: "#8250df"
+    stroke: "#8250df"
+    font-color: "#FFFFFF"
+    border-radius: 6
+    font-size: 16
+  }
+}
+
+S0 -> S1: "1. client"
+S1 -> S2: "2. domain service"
+S2 -> S3: "3. entities/value objects"
+S3 -> S4: "4. repository"

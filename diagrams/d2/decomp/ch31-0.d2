@@ -1,22 +1,26 @@
 direction: down
 
-R: {
+S0: {
   label: |md
-    **Order Service — the writer**
+    **writer**
+
+    instrumented service
   |
   shape: rectangle
   style: {
     fill: "#238636"
     stroke: "#2ea043"
     font-color: "#FFFFFF"
-    border-radius: 8
+    border-radius: 6
     font-size: 16
   }
 }
 
-P0: {
+S1: {
   label: |md
-    counter increments on create\_order completion
+    **transport**
+
+    push/pull
   |
   shape: rectangle
   style: {
@@ -24,13 +28,15 @@ P0: {
     stroke: "#388bfd"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-P1: {
+S2: {
   label: |md
-    histogram observes each request duration
+    **collector**
+
+    metrics service
   |
   shape: rectangle
   style: {
@@ -38,9 +44,43 @@ P1: {
     stroke: "#388bfd"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-R -> P0: "1. comprises"
-R -> P1: "2. comprises"
+S3: {
+  label: |md
+    **aggregator**
+
+    store/registry
+  |
+  shape: rectangle
+  style: {
+    fill: "#1f6feb"
+    stroke: "#388bfd"
+    font-color: "#FFFFFF"
+    border-radius: 6
+    font-size: 16
+  }
+}
+
+S4: {
+  label: |md
+    **reader**
+
+    dashboard
+  |
+  shape: rectangle
+  style: {
+    fill: "#8250df"
+    stroke: "#8250df"
+    font-color: "#FFFFFF"
+    border-radius: 6
+    font-size: 16
+  }
+}
+
+S0 -> S1: "1. instrumented service"
+S1 -> S2: "2. push/pull"
+S2 -> S3: "3. metrics service"
+S3 -> S4: "4. store/registry"

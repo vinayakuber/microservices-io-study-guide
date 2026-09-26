@@ -113,23 +113,28 @@ _Also known as: Chris Richardson · Microservice Patterns p.387 · microservices
 
 **The pipeline:** build pipeline → package → machine (runtime) → JVM process
 
+![system design pipeline](../diagrams/d2/decomp/ch39-0.png)
+
 ### Deployment pipeline — the builder
 
 _Role: build pipeline_
 
-![Deployment pipeline — the builder](../diagrams/d2/decomp/ch39-0.png)
+- compiles the service into one runnable JAR
+- produces restaurant-service-3.1.0.jar
 
 ### Machine — the runtime host
 
 _Role: machine (runtime)_
 
-![Machine — the runtime host](../diagrams/d2/decomp/ch39-1.png)
+- installs JDK 17 and Tomcat 10
+- boots the packaged service
 
 ### JVM process — the running service
 
 _Role: JVM process_
 
-![JVM process — the running service](../diagrams/d2/decomp/ch39-2.png)
+- loads the JAR and serves traffic
+- runs as jvm-8121
 
 ```java
 // SYSTEM DESIGN — language-specific packaging: build pipeline -> package -> machine (runtime) -> JVM process

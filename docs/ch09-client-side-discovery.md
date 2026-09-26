@@ -132,23 +132,29 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 9 · microservices
 
 **The pipeline:** client → service registry → service instances (client load-balances)
 
+![system design pipeline](../diagrams/d2/decomp/ch09-0.png)
+
 ### order-service client — the client
 
 _Role: client_
 
-![order-service client — the client](../diagrams/d2/decomp/ch09-0.png)
+- Queries the registry for a service name
+- Selects one instance from the returned set
+- Load-balances across the instances
 
 ### service registry (Eureka) — the store of locations
 
 _Role: service registry_
 
-![service registry (Eureka) — the store of locations](../diagrams/d2/decomp/ch09-1.png)
+- Keeps the name -> instances map
+- Returns instance locations on query
 
 ### order-service instances — the targets
 
 _Role: service instances_
 
-![order-service instances — the targets](../diagrams/d2/decomp/ch09-2.png)
+- Self-register on startup
+- Serve the direct request
 
 ```java
 // SYSTEM DESIGN — client-side discovery as a pipeline: client -> service registry -> service instances (the client load-balances and calls one instance directly, no router)

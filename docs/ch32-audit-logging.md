@@ -93,29 +93,35 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 32 (p.377) · micr
 
 **The pipeline:** service → audit log (store) → log aggregator → reader
 
+![system design pipeline](../diagrams/d2/decomp/ch32-0.png)
+
 ### Order Service — the writer
 
 _Role: service (business op + audit record)_
 
-![Order Service — the writer](../diagrams/d2/decomp/ch32-0.png)
+- performs the business op (view/create/pay order)
+- writes one audit row per action
 
 ### audit log store
 
 _Role: audit log (store)_
 
-![audit log store](../diagrams/d2/decomp/ch32-1.png)
+- PostgreSQL 16 @ audit-db-1
+- holds rows (id, user, action, target, at)
 
 ### log aggregator
 
 _Role: log aggregator_
 
-![log aggregator](../diagrams/d2/decomp/ch32-2.png)
+- collects audit rows across services
+- indexes them for query
 
 ### reader (auditor queries)
 
 _Role: reader_
 
-![reader (auditor queries)](../diagrams/d2/decomp/ch32-3.png)
+- support/compliance/security query the log
+- reconstructs what a user did
 
 ```java
 // SYSTEM DESIGN — audit logging pipeline: service (Order Service, business op + audit record) -> audit log (PostgreSQL 16 @ audit-db-1) -> log aggregator -> reader (support/compliance/security)

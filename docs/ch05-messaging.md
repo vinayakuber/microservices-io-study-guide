@@ -133,23 +133,28 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 5 · microservices
 
 **The pipeline:** sender/producer → message channel (broker) → receiver/consumer
 
+![system design pipeline](../diagrams/d2/decomp/ch05-0.png)
+
 ### the sender — e.g. Order Service
 
 _Role: writer (producer)_
 
-![the sender — e.g. Order Service](../diagrams/d2/decomp/ch05-0.png)
+- builds the message — OrderCreated(PO-2001)
+- sends it to the channel and returns at once
 
 ### the message channel — the broker
 
 _Role: transport_
 
-![the message channel — the broker](../diagrams/d2/decomp/ch05-1.png)
+- RabbitMQ broker holding the queue
+- buffers messages until the consumer is ready
 
 ### the receiver — e.g. Kitchen consumer
 
 _Role: reader (consumer)_
 
-![the receiver — e.g. Kitchen consumer](../diagrams/d2/decomp/ch05-2.png)
+- subscribes to the channel
+- handles each message — starts cooking
 
 ```java
 // SYSTEM DESIGN — messaging as a pipeline: sender/producer (builds the message, sends it) -> transport (RabbitMQ channel) -> receiver/consumer (subscribes, handles the message)

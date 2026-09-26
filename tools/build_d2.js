@@ -242,42 +242,69 @@ function mermaidToD2(src) {
 
 function indent(s, pad) { return s.split('\n').map(l => pad + l).join('\n'); }
 
-// systemDesign "comprises" tree -> D2 (root box branching to its parts)
-function decompToD2(box, parts) {
+// systemDesign pipeline -> D2 (the full flow: every stage connected, numbered
+// arrows). The pipeline string is the source of truth for stage order; each
+// stage's parenthetical becomes a subtitle, and each arrow is labelled with the
+// source stage's description so the diagram covers the whole system, not just
+// one box "comprising" its parts.
+function splitPipeline(s) {
+  s = String(s || '').replace(/→/g, '->');
+  const out = [];
+  let cur = '', depth = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === '(') depth++;
+    else if (c === ')') depth = Math.max(0, depth - 1);
+    if (c === '-' && s[i + 1] === '>' && depth === 0) { out.push(cur.trim()); cur = ''; i++; continue; }
+    cur += c;
+  }
+  if (cur.trim()) out.push(cur.trim());
+  return out.filter(Boolean);
+}
+
+function stageParts(stage) {
+  const m = String(stage).match(/^(.*?)\s*\((.*)\)$/);
+  if (m) return { name: m[1].trim(), sub: m[2].trim() };
+  return { name: String(stage).trim(), sub: '' };
+}
+
+function pipelineToD2(sd) {
+  const stages = splitPipeline(sd.pipeline);
+  if (!stages.length) return null;
   const lines = ['direction: down', ''];
-  lines.push('R: {');
-  lines.push('  label: |md');
-  lines.push(`    **${mdEsc(ent(box))}**`);
-  lines.push('  |');
-  lines.push('  shape: rectangle');
-  lines.push('  style: {');
-  lines.push('    fill: "#238636"');
-  lines.push('    stroke: "#2ea043"');
-  lines.push('    font-color: "#FFFFFF"');
-  lines.push('    border-radius: 8');
-  lines.push('    font-size: 16');
-  lines.push('  }');
-  lines.push('}');
-  lines.push('');
-  parts.forEach((p, i) => {
-    lines.push(`P${i}: {`);
+  const START = { fill: '#238636', stroke: '#2ea043' };
+  const STEP = { fill: '#1f6feb', stroke: '#388bfd' };
+  const STOP = { fill: '#8250df', stroke: '#8250df' };
+  stages.forEach((stage, i) => {
+    const { name, sub } = stageParts(stage);
+    const style = i === 0 ? START : (i === stages.length - 1 ? STOP : STEP);
+    lines.push(`S${i}: {`);
     lines.push('  label: |md');
-    lines.push(`    ${mdEsc(ent(p))}`);
+    lines.push(`    **${mdEsc(ent(name))}**`);
+    if (sub) {
+      lines.push('');
+      lines.push(`    ${mdEsc(ent(sub))}`);
+    }
     lines.push('  |');
     lines.push('  shape: rectangle');
     lines.push('  style: {');
-    lines.push('    fill: "#1f6feb"');
-    lines.push('    stroke: "#388bfd"');
+    lines.push(`    fill: "${style.fill}"`);
+    lines.push(`    stroke: "${style.stroke}"`);
     lines.push('    font-color: "#FFFFFF"');
     lines.push('    border-radius: 6');
-    lines.push('    font-size: 15');
+    lines.push('    font-size: 16');
     lines.push('  }');
     lines.push('}');
     lines.push('');
   });
-  parts.forEach((p, i) => {
-    lines.push(`R -> P${i}: "${i + 1}. comprises"`);
-  });
+  for (let i = 0; i < stages.length - 1; i++) {
+    const { name, sub } = stageParts(stages[i]);
+    // Use the parenthetical as the label unless it is itself a nested flow
+    // (e.g. "presentation -> business logic -> data access"), where the stage
+    // name reads cleaner on the arrow.
+    const label = (sub && !/->|→/.test(sub)) ? sub : name;
+    lines.push(`S${i} -> S${i + 1}: ${JSON.stringify(`${i + 1}. ${ent(label)}`)}`);
+  }
   return lines.join('\n').replace(/\n{3,}/g, '\n\n') + '\n';
 }
 
@@ -287,7 +314,13 @@ function main() {
   const cardDiagrams = loadCardDiagrams();
   const files = []; // {relDir, name, d2}
 
-  fs.rmSync(D2_ROOT, { recursive: true, force: true });
+  // Regenerate only what is derived from content. decomp/ is rebuilt every run;
+  // card/ is now a committed static source (card-diagrams.json is gone), so it
+  // is cleared only when that JSON is present again.
+  fs.rmSync(path.join(D2_ROOT, 'decomp'), { recursive: true, force: true });
+  if (Object.keys(cardDiagrams).length) {
+    fs.rmSync(path.join(D2_ROOT, 'card'), { recursive: true, force: true });
+  }
 
   for (const ch of CHAPTERS) {
     const num = chSlug(ch.num);
@@ -299,14 +332,11 @@ function main() {
       if (!cardDiagrams[ck]) return;
       files.push({ dir: 'card', name: `${num}-${ci}`, d2: mermaidToD2(cardDiagrams[ck]) });
     });
-    // systemDesign decomposition
+    // systemDesign: one full-pipeline diagram per chapter
     const sd = ch.systemDesign;
     if (sd) {
-      const dec = Array.isArray(sd.decomposition) ? sd.decomposition : [];
-      dec.forEach((d, di) => {
-        if (!d || !Array.isArray(d.parts) || !d.parts.length) return;
-        files.push({ dir: 'decomp', name: `${num}-${di}`, d2: decompToD2(d.box, d.parts) });
-      });
+      const d2 = pipelineToD2(sd);
+      if (d2) files.push({ dir: 'decomp', name: `${num}-0`, d2 });
     }
   }
 

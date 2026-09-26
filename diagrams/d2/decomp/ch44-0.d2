@@ -1,22 +1,22 @@
 direction: down
 
-R: {
+S0: {
   label: |md
-    **legacy monolith — the running system that still serves unmigrated paths**
+    **legacy monolith**
   |
   shape: rectangle
   style: {
     fill: "#238636"
     stroke: "#2ea043"
     font-color: "#FFFFFF"
-    border-radius: 8
+    border-radius: 6
     font-size: 16
   }
 }
 
-P0: {
+S1: {
   label: |md
-    checkout + accounts — features not yet moved
+    **strangler façade/router**
   |
   shape: rectangle
   style: {
@@ -24,23 +24,23 @@ P0: {
     stroke: "#388bfd"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-P1: {
+S2: {
   label: |md
-    Serves — any path the route table still points at it
+    **new microservices**
   |
   shape: rectangle
   style: {
-    fill: "#1f6feb"
-    stroke: "#388bfd"
+    fill: "#8250df"
+    stroke: "#8250df"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-R -> P0: "1. comprises"
-R -> P1: "2. comprises"
+S0 -> S1: "1. legacy monolith"
+S1 -> S2: "2. strangler façade/router"

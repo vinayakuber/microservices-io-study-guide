@@ -118,23 +118,28 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 24 · microservice
 
 **The pipeline:** client → per-client gateway → upstream services
 
+![system design pipeline](../diagrams/d2/decomp/ch24-0.png)
+
 ### Clients — two device shapes
 
 _Role: client_
 
-![Clients — two device shapes](../diagrams/d2/decomp/ch24-0.png)
+- WEB — desktop client needing 5 fields
+- MOB — mobile client needing 2 fields
 
 ### Per-client gateways — the BFFs
 
 _Role: per-client gateway_
 
-![Per-client gateways — the BFFs](../diagrams/d2/decomp/ch24-1.png)
+- GW-W — web gateway, owned by the public API team
+- GW-M — mobile gateway, owned by the mobile team
 
 ### Upstream services + shared library
 
 _Role: upstream services_
 
-![Upstream services + shared library](../diagrams/d2/decomp/ch24-2.png)
+- PROD — product service
+- LIB — shared library with verify_access_token
 
 ```java
 // SYSTEM DESIGN — BFF: client -> per-client gateway -> upstream services, one product fetched for two devices

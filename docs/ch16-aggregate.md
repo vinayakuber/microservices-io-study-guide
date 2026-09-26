@@ -105,29 +105,34 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.16 (p.150) · micro
 
 **The pipeline:** client → aggregate root (domain objects) → repository → database
 
+![system design pipeline](../diagrams/d2/decomp/ch16-0.png)
+
 ### client — calls the aggregate
 
 _Role: client_
 
-![client — calls the aggregate](../diagrams/d2/decomp/ch16-0.png)
+- Sends a command to the aggregate
+- Treats the aggregate as one unit
 
 ### order aggregate root (order + line items) — the aggregate
 
 _Role: aggregate root_
 
-![order aggregate root (order + line items) — the aggregate](../diagrams/d2/decomp/ch16-1.png)
+- Enforces invariants on the order
+- Adds the line item and recomputes the total
 
 ### repository — the repository
 
 _Role: repository_
 
-![repository — the repository](../diagrams/d2/decomp/ch16-2.png)
+- Loads the aggregate
+- Persists the aggregate after the command
 
 ### PostgreSQL 16 @ orders-db-1 — the database
 
 _Role: database_
 
-![PostgreSQL 16 @ orders-db-1 — the database](../diagrams/d2/decomp/ch16-3.png)
+- Stores the aggregate as one consistency boundary
 
 ```java
 // SYSTEM DESIGN — aggregate as a pipeline: client -> aggregate root (domain objects) -> repository -> database (one unit of consistency per command)

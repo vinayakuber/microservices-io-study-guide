@@ -127,29 +127,36 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 11 · microservice
 
 **The pipeline:** client → router / load balancer → service registry → service instances
 
+![system design pipeline](../diagrams/d2/decomp/ch11-0.png)
+
 ### client — calls only the router
 
 _Role: client_
 
-![client — calls only the router](../diagrams/d2/decomp/ch11-0.png)
+- Dials the router at a well-known address
+- Never performs discovery itself
 
 ### router / load balancer — the router
 
 _Role: router / load balancer_
 
-![router / load balancer — the router](../diagrams/d2/decomp/ch11-1.png)
+- Queries the registry for available instances
+- Picks one instance
+- Forwards the request to it
 
 ### service registry (Eureka) — the registry
 
 _Role: registry_
 
-![service registry (Eureka) — the registry](../diagrams/d2/decomp/ch11-2.png)
+- Holds the name -> instances map
+- Returns instance locations on query
 
 ### order-service instances — the instances
 
 _Role: service instances_
 
-![order-service instances — the instances](../diagrams/d2/decomp/ch11-3.png)
+- Self-register on startup
+- Serve the forwarded request
 
 ```java
 // SYSTEM DESIGN — server-side discovery as a pipeline: client -> router/load balancer -> service registry -> service instances (the client never discovers)

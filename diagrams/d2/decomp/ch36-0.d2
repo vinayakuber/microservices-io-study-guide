@@ -1,22 +1,22 @@
 direction: down
 
-R: {
+S0: {
   label: |md
-    **Three services — the writers**
+    **writer**
   |
   shape: rectangle
   style: {
     fill: "#238636"
     stroke: "#2ea043"
     font-color: "#FFFFFF"
-    border-radius: 8
+    border-radius: 6
     font-size: 16
   }
 }
 
-P0: {
+S1: {
   label: |md
-    Order Service — writes a log line tagged REQ-3001
+    **transport**
   |
   shape: rectangle
   style: {
@@ -24,13 +24,13 @@ P0: {
     stroke: "#388bfd"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-P1: {
+S2: {
   label: |md
-    Customer Service and Payment Service — write their own lines for REQ-3001
+    **collector**
   |
   shape: rectangle
   style: {
@@ -38,9 +38,39 @@ P1: {
     stroke: "#388bfd"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-R -> P0: "1. comprises"
-R -> P1: "2. comprises"
+S3: {
+  label: |md
+    **aggregator/store**
+  |
+  shape: rectangle
+  style: {
+    fill: "#1f6feb"
+    stroke: "#388bfd"
+    font-color: "#FFFFFF"
+    border-radius: 6
+    font-size: 16
+  }
+}
+
+S4: {
+  label: |md
+    **reader**
+  |
+  shape: rectangle
+  style: {
+    fill: "#8250df"
+    stroke: "#8250df"
+    font-color: "#FFFFFF"
+    border-radius: 6
+    font-size: 16
+  }
+}
+
+S0 -> S1: "1. writer"
+S1 -> S2: "2. transport"
+S2 -> S3: "3. collector"
+S3 -> S4: "4. aggregator/store"

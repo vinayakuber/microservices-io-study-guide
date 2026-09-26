@@ -141,29 +141,38 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 33 (p.370) · micr
 
 **The pipeline:** writer → transport → collector → aggregator/store → reader
 
+![system design pipeline](../diagrams/d2/decomp/ch33-0.png)
+
 ### each service process (GW, Order, Kitchen, Payment) — the writer
 
 _Role: writer_
 
-![each service process (GW, Order, Kitchen, Payment) — the writer](../diagrams/d2/decomp/ch33-0.png)
+- Tracer — mints trace/span ids, propagates B3/W3C headers
+- Reporter — batches finished spans
+- Sender — transport adapter: HTTP / Kafka / RabbitMQ
 
 ### RabbitMQ broker — the transport
 
 _Role: transport_
 
-![RabbitMQ broker — the transport](../diagrams/d2/decomp/ch33-1.png)
+- queue "zipkin" — the span channel
+- decouples writers from the collector, buffers under load
 
 ### Zipkin server (one central process, NOT per-host) — collector + aggregator + reader
 
 _Role: collector + aggregator/store + reader_
 
-![Zipkin server (one central process, NOT per-host) — collector + aggregator + reader](../diagrams/d2/decomp/ch33-2.png)
+- Collector — ingests spans (HTTP POST /api/v2/spans, or Kafka/RabbitMQ)
+- Storage — MySQL 8 @ zipkin-db-1, Cassandra, or Elasticsearch (the trace store)
+- Query API — REST: fetch a trace by id
+- UI — Zipkin Lens (the timeline browser)
 
 ### operator — the reader
 
 _Role: reader_
 
-![operator — the reader](../diagrams/d2/decomp/ch33-3.png)
+- queries a trace id
+- reads the timeline, finds the slow hop
 
 ```java
 // SYSTEM DESIGN — tracing as a pipeline: writer (in-process Tracer -> Reporter -> Sender) -> transport (RabbitMQ) -> collector (Zipkin collector) -> aggregator (trace store MySQL 8 @ zipkin-db-1) -> reader (Zipkin query UI + operator)

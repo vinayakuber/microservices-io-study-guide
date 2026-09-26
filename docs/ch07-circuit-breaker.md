@@ -122,23 +122,29 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 7 · microservices
 
 **The pipeline:** caller → breaker proxy → downstream service
 
+![system design pipeline](../diagrams/d2/decomp/ch07-0.png)
+
 ### the caller
 
 _Role: caller_
 
-![the caller](../diagrams/d2/decomp/ch07-0.png)
+- makes remote calls through the breaker
+- gets a fail-fast verdict while the breaker is OPEN
 
 ### the breaker proxy
 
 _Role: breaker_
 
-![the breaker proxy](../diagrams/d2/decomp/ch07-1.png)
+- failure counter (trips at threshold 4)
+- timeout timer (250 ms)
+- state machine CLOSED / OPEN / HALF-OPEN
 
 ### the downstream service
 
 _Role: server_
 
-![the downstream service](../diagrams/d2/decomp/ch07-2.png)
+- answers calls while healthy
+- times out when degraded
 
 ```java
 // SYSTEM DESIGN — the circuit breaker as a pipeline: caller -> breaker proxy -> downstream service

@@ -124,23 +124,28 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. · microservices.i
 
 **The pipeline:** test harness → service under test (in-process) → stubbed dependencies
 
+![system design pipeline](../diagrams/d2/decomp/ch27-0.png)
+
 ### test harness
 
 _Role: test harness_
 
-![test harness](../diagrams/d2/decomp/ch27-0.png)
+- drives the service in-process (no network)
+- asserts the response against the double's canned reply
 
 ### Order Service — the service under test
 
 _Role: service under test (in-process)_
 
-![Order Service — the service under test](../diagrams/d2/decomp/ch27-1.png)
+- real wiring: its controller and outbound call run for real
+- in-memory database instead of the production store
 
 ### Kitchen Service double
 
 _Role: stubbed dependency_
 
-![Kitchen Service double](../diagrams/d2/decomp/ch27-2.png)
+- returns the canned ticket "T-88"
+- stands in for the real Kitchen Service
 
 ```java
 // SYSTEM DESIGN — service component test: test harness -> service under test (Order Service, in-process) -> stubbed dependency (Kitchen Service double)

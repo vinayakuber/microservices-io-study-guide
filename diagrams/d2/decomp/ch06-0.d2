@@ -1,22 +1,22 @@
 direction: down
 
-R: {
+S0: {
   label: |md
-    **the caller — Registration Service**
+    **caller**
   |
   shape: rectangle
   style: {
     fill: "#238636"
     stroke: "#2ea043"
     font-color: "#FFFFFF"
-    border-radius: 8
+    border-radius: 6
     font-size: 16
   }
 }
 
-P0: {
+S1: {
   label: |md
-    builds the request { email: "bob@example.com" }
+    **client stub/proxy**
   |
   shape: rectangle
   style: {
@@ -24,13 +24,15 @@ P0: {
     stroke: "#388bfd"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-P1: {
+S2: {
   label: |md
-    waits synchronously for the reply
+    **transport**
+
+    HTTP
   |
   shape: rectangle
   style: {
@@ -38,9 +40,54 @@ P1: {
     stroke: "#388bfd"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-R -> P0: "1. comprises"
-R -> P1: "2. comprises"
+S3: {
+  label: |md
+    **server skeleton**
+  |
+  shape: rectangle
+  style: {
+    fill: "#1f6feb"
+    stroke: "#388bfd"
+    font-color: "#FFFFFF"
+    border-radius: 6
+    font-size: 16
+  }
+}
+
+S4: {
+  label: |md
+    **business logic**
+  |
+  shape: rectangle
+  style: {
+    fill: "#1f6feb"
+    stroke: "#388bfd"
+    font-color: "#FFFFFF"
+    border-radius: 6
+    font-size: 16
+  }
+}
+
+S5: {
+  label: |md
+    **reply**
+  |
+  shape: rectangle
+  style: {
+    fill: "#8250df"
+    stroke: "#8250df"
+    font-color: "#FFFFFF"
+    border-radius: 6
+    font-size: 16
+  }
+}
+
+S0 -> S1: "1. caller"
+S1 -> S2: "2. client stub/proxy"
+S2 -> S3: "3. HTTP"
+S3 -> S4: "4. server skeleton"
+S4 -> S5: "5. business logic"

@@ -114,29 +114,37 @@ _Also known as: Chris Richardson · Microservice Patterns p.416 · microservices
 
 **The pipeline:** client request → API gateway → function runtime → function
 
+![system design pipeline](../diagrams/d2/decomp/ch41-0.png)
+
 ### client — the HTTP caller that sends the request
 
 _Role: client_
 
-![client — the HTTP caller that sends the request](../diagrams/d2/decomp/ch41-0.png)
+- Browser / app — issues GET /restaurants/42
+- Waits — for the HTTP response to come back
 
 ### API gateway — the HTTP entry that maps requests to functions
 
 _Role: gateway_
 
-![API gateway — the HTTP entry that maps requests to functions](../diagrams/d2/decomp/ch41-1.png)
+- Request transform — turns HTTP into an event object
+- Invoke — calls the function with the event
+- Response — builds the HTTP reply from the result
 
 ### function runtime — the serverless infrastructure (AWS Lambda)
 
 _Role: function runtime_
 
-![function runtime — the serverless infrastructure (AWS Lambda)](../diagrams/d2/decomp/ch41-2.png)
+- Load function — unpacks the uploaded ZIP restaurant.zip
+- Cold start — launches instance i-1 when none is idle
+- Scale to zero — frees idle instances when traffic stops
 
 ### the function — the stateless handler that runs the code
 
 _Role: function_
 
-![the function — the stateless handler that runs the code](../diagrams/d2/decomp/ch41-3.png)
+- index.handler — the named entrypoint
+- Stateless — runs only in response to an event
 
 ```java
 // SYSTEM DESIGN — serverless: client request -> API gateway -> function runtime -> function

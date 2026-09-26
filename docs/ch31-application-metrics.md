@@ -91,35 +91,42 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 31 (p.373) · micr
 
 **The pipeline:** writer (instrumented service) → transport (push/pull) → collector (metrics service) → aggregator (store/registry) → reader (dashboard)
 
+![system design pipeline](../diagrams/d2/decomp/ch31-0.png)
+
 ### Order Service — the writer
 
 _Role: writer (instrumented service)_
 
-![Order Service — the writer](../diagrams/d2/decomp/ch31-0.png)
+- counter increments on create_order completion
+- histogram observes each request duration
 
 ### push/pull transport
 
 _Role: transport (push/pull)_
 
-![push/pull transport](../diagrams/d2/decomp/ch31-1.png)
+- push: the service POSTs metrics
+- pull: the metrics service GETs /metrics
 
 ### Prometheus — the collector
 
 _Role: collector (metrics service)_
 
-![Prometheus — the collector](../diagrams/d2/decomp/ch31-2.png)
+- scrapes or receives the metrics
+- provides reporting and alerting
 
 ### time-series registry — the aggregator
 
 _Role: aggregator/store (registry)_
 
-![time-series registry — the aggregator](../diagrams/d2/decomp/ch31-3.png)
+- holds each series keyed by metric name
+- stores orders_created and request_ms
 
 ### dashboard — the reader
 
 _Role: reader (dashboard)_
 
-![dashboard — the reader](../diagrams/d2/decomp/ch31-4.png)
+- queries the stored series
+- renders the counts and latencies
 
 ```java
 // SYSTEM DESIGN — application metrics pipeline: writer (Order Service, instrumented) -> transport (push/pull) -> collector (Prometheus metrics service) -> aggregator (time-series registry) -> reader (dashboard)

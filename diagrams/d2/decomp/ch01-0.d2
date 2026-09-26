@@ -1,22 +1,24 @@
 direction: down
 
-R: {
+S0: {
   label: |md
-    **the monolith — one deployable process holding every subdomain**
+    **client**
   |
   shape: rectangle
   style: {
     fill: "#238636"
     stroke: "#2ea043"
     font-color: "#FFFFFF"
-    border-radius: 8
+    border-radius: 6
     font-size: 16
   }
 }
 
-P0: {
+S1: {
   label: |md
-    presentation tier — receives client requests, returns responses
+    **monolithic application**
+
+    presentation -> business logic -> data access
   |
   shape: rectangle
   style: {
@@ -24,38 +26,23 @@ P0: {
     stroke: "#388bfd"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-P1: {
+S2: {
   label: |md
-    business logic — implements business rules, mutates entities
+    **single relational database**
   |
   shape: rectangle
   style: {
-    fill: "#1f6feb"
-    stroke: "#388bfd"
+    fill: "#8250df"
+    stroke: "#8250df"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-P2: {
-  label: |md
-    data-access layer — reads and writes the single database
-  |
-  shape: rectangle
-  style: {
-    fill: "#1f6feb"
-    stroke: "#388bfd"
-    font-color: "#FFFFFF"
-    border-radius: 6
-    font-size: 15
-  }
-}
-
-R -> P0: "1. comprises"
-R -> P1: "2. comprises"
-R -> P2: "3. comprises"
+S0 -> S1: "1. client"
+S1 -> S2: "2. monolithic application"

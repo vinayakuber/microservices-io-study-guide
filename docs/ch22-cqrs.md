@@ -126,23 +126,28 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 22 · microservice
 
 **The pipeline:** command side → event store → projections → query side
 
+![system design pipeline](../diagrams/d2/decomp/ch22-0.png)
+
 ### Order Service — command side
 
 _Role: command side_
 
-![Order Service — command side](../diagrams/d2/decomp/ch22-0.png)
+- createOrder handler — appends order_created to the event stream
+- updateOrder handler — appends order_updated for the total change
 
 ### Event store — the write model
 
 _Role: event store_
 
-![Event store — the write model](../diagrams/d2/decomp/ch22-1.png)
+- EventStoreDB 24 @ orders-events-1 — append-only source of truth
+- publishes each event to the broker BRK
 
 ### Order History Service — query side
 
 _Role: projections + query side_
 
-![Order History Service — query side](../diagrams/d2/decomp/ch22-2.png)
+- projector — folds events into the view model
+- MongoDB 7 @ orders-view-1 — serves the history queries
 
 ```java
 // SYSTEM DESIGN — CQRS: command side -> event store -> projections -> query side, one order updated end to end

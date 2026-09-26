@@ -1,22 +1,24 @@
 direction: down
 
-R: {
+S0: {
   label: |md
-    **Order Service command side — appends events**
+    **command**
   |
   shape: rectangle
   style: {
     fill: "#238636"
     stroke: "#2ea043"
     font-color: "#FFFFFF"
-    border-radius: 8
+    border-radius: 6
     font-size: 16
   }
 }
 
-P0: {
+S1: {
   label: |md
-    append — one atomic write per state change
+    **event store**
+
+    append
   |
   shape: rectangle
   style: {
@@ -24,13 +26,13 @@ P0: {
     stroke: "#388bfd"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-P1: {
+S2: {
   label: |md
-    event store — EventStoreDB 24 @ orders-events-1
+    **projector/event handler**
   |
   shape: rectangle
   style: {
@@ -38,13 +40,13 @@ P1: {
     stroke: "#388bfd"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-P2: {
+S3: {
   label: |md
-    delivers each saved event to subscribers like a broker
+    **read model**
   |
   shape: rectangle
   style: {
@@ -52,10 +54,25 @@ P2: {
     stroke: "#388bfd"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-R -> P0: "1. comprises"
-R -> P1: "2. comprises"
-R -> P2: "3. comprises"
+S4: {
+  label: |md
+    **query**
+  |
+  shape: rectangle
+  style: {
+    fill: "#8250df"
+    stroke: "#8250df"
+    font-color: "#FFFFFF"
+    border-radius: 6
+    font-size: 16
+  }
+}
+
+S0 -> S1: "1. command"
+S1 -> S2: "2. append"
+S2 -> S3: "3. projector/event handler"
+S3 -> S4: "4. read model"

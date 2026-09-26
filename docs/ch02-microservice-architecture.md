@@ -130,29 +130,36 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 2 · microservices
 
 **The pipeline:** client → API gateway → microservices → service databases
 
+![system design pipeline](../diagrams/d2/decomp/ch02-0.png)
+
 ### the client
 
 _Role: client_
 
-![the client](../diagrams/d2/decomp/ch02-0.png)
+- sends a request to the API gateway
+- reads the composed response
 
 ### the API gateway
 
 _Role: gateway (the entry point)_
 
-![the API gateway](../diagrams/d2/decomp/ch02-1.png)
+- routes the request to one or more services
+- composes the responses into one page
 
 ### each microservice — e.g. the order service
 
 _Role: service_
 
-![each microservice — e.g. the order service](../diagrams/d2/decomp/ch02-2.png)
+- own business logic — implements one or more subdomains
+- own database — PostgreSQL 16 @ order-db-1
+- communicates over HTTP or messaging
 
 ### the service database
 
 _Role: store_
 
-![the service database](../diagrams/d2/decomp/ch02-3.png)
+- PostgreSQL 16 @ order-db-1 — one engine and instance per service
+- no single ACID commit spans two services
 
 ```java
 // SYSTEM DESIGN — microservices: client -> API gateway -> microservices (own business logic + own database) -> service databases; a distributed command becomes a saga of local transactions

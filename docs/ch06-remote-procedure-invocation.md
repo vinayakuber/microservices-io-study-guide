@@ -127,23 +127,28 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 6 · microservices
 
 **The pipeline:** caller → client stub/proxy → transport (HTTP) → server skeleton → business logic → reply
 
+![system design pipeline](../diagrams/d2/decomp/ch06-0.png)
+
 ### the caller — Registration Service
 
 _Role: caller_
 
-![the caller — Registration Service](../diagrams/d2/decomp/ch06-0.png)
+- builds the request { email: "bob@example.com" }
+- waits synchronously for the reply
 
 ### the client stub/proxy — RegistrationServiceProxy
 
 _Role: interface (client proxy)_
 
-![the client stub/proxy — RegistrationServiceProxy](../diagrams/d2/decomp/ch06-1.png)
+- serializes the request over HTTP
+- hides the transport from the caller
 
 ### the server — User Registration instance
 
 _Role: server_
 
-![the server — User Registration instance](../diagrams/d2/decomp/ch06-2.png)
+- runs the business logic
+- stores the row and returns the reply
 
 ```java
 // SYSTEM DESIGN — RPI as a pipeline: caller -> client stub/proxy -> transport (HTTP) -> server skeleton -> business logic -> reply

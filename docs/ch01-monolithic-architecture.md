@@ -138,23 +138,30 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 1 · microservices
 
 **The pipeline:** client → monolithic application (presentation → business logic → data access) → single relational database
 
+![system design pipeline](../diagrams/d2/decomp/ch01-0.png)
+
 ### the monolith — one deployable process holding every subdomain
 
 _Role: application (all three tiers in one process)_
 
-![the monolith — one deployable process holding every subdomain](../diagrams/d2/decomp/ch01-0.png)
+- presentation tier — receives client requests, returns responses
+- business logic — implements business rules, mutates entities
+- data-access layer — reads and writes the single database
 
 ### the single relational database
 
 _Role: store_
 
-![the single relational database](../diagrams/d2/decomp/ch01-1.png)
+- PostgreSQL 16 @ monolith-db-1 — the one engine and instance
+- holds the rows of every subdomain in one schema
+- one ACID transaction spans the Orders and Credit subdomains
 
 ### the client
 
 _Role: client_
 
-![the client](../diagrams/d2/decomp/ch01-2.png)
+- sends a synchronous request to the monolith
+- reads the response — no network hops inside the app
 
 ```java
 // SYSTEM DESIGN — the monolith is one process with three tiers inside it, all hitting one database: client -> presentation tier -> business logic -> data-access layer -> PostgreSQL 16 @ monolith-db-1

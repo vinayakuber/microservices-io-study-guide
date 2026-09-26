@@ -94,23 +94,28 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 28 · microservice
 
 **The pipeline:** client → identity provider (token issuance) → API gateway (validation) → service
 
+![system design pipeline](../diagrams/d2/decomp/ch28-0.png)
+
 ### identity provider — the token issuer
 
 _Role: identity provider (token issuance)_
 
-![identity provider — the token issuer](../diagrams/d2/decomp/ch28-0.png)
+- authenticates the requestor (alice)
+- mints the JWT "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"
 
 ### API gateway — the single entry point
 
 _Role: API gateway (validation)_
 
-![API gateway — the single entry point](../diagrams/d2/decomp/ch28-1.png)
+- validates the token signature
+- routes the request to the service with the token attached
 
 ### Order Service — the verifier
 
 _Role: service_
 
-![Order Service — the verifier](../diagrams/d2/decomp/ch28-2.png)
+- verifies the signature locally
+- checks role customer against operation place_order
 
 ```java
 // SYSTEM DESIGN — access token: client -> identity provider (token issuance) -> API gateway (validation) -> service (Order Service verifies + authorizes)

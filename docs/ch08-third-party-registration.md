@@ -101,23 +101,30 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 8 · microservices
 
 **The pipeline:** service instance → third-party registrar → service registry
 
+![system design pipeline](../diagrams/d2/decomp/ch08-0.png)
+
 ### the service instance
 
 _Role: service_
 
-![the service instance](../diagrams/d2/decomp/ch08-0.png)
+- starts and stops the app
+- never talks to the registry itself
 
 ### the third-party registrar
 
 _Role: registrar_
 
-![the third-party registrar](../diagrams/d2/decomp/ch08-1.png)
+- Netflix Prana sidecar
+- observes / polls the instance
+- registers on startup, unregisters on shutdown
 
 ### the service registry
 
 _Role: registry_
 
-![the service registry](../diagrams/d2/decomp/ch08-2.png)
+- Eureka
+- stores the reachable endpoints
+- serves discovery lookups
 
 ```java
 // SYSTEM DESIGN — third-party registration as a pipeline: service instance -> third-party registrar -> service registry

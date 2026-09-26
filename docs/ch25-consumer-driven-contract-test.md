@@ -122,23 +122,28 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. · microservices.i
 
 **The pipeline:** consumer → contract/expectation → provider verification → provider
 
+![system design pipeline](../diagrams/d2/decomp/ch25-0.png)
+
 ### API Gateway — the consumer
 
 _Role: consumer_
 
-![API Gateway — the consumer](../diagrams/d2/decomp/ch25-0.png)
+- OrderServiceProxy — calls GET /orders/{orderId}
+- contract suite — defines the expectation and generates the contract
 
 ### Pact broker — the contract repo
 
 _Role: contract broker/repo_
 
-![Pact broker — the contract repo](../diagrams/d2/decomp/ch25-1.png)
+- stores the example request/reply contract
+- serves the contract back to the provider pipeline
 
 ### Order Service — the provider
 
 _Role: provider verification + provider_
 
-![Order Service — the provider](../diagrams/d2/decomp/ch25-2.png)
+- verifies the actual response against the contract
+- keeps the promise: serves GET /orders/ORD-4007 with status 200
 
 ```java
 // SYSTEM DESIGN — consumer-driven contract test: consumer (API Gateway) -> contract/expectation (Pact broker) -> provider verification (deployment pipeline) -> provider (Order Service)

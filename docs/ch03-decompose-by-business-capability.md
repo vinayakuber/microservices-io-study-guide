@@ -130,23 +130,29 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 3 · microservices
 
 **The pipeline:** business capability → service → autonomous team
 
+![system design pipeline](../diagrams/d2/decomp/ch03-0.png)
+
 ### a business capability — e.g. product catalog
 
 _Role: business capability_
 
-![a business capability — e.g. product catalog](../diagrams/d2/decomp/ch03-0.png)
+- something the business does to generate value
+- maps to a business object — Product
 
 ### the service — e.g. the catalog service
 
 _Role: service (owns its data)_
 
-![the service — e.g. the catalog service](../diagrams/d2/decomp/ch03-1.png)
+- owns the capability business object and its data
+- owns its database — PostgreSQL 16 @ catalog-db-1
+- hides its implementation behind an API
 
 ### the autonomous team
 
 _Role: team (owns the service)_
 
-![the autonomous team](../diagrams/d2/decomp/ch03-2.png)
+- a two-pizza team of 6-10 people
+- develops, tests and deploys the service alone
 
 ```java
 // SYSTEM DESIGN — decompose by business capability: business capability (Product) -> service (catalog, owns its data) -> autonomous two-pizza team (owns the service)

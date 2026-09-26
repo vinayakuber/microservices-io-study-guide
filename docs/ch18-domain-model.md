@@ -119,29 +119,37 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.5 · microservices.
 
 **The pipeline:** client → domain service → entities/value objects → repository → database
 
+![system design pipeline](../diagrams/d2/decomp/ch18-0.png)
+
 ### OrderService — the domain service
 
 _Role: domain service_
 
-![OrderService — the domain service](../diagrams/d2/decomp/ch18-0.png)
+- createOrder() — delegates to the Order.create() factory
+- reviseOrder()/cancelOrder() — routes commands to the aggregate
+- holds no business state (behavior only)
 
 ### Order aggregate + DeliveryInformation — entities/value objects
 
 _Role: entities/value objects_
 
-![Order aggregate + DeliveryInformation — entities/value objects](../diagrams/d2/decomp/ch18-1.png)
+- Order — entity with state (orderId, lineItems) and behavior create()/revise()/cancel()
+- DeliveryInformation — state-only value object (deliveryTime, deliveryAddress)
+- business rules — guard the CREATED -> CANCELLED transition and recompute the total
 
 ### OrderRepository — the repository
 
 _Role: repository_
 
-![OrderRepository — the repository](../diagrams/d2/decomp/ch18-2.png)
+- findOrderById() — loads the aggregate
+- save() — persists the aggregate back
 
 ### PostgreSQL 16 @ orders-db-1 — the database
 
 _Role: database_
 
-![PostgreSQL 16 @ orders-db-1 — the database](../diagrams/d2/decomp/ch18-3.png)
+- stores the aggregate rows
+- single source of truth for orders
 
 ```java
 // SYSTEM DESIGN — domain model as a pipeline: client -> domain service (OrderService) -> entities/value objects (Order + DeliveryInformation) -> repository (OrderRepository) -> database (PostgreSQL 16 @ orders-db-1)

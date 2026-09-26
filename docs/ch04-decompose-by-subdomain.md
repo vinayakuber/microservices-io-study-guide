@@ -125,23 +125,29 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 4 · microservices
 
 **The pipeline:** domain → subdomain (core/supporting/generic) → service
 
+![system design pipeline](../diagrams/d2/decomp/ch04-0.png)
+
 ### the domain — the business problem space
 
 _Role: domain_
 
-![the domain — the business problem space](../diagrams/d2/decomp/ch04-0.png)
+- the business DDD models — e.g. food delivery
+- splits into multiple subdomains
 
 ### a subdomain — a distinct part of the business
 
 _Role: subdomain (core/supporting/generic)_
 
-![a subdomain — a distinct part of the business](../diagrams/d2/decomp/ch04-1.png)
+- classified core (key differentiator), supporting, or generic
+- often has a key domain object — Order
 
 ### the service — one per subdomain
 
 _Role: service (owns its data)_
 
-![the service — one per subdomain](../diagrams/d2/decomp/ch04-2.png)
+- owns the subdomain model and its data
+- owns its database — PostgreSQL 16 @ order-db-1
+- cohesive, loosely coupled behind an API
 
 ```java
 // SYSTEM DESIGN — decompose by subdomain: domain (food delivery) -> subdomain (core/supporting/generic) -> service (owns its subdomain data)

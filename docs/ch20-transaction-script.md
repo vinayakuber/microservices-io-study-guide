@@ -85,29 +85,36 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.5 · microservices.
 
 **The pipeline:** presentation tier → transaction script (OrderService) → DAO (OrderDao) → database
 
+![system design pipeline](../diagrams/d2/decomp/ch20-0.png)
+
 ### presentation tier
 
 _Role: presentation tier_
 
-![presentation tier](../diagrams/d2/decomp/ch20-0.png)
+- receives the HTTP request POST /orders
+- maps it to OrderService.createOrder()
 
 ### OrderService — the transaction script
 
 _Role: transaction script (service class)_
 
-![OrderService — the transaction script](../diagrams/d2/decomp/ch20-1.png)
+- createOrder() — one procedural method per request type
+- reviseOrder()/cancelOrder() — each runs its whole transaction
+- mutates a pure-data Order object step by step
 
 ### OrderDao — the DAO
 
 _Role: DAO_
 
-![OrderDao — the DAO](../diagrams/d2/decomp/ch20-2.png)
+- save(Order) — writes the row
+- findOrderById() — reads the row back
 
 ### PostgreSQL 16 @ orders-db-1 — the database
 
 _Role: database_
 
-![PostgreSQL 16 @ orders-db-1 — the database](../diagrams/d2/decomp/ch20-3.png)
+- holds the Order rows
+- written by save(Order), read by findOrderById()
 
 ```java
 // SYSTEM DESIGN — transaction script as a pipeline: presentation tier -> transaction script (OrderService) -> DAO (OrderDao) -> database (PostgreSQL 16 @ orders-db-1)

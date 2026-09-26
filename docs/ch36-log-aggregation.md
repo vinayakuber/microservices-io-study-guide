@@ -109,23 +109,28 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 36 · microservice
 
 **The pipeline:** writer → transport → collector → aggregator/store → reader
 
+![system design pipeline](../diagrams/d2/decomp/ch36-0.png)
+
 ### Three services — the writers
 
 _Role: writer_
 
-![Three services — the writers](../diagrams/d2/decomp/ch36-0.png)
+- Order Service — writes a log line tagged REQ-3001
+- Customer Service and Payment Service — write their own lines for REQ-3001
 
 ### Central logging service — collector + aggregator/store
 
 _Role: collector / aggregator/store_
 
-![Central logging service — collector + aggregator/store](../diagrams/d2/decomp/ch36-1.png)
+- collects the lines shipped by each service
+- indexes them by request id into {"REQ-3001":[1,2,3]}
 
 ### Developer — the reader
 
 _Role: reader_
 
-![Developer — the reader](../diagrams/d2/decomp/ch36-2.png)
+- searches REQ-3001
+- reads the 3 correlated lines from the index
 
 ```java
 // SYSTEM DESIGN — log aggregation: writer -> transport -> collector -> aggregator/store -> reader

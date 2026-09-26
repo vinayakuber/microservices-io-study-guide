@@ -116,23 +116,28 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 34 · microservice
 
 **The pipeline:** service → exception tracker (collect/dedup/aggregate) → developer reader
 
+![system design pipeline](../diagrams/d2/decomp/ch34-0.png)
+
 ### Order Service — the thrower
 
 _Role: service (source)_
 
-![Order Service — the thrower](../diagrams/d2/decomp/ch34-0.png)
+- throws the exception EX-1001 with msg "customer is null"
+- reports the stack trace SVC.doGet line 42
 
 ### Exception tracking service — collect, dedup, aggregate
 
 _Role: exception tracker_
 
-![Exception tracking service — collect, dedup, aggregate](../diagrams/d2/decomp/ch34-1.png)
+- normalizes each throw into a fingerprint
+- PostgreSQL 16 @ exc-db-1 — folds repeats by fingerprint and bumps the count
 
 ### Developer — the reader
 
 _Role: reader_
 
-![Developer — the reader](../diagrams/d2/decomp/ch34-2.png)
+- sees one deduplicated issue, not a flood
+- triages the issue FP-77A3 against a threshold of 1
 
 ```java
 // SYSTEM DESIGN — exception tracking: service -> exception tracker (collect/dedup/aggregate) -> developer reader

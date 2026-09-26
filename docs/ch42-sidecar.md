@@ -113,23 +113,30 @@ _Also known as: Chris Richardson · Microservice Patterns p.410 · microservices
 
 **The pipeline:** application container → sidecar container → shared resources
 
+![system design pipeline](../diagrams/d2/decomp/ch42-0.png)
+
 ### application container — the Order Service that owns the business logic
 
 _Role: application container_
 
-![application container — the Order Service that owns the business logic](../diagrams/d2/decomp/ch42-0.png)
+- Order Service — runs the business code
+- Sends calls — outbound traffic passes through the sidecar
 
 ### sidecar container — the concern-carrying twin
 
 _Role: sidecar container_
 
-![sidecar container — the concern-carrying twin](../diagrams/d2/decomp/ch42-1.png)
+- Proxy — intercepts outbound traffic and stamps a trace id
+- Log-shipper — forwards the logs from the shared volume
+- Config-reloader — watches and reloads config
+- Shares the pod — mounts the same volume and network namespace
 
 ### shared resources — what both containers share
 
 _Role: shared resources_
 
-![shared resources — what both containers share](../diagrams/d2/decomp/ch42-2.png)
+- Network namespace — one IP for app and sidecar
+- Volume — shared-logs mounted by both
 
 ```java
 // SYSTEM DESIGN — sidecar: application container -> sidecar container -> shared resources

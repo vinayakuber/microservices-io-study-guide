@@ -95,23 +95,28 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 44 · microservice
 
 **The pipeline:** legacy monolith → strangler façade/router → new microservices
 
+![system design pipeline](../diagrams/d2/decomp/ch44-0.png)
+
 ### legacy monolith — the running system that still serves unmigrated paths
 
 _Role: legacy monolith_
 
-![legacy monolith — the running system that still serves unmigrated paths](../diagrams/d2/decomp/ch44-0.png)
+- checkout + accounts — features not yet moved
+- Serves — any path the route table still points at it
 
 ### strangler façade / router — fronts both systems and decides per request
 
 _Role: router_
 
-![strangler façade / router — fronts both systems and decides per request](../diagrams/d2/decomp/ch44-1.png)
+- Route by path — looks up each path in the route table
+- Incrementally replace — moves one feature at a time
 
 ### new microservices — the growing strangler application
 
 _Role: new microservices_
 
-![new microservices — the growing strangler application](../diagrams/d2/decomp/ch44-2.png)
+- Migrated features — catalog, search re-implemented
+- New features — recommendations, wishlist with no monolith twin
 
 ```java
 // SYSTEM DESIGN — strangler application: legacy monolith -> strangler façade/router -> new microservices

@@ -120,23 +120,30 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 21 · microservice
 
 **The pipeline:** client → API composer → provider services → their databases
 
+![system design pipeline](../diagrams/d2/decomp/ch21-0.png)
+
 ### API Composer
 
 _Role: API composer_
 
-![API Composer](../diagrams/d2/decomp/ch21-0.png)
+- query — invokes each provider service that owns a fragment
+- join — merges fragments in memory on a shared key
+- returns one combined response
 
 ### provider services
 
 _Role: provider services_
 
-![provider services](../diagrams/d2/decomp/ch21-1.png)
+- Order Service — owns the order rows
+- Customer Service — owns the customer rows
+- Inventory Service — owns the stock rows
 
 ### their databases
 
 _Role: databases_
 
-![their databases](../diagrams/d2/decomp/ch21-2.png)
+- PostgreSQL 16 @ orders-db-1
+- PostgreSQL 16 @ customers-db-1
 
 ```java
 // SYSTEM DESIGN — API composition as a pipeline: client -> API composer -> provider services -> their databases

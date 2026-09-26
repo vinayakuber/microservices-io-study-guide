@@ -97,23 +97,28 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 29 · microservice
 
 **The pipeline:** service → config server → config repository (git/VCS)
 
+![system design pipeline](../diagrams/d2/decomp/ch29-0.png)
+
 ### Order Service — the consumer of config
 
 _Role: service_
 
-![Order Service — the consumer of config](../diagrams/d2/decomp/ch29-0.png)
+- pulls config at startup (DB_URL, DB_PASSWORD)
+- refreshes when the config changes
 
 ### Spring Cloud Config server
 
 _Role: config server_
 
-![Spring Cloud Config server](../diagrams/d2/decomp/ch29-1.png)
+- serves configuration over HTTP
+- versions each property change
 
 ### git repository — the config source
 
 _Role: config repository (git/VCS)_
 
-![git repository — the config source](../diagrams/d2/decomp/ch29-2.png)
+- stores the property files per environment
+- is the versioned source of truth
 
 ```java
 // SYSTEM DESIGN — externalized configuration: service (Order Service) -> config server (Spring Cloud Config) -> config repository (git/VCS)

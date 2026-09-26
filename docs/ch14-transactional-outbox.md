@@ -124,29 +124,36 @@ _Also known as: Application events · Chris Richardson · Microservice Patterns 
 
 **The pipeline:** application tx → outbox table → relay publisher → broker
 
+![system design pipeline](../diagrams/d2/decomp/ch14-0.png)
+
 ### order service (application) — the application
 
 _Role: application_
 
-![order service (application) — the application](../diagrams/d2/decomp/ch14-0.png)
+- Writes the order row
+- Writes the outbox event row in the same tx
 
 ### orders + outbox table (PostgreSQL 16 @ orders-db-1) — the database
 
 _Role: database_
 
-![orders + outbox table (PostgreSQL 16 @ orders-db-1) — the database](../diagrams/d2/decomp/ch14-1.png)
+- Keeps business rows and outbox rows in one instance
+- Commits both writes atomically
 
 ### relay publisher — the relay
 
 _Role: relay_
 
-![relay publisher — the relay](../diagrams/d2/decomp/ch14-2.png)
+- Reads outbox rows not yet relayed
+- Publishes them to the broker
+- Marks each row relayed
 
 ### message broker (RabbitMQ) — the broker
 
 _Role: broker_
 
-![message broker (RabbitMQ) — the broker](../diagrams/d2/decomp/ch14-3.png)
+- Holds published events
+- Delivers them to subscribers
 
 ```java
 // SYSTEM DESIGN — transactional outbox as a pipeline: application tx -> outbox table (same database) -> relay publisher -> broker (reliable, no dual-write)

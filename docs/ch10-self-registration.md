@@ -98,23 +98,29 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 10 · microservice
 
 **The pipeline:** service instance → self-registrar → service registry
 
+![system design pipeline](../diagrams/d2/decomp/ch10-0.png)
+
 ### order-service instance — the service instance
 
 _Role: service instance_
 
-![order-service instance — the service instance](../diagrams/d2/decomp/ch10-0.png)
+- Registers its own host and IP on startup
+- Renews the lease on a heartbeat timer
+- Unregisters itself on shutdown
 
 ### self-registrar (in-process chassis code) — the registrar
 
 _Role: self-registrar_
 
-![self-registrar (in-process chassis code) — the registrar](../diagrams/d2/decomp/ch10-1.png)
+- Writes the instance row on boot
+- Pushes the ttl out on each heartbeat
 
 ### service registry (Eureka) — the registry
 
 _Role: registry_
 
-![service registry (Eureka) — the registry](../diagrams/d2/decomp/ch10-2.png)
+- Holds name -> instance rows
+- Evicts entries whose lease lapses
 
 ```java
 // SYSTEM DESIGN — self-registration as a pipeline: service instance -> self-registrar (startup register + heartbeat lease) -> service registry

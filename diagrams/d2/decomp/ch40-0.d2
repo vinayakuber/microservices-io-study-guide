@@ -1,22 +1,24 @@
 direction: down
 
-R: {
+S0: {
   label: |md
-    **Order Service — the business service whose traffic the mesh mediates**
+    **service**
   |
   shape: rectangle
   style: {
     fill: "#238636"
     stroke: "#2ea043"
     font-color: "#FFFFFF"
-    border-radius: 8
+    border-radius: 6
     font-size: 16
   }
 }
 
-P0: {
+S1: {
   label: |md
-    Application code — sends queries and receives replies
+    **sidecar proxy**
+
+    data plane
   |
   shape: rectangle
   style: {
@@ -24,23 +26,23 @@ P0: {
     stroke: "#388bfd"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-P1: {
+S2: {
   label: |md
-    Traffic — every in/out call is routed through the sidecar proxy
+    **control plane**
   |
   shape: rectangle
   style: {
-    fill: "#1f6feb"
-    stroke: "#388bfd"
+    fill: "#8250df"
+    stroke: "#8250df"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-R -> P0: "1. comprises"
-R -> P1: "2. comprises"
+S0 -> S1: "1. service"
+S1 -> S2: "2. data plane"

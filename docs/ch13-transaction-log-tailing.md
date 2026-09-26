@@ -105,29 +105,35 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.13 · microservices
 
 **The pipeline:** database transaction log → log tailer/miner → message broker → subscriber
 
+![system design pipeline](../diagrams/d2/decomp/ch13-0.png)
+
 ### source database (transaction log) — the source database
 
 _Role: source database_
 
-![source database (transaction log) — the source database](../diagrams/d2/decomp/ch13-0.png)
+- Appends every committed change to the log
+- Exposes the log to the tailer
 
 ### log tailer / miner — the tailer
 
 _Role: log tailer_
 
-![log tailer / miner — the tailer](../diagrams/d2/decomp/ch13-1.png)
+- Tails the transaction log
+- Converts log records into domain events
+- Publishes each event to the broker
 
 ### message broker (RabbitMQ) — the broker
 
 _Role: broker_
 
-![message broker (RabbitMQ) — the broker](../diagrams/d2/decomp/ch13-2.png)
+- Receives the events in commit order
+- Holds them for subscribers
 
 ### subscriber — the consumer
 
 _Role: subscriber_
 
-![subscriber — the consumer](../diagrams/d2/decomp/ch13-3.png)
+- Consumes each event off the broker
 
 ```java
 // SYSTEM DESIGN — transaction log tailing as a pipeline: database transaction log -> log tailer/miner -> message broker -> subscriber (consumer)

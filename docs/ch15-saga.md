@@ -140,29 +140,35 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.15 (p.114) · micro
 
 **The pipeline:** orchestrator → participant services → event/message broker
 
+![system design pipeline](../diagrams/d2/decomp/ch15-0.png)
+
 ### saga orchestrator — the orchestrator
 
 _Role: orchestrator_
 
-![saga orchestrator — the orchestrator](../diagrams/d2/decomp/ch15-0.png)
+- Orders each participant to act
+- Tracks the saga state
+- Triggers compensations on failure
 
 ### order service — the participant
 
 _Role: participant service_
 
-![order service — the participant](../diagrams/d2/decomp/ch15-1.png)
+- Executes its step
+- Publishes its outcome event
 
 ### customer service — the participant
 
 _Role: participant service_
 
-![customer service — the participant](../diagrams/d2/decomp/ch15-2.png)
+- Reserves credit for the order
+- Publishes CreditReserved
 
 ### event / message broker (RabbitMQ) — the broker
 
 _Role: broker_
 
-![event / message broker (RabbitMQ) — the broker](../diagrams/d2/decomp/ch15-3.png)
+- Carries step results back to the orchestrator
 
 ```java
 // SYSTEM DESIGN — saga (orchestrated) as a pipeline: orchestrator -> participant services -> event/message broker (each step executes + records state, compensations on failure)

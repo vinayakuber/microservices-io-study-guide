@@ -97,29 +97,35 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.12 · microservices
 
 **The pipeline:** source database → polling publisher (relay) → message broker → subscriber
 
+![system design pipeline](../diagrams/d2/decomp/ch12-0.png)
+
 ### source database (outbox table) — the source database
 
 _Role: source database_
 
-![source database (outbox table) — the source database](../diagrams/d2/decomp/ch12-0.png)
+- Holds the outbox rows with a sent flag
+- Answers the unsent-row SELECT
 
 ### polling publisher relay — the relay
 
 _Role: polling publisher_
 
-![polling publisher relay — the relay](../diagrams/d2/decomp/ch12-1.png)
+- Polls SELECT ... WHERE sent=false ORDER BY id
+- Publishes each row to the broker
+- Marks the row sent=true
 
 ### message broker (RabbitMQ) — the broker
 
 _Role: broker_
 
-![message broker (RabbitMQ) — the broker](../diagrams/d2/decomp/ch12-2.png)
+- Receives published events in id order
+- Holds them for subscribers
 
 ### subscriber — the consumer
 
 _Role: subscriber_
 
-![subscriber — the consumer](../diagrams/d2/decomp/ch12-3.png)
+- Consumes each event off the broker
 
 ```java
 // SYSTEM DESIGN — polling publisher as a pipeline: source database (outbox table) -> polling publisher relay -> message broker -> subscriber (consumer)

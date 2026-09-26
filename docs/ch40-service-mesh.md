@@ -114,23 +114,30 @@ _Also known as: Chris Richardson · Microservice Patterns p.380 · microservices
 
 **The pipeline:** service → sidecar proxy (data plane) → control plane
 
+![system design pipeline](../diagrams/d2/decomp/ch40-0.png)
+
 ### Order Service — the business service whose traffic the mesh mediates
 
 _Role: service_
 
-![Order Service — the business service whose traffic the mesh mediates](../diagrams/d2/decomp/ch40-0.png)
+- Application code — sends queries and receives replies
+- Traffic — every in/out call is routed through the sidecar proxy
 
 ### sidecar proxy — the per-service data plane
 
 _Role: data plane_
 
-![sidecar proxy — the per-service data plane](../diagrams/d2/decomp/ch40-1.png)
+- Interceptor — sees each call before it leaves the service
+- mTLS — encrypts service-to-service traffic with a distributed cert
+- Retry / circuit-breaker — retries and trips circuits on failures
+- Metrics — counts requests and answers health pings
 
 ### control plane — the mesh brain that pushes policy to every proxy
 
 _Role: control plane_
 
-![control plane — the mesh brain that pushes policy to every proxy](../diagrams/d2/decomp/ch40-2.png)
+- Route config — distributes route rules to the proxies
+- Cert distribution — hands each proxy its mTLS identity
 
 ```java
 // SYSTEM DESIGN — service mesh: service -> sidecar proxy (data plane) -> control plane

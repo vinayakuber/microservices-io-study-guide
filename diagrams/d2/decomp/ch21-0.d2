@@ -1,22 +1,22 @@
 direction: down
 
-R: {
+S0: {
   label: |md
-    **API Composer**
+    **client**
   |
   shape: rectangle
   style: {
     fill: "#238636"
     stroke: "#2ea043"
     font-color: "#FFFFFF"
-    border-radius: 8
+    border-radius: 6
     font-size: 16
   }
 }
 
-P0: {
+S1: {
   label: |md
-    query — invokes each provider service that owns a fragment
+    **API composer**
   |
   shape: rectangle
   style: {
@@ -24,13 +24,13 @@ P0: {
     stroke: "#388bfd"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-P1: {
+S2: {
   label: |md
-    join — merges fragments in memory on a shared key
+    **provider services**
   |
   shape: rectangle
   style: {
@@ -38,24 +38,24 @@ P1: {
     stroke: "#388bfd"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-P2: {
+S3: {
   label: |md
-    returns one combined response
+    **their databases**
   |
   shape: rectangle
   style: {
-    fill: "#1f6feb"
-    stroke: "#388bfd"
+    fill: "#8250df"
+    stroke: "#8250df"
     font-color: "#FFFFFF"
     border-radius: 6
-    font-size: 15
+    font-size: 16
   }
 }
 
-R -> P0: "1. comprises"
-R -> P1: "2. comprises"
-R -> P2: "3. comprises"
+S0 -> S1: "1. client"
+S1 -> S2: "2. API composer"
+S2 -> S3: "3. provider services"

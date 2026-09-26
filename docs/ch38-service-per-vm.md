@@ -114,23 +114,28 @@ _Also known as: Chris Richardson · Microservice Patterns p.390 · microservices
 
 **The pipeline:** build pipeline → image (AMI) → IaaS → VM instances
 
+![system design pipeline](../diagrams/d2/decomp/ch38-0.png)
+
 ### Build pipeline — the baker
 
 _Role: build pipeline_
 
-![Build pipeline — the baker](../diagrams/d2/decomp/ch38-0.png)
+- bakes JDK 17 + OS into one machine image
+- publishes the AMI catalog:2.3.0
 
 ### EC2 IaaS — the provisioner
 
 _Role: IaaS_
 
-![EC2 IaaS — the provisioner](../diagrams/d2/decomp/ch38-1.png)
+- provisions a new EC2 instance per service instance
+- boots the AMI on each VM
 
 ### Auto-scaling group + load balancer
 
 _Role: VM instances_
 
-![Auto-scaling group + load balancer](../diagrams/d2/decomp/ch38-2.png)
+- ASG scales between min 2 and max 6
+- ELB routes to the healthy instances i-1, i-2, i-3
 
 ```java
 // SYSTEM DESIGN — service per VM: build pipeline -> image (AMI) -> IaaS -> VM instances

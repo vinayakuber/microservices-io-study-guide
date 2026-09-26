@@ -109,23 +109,28 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 35 · microservice
 
 **The pipeline:** service instance → /health endpoint → health-check client → routing/alert
 
+![system design pipeline](../diagrams/d2/decomp/ch35-0.png)
+
 ### Order Service — the instance under check
 
 _Role: service instance_
 
-![Order Service — the instance under check](../diagrams/d2/decomp/ch35-0.png)
+- exposes GET /health
+- probes its db, disk, and app dependencies
 
 ### Monitoring service — the health-check client
 
 _Role: health-check client_
 
-![Monitoring service — the health-check client](../diagrams/d2/decomp/ch35-1.png)
+- polls /health every 30s
+- marks the instance UP or DOWN
 
 ### Load balancer + registry — routing/alert
 
 _Role: routing/alert_
 
-![Load balancer + registry — routing/alert](../diagrams/d2/decomp/ch35-2.png)
+- LB stops routing to a DOWN instance
+- REG de-registers the unhealthy instance
 
 ```java
 // SYSTEM DESIGN — health check: service instance -> /health endpoint -> health-check client -> routing/alert
