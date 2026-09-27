@@ -31,9 +31,17 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 30 (p.379) · micr
 // -> concern_count : 6   // = security + config + logging + health + metrics + tracing
 // -> service_count : 3
 //    step 1 · wire SVC1 by hand    manual_wiring.SVC1 : 0 -> 6   BECAUSE each service re-implements the 6 concerns
+//    -> input  : manual_wiring.SVC1 = 0 (concern_count = 6)
+//    <- output : manual_wiring.SVC1 = 6   BECAUSE each service re-implements the 6 concerns
 //    step 2 · wire SVC2 by hand    manual_wiring.SVC2 : 0 -> 6
+//    -> input  : manual_wiring.SVC2 = 0 (concern_count = 6)
+//    <- output : manual_wiring.SVC2 = 6   BECAUSE each service re-implements the 6 concerns
 //    step 3 · wire SVC3 by hand    manual_wiring.SVC3 : 0 -> 6
+//    -> input  : manual_wiring.SVC3 = 0 (concern_count = 6)
+//    <- output : manual_wiring.SVC3 = 6   BECAUSE each service re-implements the 6 concerns
 //    step 4 · total by hand = 3 services x 6 concerns = 18 wirings
+//    -> input  : manual_wiring = { SVC1: 6, SVC2: 6, SVC3: 6 } (service_count = 3, concern_count = 6)
+//    <- output : total = 18 wirings   BECAUSE 3 services x 6 concerns = 18
 // <- outcome : manual_wiring : { SVC1: 6, SVC2: 6, SVC3: 6 } = 18 wirings total
 //    alt chassis : wire once -> chassis_wiring.chassis : 0 -> 6, then SVC1/SVC2/SVC3 inherit = 6 wirings, not 18
 ```
@@ -58,10 +66,20 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 30 (p.379) · micr
 // DEF: adopt_chassis · CALLED BY: a developer scaffolding SVC
 // -> chassis_version : "2.4.0"
 //    step 1 · add the chassis Gradle plugin          svc.build : "none" -> "gradle-plugin:2.4.0"
+//    -> input  : svc.build = "none" (chassis_version = "2.4.0")
+//    <- output : svc.build = "gradle-plugin:2.4.0"   BECAUSE the chassis ships the build plugin
 //    step 2 · chassis wires access-token security    svc.security : "none" -> "access-token-check"
+//    -> input  : svc.security = "none" (chassis_version = "2.4.0")
+//    <- output : svc.security = "access-token-check"   BECAUSE the chassis wires security via an access token
 //    step 3 · chassis wires metrics                  svc.metrics : "none" -> "counter:orders_created"
+//    -> input  : svc.metrics = "none" (chassis_version = "2.4.0")
+//    <- output : svc.metrics = "counter:orders_created"   BECAUSE the chassis wires the metrics counter
 //    step 4 · chassis wires tracing                  svc.tracing : "none" -> "trace-id-filter"
+//    -> input  : svc.tracing = "none" (chassis_version = "2.4.0")
+//    <- output : svc.tracing = "trace-id-filter"   BECAUSE the chassis wires distributed tracing
 //    step 5 · chassis self-registers SVC with REG    svc.registered : false -> true
+//    -> input  : svc.registered = false (chassis_version = "2.4.0")
+//    <- output : svc.registered = true   BECAUSE the chassis registers the service with the registry
 // <- outcome : svc : { build:"gradle-plugin:2.4.0", security:"access-token-check", metrics:"counter:orders_created", tracing:"trace-id-filter", registered:true }
 ```
 
@@ -85,9 +103,17 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 30 (p.379) · micr
 // DEF: upgrade · CALLED BY: the team releasing chassis 2.4.0 (a logging fix)
 // -> new_version : "2.4.0"
 //    step 1 · release the chassis once at "2.4.0"
+//    -> input  : new_version = "2.4.0" (chassis = "2.3.0")
+//    <- output : released = "chassis:2.4.0"   BECAUSE the fix is published once, in one release
 //    step 2 · SVC1 bumps its dependency     deps.SVC1 : "chassis:2.3.0" -> "chassis:2.4.0"
+//    -> input  : deps.SVC1 = "chassis:2.3.0" (new_version = "2.4.0")
+//    <- output : deps.SVC1 = "chassis:2.4.0"   BECAUSE the service bumps to the new chassis version
 //    step 3 · SVC2 bumps its dependency     deps.SVC2 : "chassis:2.3.0" -> "chassis:2.4.0"
+//    -> input  : deps.SVC2 = "chassis:2.3.0" (new_version = "2.4.0")
+//    <- output : deps.SVC2 = "chassis:2.4.0"   BECAUSE the service bumps to the new chassis version
 //    step 4 · SVC3 bumps its dependency     deps.SVC3 : "chassis:2.3.0" -> "chassis:2.4.0"
+//    -> input  : deps.SVC3 = "chassis:2.3.0" (new_version = "2.4.0")
+//    <- output : deps.SVC3 = "chassis:2.4.0"   BECAUSE the service bumps to the new chassis version
 // <- outcome : deps : { SVC1: "chassis:2.4.0", SVC2: "chassis:2.4.0", SVC3: "chassis:2.4.0" } · the fix reaches all 3 services
 //    alt service template : the fix is copied-and-pasted into 3 separate codebases, one edit per service
 ```
@@ -112,8 +138,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 30 (p.379) · micr
 // DEF: adopt_go · CALLED BY: the team adding its first Go service
 // -> new_language : "Go"
 //    step 1 · the JVM chassis cannot run Go -> build a second one   chassis_count : 1 -> 2
+//    -> input  : chassis_count = 1 (new_language = "Go")
+//    <- output : chassis_count = 2   BECAUSE the JVM chassis cannot run Go, so a second one is built
 //    step 2 · build chassis-go on a Go framework base               chassis.GO : "none" -> "chassis-go:1.0.0"   BECAUSE Gizmo/Micro/Go kit serve Go, not Java
+//    -> input  : chassis.GO = "none" (new_language = "Go")
+//    <- output : chassis.GO = "chassis-go:1.0.0"   BECAUSE Gizmo/Micro/Go kit serve Go, not Java
 //    step 3 · re-implement the same concerns in Go                  concerns_in_go : 0 -> 6   BECAUSE security+config+logging+health+metrics+tracing all repeat
+//    -> input  : concerns_in_go = 0 (chassis.GO = "chassis-go:1.0.0")
+//    <- output : concerns_in_go = 6   BECAUSE security+config+logging+health+metrics+tracing all repeat
 // <- outcome : chassis : { JVM: "chassis-java:2.4.0", GO: "chassis-go:1.0.0" } · concerns_in_go : 6 · 2 chassis to keep current
 //    alt single-language : only 1 chassis to maintain, but Go adoption stays blocked
 ```
@@ -160,9 +192,17 @@ _Role: cross-cutting concerns_
 // DEF: adopt_chassis · CALLED BY: a developer scaffolding SVC
 // -> chassis_version : "2.4.0"
 //    step 1 · add the chassis Gradle plugin    svc.build : "none" -> "gradle-plugin:2.4.0"
+//    -> input  : svc.build = "none" (chassis_version = "2.4.0")
+//    <- output : svc.build = "gradle-plugin:2.4.0"   BECAUSE the chassis ships the build plugin
 //    step 2 · chassis injects security and metrics    svc.security : "none" -> "access-token-check" · svc.metrics : "none" -> "counter:orders_created"
+//    -> input  : svc.security = "none" · svc.metrics = "none" (chassis_version = "2.4.0")
+//    <- output : svc.security = "access-token-check" · svc.metrics = "counter:orders_created"   BECAUSE the chassis wires security and metrics
 //    step 3 · chassis self-registers SVC with REG    svc.registered : false -> true
+//    -> input  : svc.registered = false (chassis_version = "2.4.0")
+//    <- output : svc.registered = true   BECAUSE the chassis registers the service with the registry
 //    step 4 · count the wirings done once, not per service    wirings : 0 -> 6  BECAUSE the chassis wires the 6 concerns once and every service inherits them
+//    -> input  : wirings = 0 (concern = 6)
+//    <- output : wirings = 6   BECAUSE the chassis wires the 6 concerns once and every service inherits them
 // <- outcome : svc { build:"gradle-plugin:2.4.0", security:"access-token-check", metrics:"counter:orders_created", registered:true } · wirings 6, not 18
 ```
 

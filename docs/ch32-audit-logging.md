@@ -25,10 +25,16 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 32 (p.377) · micr
 // DEF: record_activity · CALLED BY: U1 performing actions
 // -> action1 : ("alice","view_order","PO-2001")
 //    step 1 · INSERT audit row id=1   audit_log : [] -> [(1,"alice","view_order","PO-2001",now)]
+//    -> input  : audit_log = [] (action1 = ("alice","view_order","PO-2001"))
+//    <- output : audit_log = [(1,"alice","view_order","PO-2001",now)]   BECAUSE the view action becomes one durable row
 // -> action2 : ("alice","create_order","PO-2001")
 //    step 2 · INSERT audit row id=2   audit_log : [1 row] -> [(1,"alice","view_order","PO-2001",now),(2,"alice","create_order","PO-2001",now)]
+//    -> input  : audit_log = [(1,"alice","view_order","PO-2001",now)] (action2 = ("alice","create_order","PO-2001"))
+//    <- output : audit_log = [(1,"alice","view_order","PO-2001",now),(2,"alice","create_order","PO-2001",now)]   BECAUSE the create action becomes a second row
 // -> action3 : ("alice","pay_order","PO-2001")
 //    step 3 · INSERT audit row id=3   audit_log : [2 rows] -> [(1,"alice","view_order","PO-2001",now),(2,"alice","create_order","PO-2001",now),(3,"alice","pay_order","PO-2001",now)]
+//    -> input  : audit_log = [(1,"alice","view_order","PO-2001",now),(2,"alice","create_order","PO-2001",now)] (action3 = ("alice","pay_order","PO-2001"))
+//    <- output : audit_log = [(1,"alice","view_order","PO-2001",now),(2,"alice","create_order","PO-2001",now),(3,"alice","pay_order","PO-2001",now)]   BECAUSE the pay action becomes a third row
 // <- outcome : audit_log : 3 rows · WHO=alice, WHAT=view/create/pay, WHEN=timestamp   BECAUSE the DB now holds a record of her actions
 ```
 
@@ -52,8 +58,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 32 (p.377) · micr
 // DEF: recent_actions · CALLED BY: SUP investigating "did alice pay?"
 // -> user : "alice"
 //    step 1 · match row id=1    answer : [] -> [(1,"alice","view_order","PO-2001",t1)]
+//    -> input  : answer = [] (user = "alice", audit_log row id=1)
+//    <- output : answer = [(1,"alice","view_order","PO-2001",t1)]   BECAUSE the log row for view_order matches alice
 //    step 2 · match row id=2    answer : [(1,"alice","view_order","PO-2001",t1)] -> [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2)]
+//    -> input  : answer = [(1,"alice","view_order","PO-2001",t1)] (audit_log row id=2)
+//    <- output : answer = [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2)]   BECAUSE the create_order row also matches alice
 //    step 3 · match row id=3    answer : [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2)] -> [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2),(3,"alice","pay_order","PO-2001",t3)]
+//    -> input  : answer = [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2)] (audit_log row id=3)
+//    <- output : answer = [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2),(3,"alice","pay_order","PO-2001",t3)]   BECAUSE the pay_order row also matches alice
 // <- outcome : answer : 3 rows · row id=3 is the payment -> SUP confirms "yes, alice paid at t3"
 //    alt compliance : query "target=PO-2001" to learn who touched it · alt security: query "action=pay_order"
 ```
@@ -80,8 +92,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 32 (p.377) · micr
 // DEF: create_order · CALLED BY: a client request
 // -> order_id : "PO-2001"
 //    step 1 · save the order, then call audit()     inline_audit : [] -> [(1,"create_order","PO-2001")]
+//    -> input  : inline_audit = [] (order_id = "PO-2001")
+//    <- output : inline_audit = [(1,"create_order","PO-2001")]   BECAUSE the audit() call appends a row after the save
 //    step 2 · publish, then call audit()            inline_audit : [1 row] -> [(1,"create_order","PO-2001"),(2,"order_published","PO-2001")]
+//    -> input  : inline_audit = [(1,"create_order","PO-2001")] (order_id = "PO-2001")
+//    <- output : inline_audit = [(1,"create_order","PO-2001"),(2,"order_published","PO-2001")]   BECAUSE the audit() call appends a row after the publish
 //    step 3 · the 2 audit() calls sit between business statements -> the method is harder to read
+//    -> input  : inline_audit = [(1,"create_order","PO-2001"),(2,"order_published","PO-2001")] (business statements = save, publish)
+//    <- output : inline_audit = 2 rows   BECAUSE the 2 audit() calls sit between business statements, making the method harder to read
 // <- outcome : inline_audit : 2 rows · business logic more complicated   BECAUSE the auditing code is intertwined with it
 //    alt event sourcing : append 2 domain events   event_log : [] -> [(1,"OrderCreated"),(2,"OrderPublished")] · the audit is a read of event_log, no audit() calls
 ```
@@ -135,9 +153,17 @@ _Role: reader_
 // DEF: record_and_reconstruct · CALLED BY: alice acting on PO-2001, then a reader querying
 // -> action1 : ("alice","view_order","PO-2001")
 //    step 1 · SVC INSERTs the view row    audit_log : [] -> [(1,"alice","view_order","PO-2001",t1)]
+//    -> input  : audit_log = [] (action1 = ("alice","view_order","PO-2001"))
+//    <- output : audit_log = [(1,"alice","view_order","PO-2001",t1)]   BECAUSE SVC writes one audit row for the view action
 //    step 2 · SVC INSERTs the create and pay rows    audit_log : [(1,"alice","view_order","PO-2001",t1)] -> [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2),(3,"alice","pay_order","PO-2001",t3)]
+//    -> input  : audit_log = [(1,"alice","view_order","PO-2001",t1)] (action = "create_order", "pay_order")
+//    <- output : audit_log = [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2),(3,"alice","pay_order","PO-2001",t3)]   BECAUSE SVC writes the create and pay rows
 //    step 3 · AGG collects and indexes the rows    audit_log : [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2),(3,"alice","pay_order","PO-2001",t3)] -> [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2),(3,"alice","pay_order","PO-2001",t3)]
+//    -> input  : audit_log = [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2),(3,"alice","pay_order","PO-2001",t3)] (collector = AGG)
+//    <- output : audit_log = [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2),(3,"alice","pay_order","PO-2001",t3)]   BECAUSE the aggregator collects and indexes the same rows
 //    step 4 · RDR queries user "alice"    answer : [] -> [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2),(3,"alice","pay_order","PO-2001",t3)]
+//    -> input  : answer = [] (user = "alice")
+//    <- output : answer = [(1,"alice","view_order","PO-2001",t1),(2,"alice","create_order","PO-2001",t2),(3,"alice","pay_order","PO-2001",t3)]   BECAUSE the reader reconstructs alice's actions from the indexed rows
 // <- outcome : answer 3 rows · row id=3 is the payment, so the support agent confirms "alice paid at t3"  BECAUSE the writer INSERTed rows, the aggregator indexed them, and the reader queried them back
 ```
 

@@ -22,8 +22,14 @@ registerChapter({
 // DEF: log_request · CALLED BY: SVC handling GET /orders for one request
 // -> req_id : "REQ-3001"
 //    step 1 · format the line in the standard shape   // line : null -> "10:00:01 INFO order-service REQ-3001 handle /orders"
+//    -> input  : req_id = "REQ-3001"
+//    <- output : line = "10:00:01 INFO order-service REQ-3001 handle /orders"   BECAUSE the instance formats in the standard shape
 //    step 2 · append the line to the instance log file   // logfile : [] -> ["10:00:01 INFO order-service REQ-3001 handle /orders"]
+//    -> input  : line = "10:00:01 INFO order-service REQ-3001 handle /orders"
+//    <- output : logfile = ["10:00:01 INFO order-service REQ-3001 handle /orders"]   BECAUSE the line is appended to the instance log file
 //    step 3 · hand the SAME req_id to the downstream call   // forwarded_id : null -> "REQ-3001"
+//    -> input  : req_id = "REQ-3001"
+//    <- output : forwarded_id = "REQ-3001"   BECAUSE the id rides with the request to the next service
 // <- log written : logfile has 1 line tagged "REQ-3001" · the id rides with the request to the next service
 //    alt the call errors : line : null -> "10:00:02 ERROR order-service REQ-3001 customer lookup failed"`
     },
@@ -43,8 +49,14 @@ registerChapter({
 // DEF: ship_logs · CALLED BY: LOG collecting each instance's log file
 // -> batch : 3 log lines, all tagged "REQ-3001"
 //    step 1 · SVC1's line arrives -> "INFO order-service REQ-3001 handle /orders"   // index : {} -> {"REQ-3001":[1]}
+//    -> input  : batch = 3 log lines tagged "REQ-3001"
+//    <- output : index = {"REQ-3001":[1]}   BECAUSE SVC1's line is the first filed under the id
 //    step 2 · SVC2's line arrives -> "INFO customer-service REQ-3001 lookup customer 42"   // index["REQ-3001"] : [1] -> [1,2]
+//    -> input  : index["REQ-3001"] = [1]
+//    <- output : index["REQ-3001"] = [1,2]   BECAUSE SVC2's line joins the same id
 //    step 3 · SVC3's line arrives -> "INFO payment-service REQ-3001 charge 19.00"   // index["REQ-3001"] : [1,2] -> [1,2,3]
+//    -> input  : index["REQ-3001"] = [1,2]
+//    <- output : index["REQ-3001"] = [1,2,3]   BECAUSE SVC3's line joins the same id
 // <- aggregated : index["REQ-3001"] has 3 lines from 3 services · one key reconstructs the whole request
 //    alt a second request "REQ-3002" : index : {"REQ-3001":[1,2,3]} -> {"REQ-3001":[1,2,3], "REQ-3002":[1]}`
     },
@@ -64,8 +76,14 @@ registerChapter({
 // DEF: search · CALLED BY: DEV typing the request id into the search UI
 // -> query : "REQ-3001"
 //    step 1 · match the key "REQ-3001" -> 3 hits   // hits : 0 -> 3
+//    -> input  : query = "REQ-3001"
+//    <- output : hits = 3   BECAUSE the index holds 3 lines under the key
 //    step 2 · sort the hits by timestamp   // order : "unsorted" -> "t1, t2, t3"
+//    -> input  : hits = 3
+//    <- output : order = "t1, t2, t3"   BECAUSE the 3 hits are sorted by timestamp
 //    step 3 · render the 3 lines as one path   // view : null -> "order-service -> customer-service -> payment-service"
+//    -> input  : order = "t1, t2, t3"
+//    <- output : view = "order-service -> customer-service -> payment-service"   BECAUSE the sorted lines reconstruct the request path
 // <- result : 3 lines across 3 services, in time order · one query shows the whole request path
 //    alt query "REQ-9999" : hits : 3 -> 0 -> an empty result, that request was never logged`
     },
@@ -85,8 +103,14 @@ registerChapter({
 // DEF: evaluate_alerts · CALLED BY: LOG as each new line is indexed
 // -> line : "ERROR order-service REQ-3001 customer lookup failed"
 //    step 1 · the configured rule "ERROR" matches this line   // match : false -> true
+//    -> input  : line = "ERROR order-service REQ-3001 customer lookup failed"
+//    <- output : match = true   BECAUSE the line contains the configured pattern "ERROR"
 //    step 2 · bump the ERROR count to its threshold   // count : 0 -> 1
+//    -> input  : match = true
+//    <- output : count = 1   BECAUSE the ERROR rule counts this match
 //    step 3 · fire the rule and notify DEV   // rules["ERROR"].fired : false -> true · alert : [] -> ["ERROR from order-service"]
+//    -> input  : count = 1 (threshold = 1)
+//    <- output : rules["ERROR"].fired = true · alert = ["ERROR from order-service"]   BECAUSE the count reached the threshold
 // <- alert : "ERROR from order-service" delivered to DEV · 1 notification for this pattern
 //    alt a plain INFO line : match : false -> false, count stays 0, no alert is raised`
     }
@@ -221,8 +245,14 @@ registerChapter({
 // DEF: aggregate_logs · CALLED BY: SVC1 writing, LOG indexing, DEV searching REQ-3001
 // -> request_id : "REQ-3001"
 //    step 1 · SVC1, SVC2, SVC3 each ship a log line   // entries : [] -> [3 lines]   BECAUSE all three services tag their lines with REQ-3001
+//    -> input  : request_id = "REQ-3001"
+//    <- output : entries = [3 lines]   BECAUSE all three services tag their lines with REQ-3001
 //    step 2 · LOG indexes each line by request id   // index : {} -> { "REQ-3001":[1,2,3] }   BECAUSE the collector keys the store by request id
+//    -> input  : entries = [3 lines]
+//    <- output : index = { "REQ-3001":[1,2,3] }   BECAUSE the collector keys the store by request id
 //    step 3 · DEV searches the index   // found : 0 -> 3   BECAUSE the reader queries the index and gets all three lines back
+//    -> input  : index = { "REQ-3001":[1,2,3] }
+//    <- output : found = 3   BECAUSE the reader queries the index and gets all three lines back
 // <- outcome : index["REQ-3001"] = [1,2,3] · DEV reads 3 correlated lines  BECAUSE transport moved each write into one aggregated store`
   },
   concepts: {

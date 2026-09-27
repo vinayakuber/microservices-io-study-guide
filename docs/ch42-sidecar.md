@@ -25,8 +25,14 @@ _Also known as: Chris Richardson · Microservice Patterns p.410 · microservices
 // DEF: start 2 processes (service + sidecar) · CALLED BY: POD at deploy time
 // -> service : "order-service" · -> sidecar : "order-sidecar"
 //    step 1 · start SVC · processes : {} -> {"order-service"}   BECAUSE the service instance runs as its own process
+//    -> input  : service = "order-service" · processes = {}
+//    <- output : processes = {"order-service"}   BECAUSE the service instance runs as its own process
 //    step 2 · start SIDE · processes : {"order-service"} -> {"order-service","order-sidecar"}  // the sidecar runs ALONGSIDE the service
+//    -> input  : sidecar = "order-sidecar" · processes = {"order-service"}
+//    <- output : processes = {"order-service","order-sidecar"}   BECAUSE the sidecar runs ALONGSIDE the service
 //    step 3 · attach concerns · concerns : [] -> ["tracing","metrics"]   // the sidecar carries cross-cutting concerns, not the service
+//    -> input  : concerns = []
+//    <- output : concerns = ["tracing","metrics"]   BECAUSE the sidecar carries cross-cutting concerns, not the service
 // <- processes : 2  · concerns : 2  · the service and sidecar share one host
 //    alt container form : sidecar : "order-sidecar" -> "order-sidecar-container"  BECAUSE a sidecar can be a container instead of a process
 ```
@@ -50,8 +56,14 @@ _Also known as: Chris Richardson · Microservice Patterns p.410 · microservices
 // DEF: mediate call 1 to DB · CALLED BY: SVC sending a query
 // -> call : "SELECT * FROM orders" · -> target : "db:5432"
 //    step 1 · intercept · request : {} -> {"call":"SELECT * FROM orders"}  BECAUSE the sidecar sits between the service and its outbound traffic
+//    -> input  : call = "SELECT * FROM orders" · request = {}
+//    <- output : request = {"call":"SELECT * FROM orders"}   BECAUSE the sidecar sits between the service and its outbound traffic
 //    step 2 · trace · trace_id : null -> "trc-77c1"                        // the sidecar stamps a unique id for distributed tracing
+//    -> input  : trace_id = null
+//    <- output : trace_id = "trc-77c1"   BECAUSE the sidecar stamps a unique id for distributed tracing
 //    step 3 · forward · sent : 0 -> 1                                      // the stamped call leaves for the DB
+//    -> input  : sent = 0 · target = "db:5432"
+//    <- output : sent = 1   BECAUSE the stamped call leaves for the DB
 // <- call : "SELECT * FROM orders" sent to db:5432 · trace_id "trc-77c1"
 //    alt reply path : reply : 0 -> 1   BECAUSE the same sidecar also mediates the inbound reply
 ```
@@ -75,8 +87,14 @@ _Also known as: Chris Richardson · Microservice Patterns p.410 · microservices
 // DEF: ping health URL every 10 s · CALLED BY: MON
 // -> health_url : "/health"
 //    step 1 · answer · health : {} -> {"status":"UP"}   BECAUSE the sidecar owns the health-check URL the monitor pings
+//    -> input  : health_url = "/health" · health = {}
+//    <- output : health = {"status":"UP"}   BECAUSE the sidecar owns the health-check URL the monitor pings
 //    step 2 · count · metric : 0 -> 1                   // the sidecar records one measured request
+//    -> input  : metric = 0
+//    <- output : metric = 1   BECAUSE the sidecar records one measured request
 //    step 3 · report · samples : 0 -> 1                 // the metric is emitted to the monitor
+//    -> input  : samples = 0
+//    <- output : samples = 1   BECAUSE the metric is emitted to the monitor
 // <- health : "UP"  · metric : 1  · observability handled by the sidecar, service code unchanged
 //    alt DOWN : health : {"status":"UP"} -> {"status":"DOWN"}   BECAUSE the service process failed behind the sidecar
 ```
@@ -100,8 +118,14 @@ _Also known as: Chris Richardson · Microservice Patterns p.410 · microservices
 // DEF: make call 1 from A to B · CALLED BY: Order Service calling Customer Service
 // -> next : "customer-service"
 //    step 1 · deploy sidecars · sidecars : {} -> {"a","b"}   BECAUSE each service instance gets its own sidecar
+//    -> input  : sidecars = {}
+//    <- output : sidecars = {"a","b"}   BECAUSE each service instance gets its own sidecar
 //    step 2 · route · hops : 0 -> 1                          // SIDEA forwards to SIDEB, which hands it to SVCB
+//    -> input  : hops = 0 · next = "customer-service"
+//    <- output : hops = 1   BECAUSE SIDEA forwards to SIDEB, which hands it to SVCB
 //    step 3 · form mesh · mediated : 0 -> 1                  // the sidecars collectively mediate all in/out communication
+//    -> input  : mediated = 0
+//    <- output : mediated = 1   BECAUSE the sidecars collectively mediate all in/out communication
 // <- hops : 1  · a mesh is often implemented using the sidecar pattern
 //    alt one sidecar only : sidecars : {"a","b"} -> {"a"}   BECAUSE without sidecars on every service, traffic is not fully mediated
 ```
@@ -151,9 +175,17 @@ _Role: shared resources_
 // DEF: colocate_sidecar · CALLED BY: the pod at deploy time
 // -> service : "order-service" · -> sidecar : "order-sidecar"
 //    step 1 · the pod starts the app container    containers : {} -> {"order-service"}   BECAUSE the service runs as its own container
+//    -> input  : service = "order-service" · containers = {}
+//    <- output : containers = {"order-service"}   BECAUSE the service runs as its own container
 //    step 2 · the pod starts the sidecar container    containers : {"order-service"} -> {"order-service","order-sidecar"}   // the sidecar runs alongside, sharing the pod
+//    -> input  : sidecar = "order-sidecar" · containers = {"order-service"}
+//    <- output : containers = {"order-service","order-sidecar"}   BECAUSE the sidecar runs alongside, sharing the pod
 //    step 3 · the sidecar attaches the concerns    concerns : [] -> ["tracing","metrics"]   // the app reads none of this; SIDE records it
+//    -> input  : concerns = []
+//    <- output : concerns = ["tracing","metrics"]   BECAUSE the app reads none of this; SIDE records it
 //    step 4 · both mount the shared volume and share the namespace    mounts : 0 -> 2   // volume "shared-logs" and net "pod-net-7"
+//    -> input  : mounts = 0 · volume = "shared-logs" · namespace = "pod-net-7"
+//    <- output : mounts = 2   BECAUSE both containers mount the shared volume and namespace
 // <- containers : 2 in the pod · the sidecar reads the shared volume "shared-logs" and writes its own metrics   BECAUSE a sidecar shares the host, network, and volume with the service
 ```
 

@@ -30,9 +30,17 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 33 (p.370) · micr
 // DEF: receive_request · CALLED BY: the client HTTP request arriving at GW
 // -> request : "GET /orders/PO-2001"
 //    step 1 · GW mints the ids    trace_id = 128 random bits -> 32 hex chars = "4bf92f3577b34da6a3ce90d0e2b88a4d" · span_id = 64 random bits -> 16 hex chars = "6f9a3c1b8e2d4001"
+//    -> input  : trace_id = "" · span_id = "" (request = "GET /orders/PO-2001")
+//    <- output : trace_id = "4bf92f3577b34da6a3ce90d0e2b88a4d" · span_id = "6f9a3c1b8e2d4001"   BECAUSE GW assigns a unique id to this external request
 //    step 2 · GW opens the root span    spans : [] -> [("6f9a3c1b8e2d4001", parent="", name="GET /orders/PO-2001", start=100)]
+//    -> input  : spans = [] (span_id = "6f9a3c1b8e2d4001", parent = "")
+//    <- output : spans = [("6f9a3c1b8e2d4001", parent="", name="GET /orders/PO-2001", start=100)]   BECAUSE the root span has no parent
 //    step 3 · GW fills the header    header : { trace_id:"", span_id:"" } -> { trace_id:"4bf92f3577b34da6a3ce90d0e2b88a4d", span_id:"6f9a3c1b8e2d4001" }   // wire form "00-4bf9...-6f9a...-01"
+//    -> input  : header = { trace_id:"", span_id:"" } (trace_id = "4bf92f3577b34da6a3ce90d0e2b88a4d", span_id = "6f9a3c1b8e2d4001")
+//    <- output : header = { trace_id:"4bf92f3577b34da6a3ce90d0e2b88a4d", span_id:"6f9a3c1b8e2d4001" }   BECAUSE the header carries the ids on the wire
 //    step 4 · GW reports the span    span : open -> on BRK queue "zipkin" · ZIP collector consumes it and the storage stores it (start=100, end=104)
+//    -> input  : span = ("6f9a3c1b8e2d4001", start=100, end=104) (queue = "zipkin")
+//    <- output : span = reported to BRK queue "zipkin"   BECAUSE the span is sent to the collector via the broker
 // <- outcome : SVC receives traceparent "00-4bf92f3577b34da6a3ce90d0e2b88a4d-6f9a3c1b8e2d4001-01" · ZIP storage holds the root span (GW keeps no registry)
 //    alt B3 header : "X-B3-TraceId: 4bf92f3577b34da6a3ce90d0e2b88a4d" + "X-B3-SpanId: 6f9a3c1b8e2d4001" (same ids, different header names)
 ```
@@ -60,10 +68,20 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 33 (p.370) · micr
 // DEF: handle_request · CALLED BY: the request moving GW -> ORD -> KIT -> PAY
 // -> trace_id : "4bf92f3577b34da6a3ce90d0e2b88a4d"
 //    step 1 · ORD reads the inbound header    parent : "" -> "6f9a3c1b8e2d4001"  (the span id of the hop that invoked it)
+//    -> input  : parent = "" (header.span_id = "6f9a3c1b8e2d4001")
+//    <- output : parent = "6f9a3c1b8e2d4001"   BECAUSE ORD reads the span id of the hop that invoked it
 //    step 2 · ORD mints a child id    span_id = 64 random bits -> 16 hex chars = "6f9a3c1b8e2d4002"  (trace_id stays the SAME across all hops)
+//    -> input  : span_id = "" (trace_id = "4bf92f3577b34da6a3ce90d0e2b88a4d")
+//    <- output : span_id = "6f9a3c1b8e2d4002"   BECAUSE each hop mints its own span id while the trace id stays the same
 //    step 3 · ORD opens the child span    spans : [1 span] -> [1 span, ("6f9a3c1b8e2d4002", parent="6f9a3c1b8e2d4001", start=105, end=120)]
+//    -> input  : spans = [1 span] (span_id = "6f9a3c1b8e2d4002", parent = "6f9a3c1b8e2d4001")
+//    <- output : spans = [1 span, ("6f9a3c1b8e2d4002", parent="6f9a3c1b8e2d4001", start=105, end=120)]   BECAUSE ORD's span names the previous hop as parent
 //    step 4 · ORD forwards the updated header    header : { span_id:"6f9a3c1b8e2d4001" } -> { span_id:"6f9a3c1b8e2d4002" }   // wire form "00-...-6f9a3c1b8e2d4002-01"
+//    -> input  : header = { span_id:"6f9a3c1b8e2d4001" } (span_id = "6f9a3c1b8e2d4002")
+//    <- output : header = { span_id:"6f9a3c1b8e2d4002" }   BECAUSE the next hop needs the child span id as its parent
 //    step 5 · KIT and PAY repeat steps 1-4    spans : [2 spans] -> [2 spans, ("6f9a3c1b8e2d4003", parent="6f9a3c1b8e2d4002", start=121, end=135)] -> [3 spans, ("6f9a3c1b8e2d4004", parent="6f9a3c1b8e2d4003", start=136, end=150)]
+//    -> input  : spans = [2 spans] (KIT then PAY each repeat steps 1-4)
+//    <- output : spans = [4 spans]   BECAUSE KIT opens span 4003 and PAY opens span 4004, chaining parent ids
 // <- outcome : 4 spans chained by parent ids, all carrying trace_id "4bf92f3577b34da6a3ce90d0e2b88a4d" · each hop's span reported to ZIP
 ```
 
@@ -96,12 +114,26 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 33 (p.370) · micr
 // DEF: collect_spans · CALLED BY: each writer finishing its operation
 // -> trace_id : "4bf92f3577b34da6a3ce90d0e2b88a4d" · -> span1 : ("6f9a3c1b8e2d4001", parent="", start=100, end=104)
 //    step 1 · writer GW reports span1 to BRK queue "zipkin"    span1 : ("6f9a3c1b8e2d4001", 100, 104) -> on the wire to BRK (transport hop 1)
+//    -> input  : span1 = ("6f9a3c1b8e2d4001", start=100, end=104) (queue = "zipkin")
+//    <- output : span1 = on the wire to BRK   BECAUSE GW reports its finished span to the transport
 //    step 2 · collector consumes span1 off BRK and writes it    trace_store : {} -> {"4bf92f3577b34da6a3ce90d0e2b88a4d" : [("6f9a3c1b8e2d4001", parent="", start=100, end=104)]}
+//    -> input  : trace_store = {} (span1 = ("6f9a3c1b8e2d4001", parent="", start=100, end=104))
+//    <- output : trace_store = {"4bf92f3577b34da6a3ce90d0e2b88a4d" : [("6f9a3c1b8e2d4001", parent="", start=100, end=104)]}   BECAUSE the collector writes the span into the store
 //    step 3 · ORD span via BRK -> collector -> store    trace_store : {"4bf92f3577b34da6a3ce90d0e2b88a4d" : 1 span} -> {"4bf92f3577b34da6a3ce90d0e2b88a4d" : [("6f9a3c1b8e2d4001", start=100, end=104), ("6f9a3c1b8e2d4002", parent="6f9a3c1b8e2d4001", start=105, end=120)]}
+//    -> input  : trace_store = {"4bf92f3577b34da6a3ce90d0e2b88a4d" : 1 span} (span2 = ("6f9a3c1b8e2d4002", parent="6f9a3c1b8e2d4001", start=105, end=120))
+//    <- output : trace_store = {"4bf92f3577b34da6a3ce90d0e2b88a4d" : 2 spans}   BECAUSE ORD's span travels BRK -> collector -> store
 //    step 4 · KIT span via BRK -> collector -> store    trace_store : {"4bf92f3577b34da6a3ce90d0e2b88a4d" : 2 spans} -> {"4bf92f3577b34da6a3ce90d0e2b88a4d" : [2 spans, ("6f9a3c1b8e2d4003", parent="6f9a3c1b8e2d4002", start=121, end=135)]}
+//    -> input  : trace_store = {"4bf92f3577b34da6a3ce90d0e2b88a4d" : 2 spans} (span3 = ("6f9a3c1b8e2d4003", parent="6f9a3c1b8e2d4002", start=121, end=135))
+//    <- output : trace_store = {"4bf92f3577b34da6a3ce90d0e2b88a4d" : 3 spans}   BECAUSE KIT's span travels BRK -> collector -> store
 //    step 5 · PAY span via BRK -> collector -> store    trace_store : {"4bf92f3577b34da6a3ce90d0e2b88a4d" : 3 spans} -> {"4bf92f3577b34da6a3ce90d0e2b88a4d" : [3 spans, ("6f9a3c1b8e2d4004", parent="6f9a3c1b8e2d4003", start=136, end=150)]}
+//    -> input  : trace_store = {"4bf92f3577b34da6a3ce90d0e2b88a4d" : 3 spans} (span4 = ("6f9a3c1b8e2d4004", parent="6f9a3c1b8e2d4003", start=136, end=150))
+//    <- output : trace_store = {"4bf92f3577b34da6a3ce90d0e2b88a4d" : 4 spans}   BECAUSE PAY's span travels BRK -> collector -> store
 //    step 6 · reader OP queries the ZIP query UI for the trace id    trace_store : {"4bf92f3577b34da6a3ce90d0e2b88a4d" : 4 spans} -> returns the 4 spans (read, nothing written)
+//    -> input  : trace_store = {"4bf92f3577b34da6a3ce90d0e2b88a4d" : 4 spans} (trace_id = "4bf92f3577b34da6a3ce90d0e2b88a4d")
+//    <- output : result = 4 spans   BECAUSE OP reads the trace back by its id (nothing written)
 //    step 7 · ZIP query UI orders them by parent+start    timeline : [] -> [GW@100-104, ORD@105-120, KIT@121-135, PAY@136-150]
+//    -> input  : timeline = [] (trace spans = 4)
+//    <- output : timeline = [GW@100-104, ORD@105-120, KIT@121-135, PAY@136-150]   BECAUSE the spans are ordered by parent+start
 // <- outcome : OP sees the timeline for trace "4bf92f3577b34da6a3ce90d0e2b88a4d" · slow hop = KIT (135 - 121 = 14 ms)   BECAUSE the writer's spans travel BRK -> collector -> store, and the reader pulls them back ordered by parent+start
 ```
 
@@ -128,8 +160,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 33 (p.370) · micr
 // DEF: search · CALLED BY: OP debugging one slow request
 // -> trace_id : "4bf92f3577b34da6a3ce90d0e2b88a4d"
 //    step 1 · each service logs with the id inline   log_index : [] -> ["[4bf92f3577b34da6a3ce90d0e2b88a4d] ORD line", "[4bf92f3577b34da6a3ce90d0e2b88a4d] KIT line", "[4bf92f3577b34da6a3ce90d0e2b88a4d] PAY line"]
+//    -> input  : log_index = [] (trace_id = "4bf92f3577b34da6a3ce90d0e2b88a4d")
+//    <- output : log_index = ["[4bf92f3577b34da6a3ce90d0e2b88a4d] ORD line", "[4bf92f3577b34da6a3ce90d0e2b88a4d] KIT line", "[4bf92f3577b34da6a3ce90d0e2b88a4d] PAY line"]   BECAUSE each service prints the id into its log line
 //    step 2 · OP queries the index for the id   matches : [] -> [ORD line, KIT line, PAY line]
+//    -> input  : matches = [] (trace_id = "4bf92f3577b34da6a3ce90d0e2b88a4d")
+//    <- output : matches = [ORD line, KIT line, PAY line]   BECAUSE the id links the log lines across machines
 //    step 3 · OP orders the 3 lines by timestamp   matches : [3 lines] -> [ORD@105, KIT@121, PAY@136]
+//    -> input  : matches = [3 lines] (timestamps = 105, 121, 136)
+//    <- output : matches = [ORD@105, KIT@121, PAY@136]   BECAUSE ordering the lines by time exposes the slow hop
 // <- outcome : matches = 3 lines for one id · slow hop = KIT (135 - 121 = 14 ms)   BECAUSE the id links log lines on 3 different machines
 //    alt infra cost : at scale N requests x M spans = N x M records -> needs real storage infrastructure
 ```
@@ -191,12 +229,26 @@ _Role: reader_
 // DEF: trace_one_request · CALLED BY: one external request finishing across GW -> ORD -> KIT -> PAY
 // -> trace_id : "4bf92f3577b34da6a3ce90d0e2b88a4d"
 //    step 1 · GW tracer mints the ids    trace_id = 128 random bits -> 32 hex chars = "4bf92f3577b34da6a3ce90d0e2b88a4d"
+//    -> input  : trace_id = "" · span_id = "" (request = "GET /orders/PO-2001")
+//    <- output : trace_id = "4bf92f3577b34da6a3ce90d0e2b88a4d"   BECAUSE the tracer mints a unique id for this request
 //    step 2 · GW reporter batches the finished span    span : ("6f9a3c1b8e2d4001", parent="", start=100, end=104) -> queued
+//    -> input  : span = ("6f9a3c1b8e2d4001", parent="", start=100, end=104) (reporter = batch)
+//    <- output : span = queued   BECAUSE the reporter batches the finished span for the sender
 //    step 3 · GW sender publishes to BRK    zipkin_queue : [] -> [span 6f9a3c1b8e2d4001]
+//    -> input  : zipkin_queue = [] (span = "6f9a3c1b8e2d4001")
+//    <- output : zipkin_queue = [span 6f9a3c1b8e2d4001]   BECAUSE the sender publishes the span to the "zipkin" queue
 //    step 4 · ZIP collector consumes and writes    trace_store : {} -> {"4bf92f3577b34da6a3ce90d0e2b88a4d" : [span 6f9a3c1b8e2d4001]}
+//    -> input  : trace_store = {} (span = "6f9a3c1b8e2d4001")
+//    <- output : trace_store = {"4bf92f3577b34da6a3ce90d0e2b88a4d" : [span 6f9a3c1b8e2d4001]}   BECAUSE the collector writes the span into the store
 //    step 5 · ORD/KIT/PAY repeat steps 1-4    trace_store : {1 span} -> {4 spans: 6f9a3c1b8e2d4001..04}   BECAUSE each of the 4 services is its own writer with its own Tracer -> Reporter -> Sender
+//    -> input  : trace_store = {1 span} (ORD, KIT, PAY each repeat steps 1-4)
+//    <- output : trace_store = {4 spans: 6f9a3c1b8e2d4001..04}   BECAUSE each of the 4 services is its own writer with its own Tracer -> Reporter -> Sender
 //    step 6 · OP queries ZIP Query API    GET /api/v2/traces/4bf92f3577b34da6a3ce90d0e2b88a4d -> the 4 spans (read, nothing written)
+//    -> input  : trace_store = {4 spans} (trace_id = "4bf92f3577b34da6a3ce90d0e2b88a4d")
+//    <- output : result = 4 spans   BECAUSE OP reads the trace back by its id (nothing written)
 //    step 7 · ZIP Lens UI orders by parent+start    timeline : [] -> [GW@100-104, ORD@105-120, KIT@121-135, PAY@136-150]
+//    -> input  : timeline = [] (trace spans = 4)
+//    <- output : timeline = [GW@100-104, ORD@105-120, KIT@121-135, PAY@136-150]   BECAUSE the spans are ordered by parent+start
 // <- outcome : OP sees the timeline · slow hop = KIT (135 - 121 = 14 ms)   BECAUSE each writer's in-process Tracer -> Reporter -> Sender ships spans over BRK (transport) to ZIP's collector -> storage (aggregator), and ZIP's query UI serves them back (reader)
 ```
 

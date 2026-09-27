@@ -27,8 +27,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 4 · microservices
 // DEF: split · CALLED BY: ARC modeling the domain of an online store
 // -> domain : "online store"
 //    step 1 · split the problem space into parts : domain.parts : [] -> ["catalog","inventory","orders","delivery"]
+//    -> input  : domain.parts = []
+//    <- output : domain.parts = ["catalog","inventory","orders","delivery"]   BECAUSE the architect splits the problem space into its parts
 //    step 2 · each part becomes a subdomain : subdomains : [] -> ["product catalog","inventory management","order management","delivery management"]
+//    -> input  : domain.parts = ["catalog","inventory","orders","delivery"]
+//    <- output : subdomains = ["product catalog","inventory management","order management","delivery management"]   BECAUSE each part of the domain corresponds to one subdomain
 //    step 3 · tag each as a distinct part of the business : distinct_areas : 0 -> 4   BECAUSE each subdomain corresponds to a different part of the business
+//    -> input  : subdomains = ["product catalog","inventory management","order management","delivery management"]
+//    <- output : distinct_areas = 4   BECAUSE each subdomain corresponds to a different part of the business
 // <- subdomain_count : 4 · the domain holds multiple subdomains
 //    alt a part is really two subdomains : subdomain_count : 4 -> 5 (a subdomain is found by iteration)
 ```
@@ -53,8 +59,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 4 · microservices
 // DEF: classify · CALLED BY: ARC rating each subdomain's value to the business
 // -> subdomain : "recommendations"
 //    step 1 · a differentiator is CORE : subdomains["recommendations"].class : "unset" -> "core"   BECAUSE it is the key differentiator and most valuable part
+//    -> input  : subdomains["recommendations"].class = "unset"
+//    <- output : subdomains["recommendations"].class = "core"   BECAUSE it is the key differentiator and most valuable part
 //    step 2 · related-but-not-differentiating is SUPPORTING : subdomains["accounting"].class : "unset" -> "supporting"  (in-house or outsourced)
+//    -> input  : subdomains["accounting"].class = "unset"
+//    <- output : subdomains["accounting"].class = "supporting"   BECAUSE it relates to the business but is not a differentiator (in-house or outsourced)
 //    step 3 · not business-specific is GENERIC : subdomains["email"].class : "unset" -> "generic"   BECAUSE it should be bought off the shelf
+//    -> input  : subdomains["email"].class = "unset"
+//    <- output : subdomains["email"].class = "generic"   BECAUSE it should be bought off the shelf
 // <- classes : "core","supporting","generic" · investment priority: core first
 //    alt every subdomain marked core : prioritize : 1 -> 3 (no differentiator is wrong — value is what matters)
 ```
@@ -80,9 +92,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 4 · microservices
 // DEF: map · CALLED BY: ARC turning subdomains into services
 // -> subdomain_list : ["product catalog","inventory management","order management","delivery management"]
 //    step 1 · one service per subdomain : services : [] -> ["catalog","inventory","order","delivery"]
+//    -> input  : subdomain_list = ["product catalog","inventory management","order management","delivery management"]
+//    <- output : services = ["catalog","inventory","order","delivery"]   BECAUSE each subdomain becomes one service
 //    step 2 · keep each service cohesive : cohesion : "unknown" -> "strong"   BECAUSE each service is one subdomain with one set of functions
+//    -> input  : services = ["catalog","inventory","order","delivery"]
+//    <- output : cohesion = "strong"   BECAUSE each service is one subdomain with one set of functions
 //    step 3 · keep services loosely coupled : coupling : "unknown" -> "loose"   (each service owns its subdomain's model)
+//    -> input  : coupling = "unknown"
+//    <- output : coupling = "loose"   BECAUSE each service encapsulates its implementation behind an API (each service owns its subdomain's model)
 //    step 4 · a client query is served by the service owning that subdomain : query "GET /orders/O-1" -> served by "order"   BECAUSE order management maps to the order service
+//    -> input  : query = "GET /orders/O-1"
+//    decode 4a · split the path to find the subdomain -> path : "none" -> "orders"
+//    decode 4b · match the subdomain to its owning service -> owner : "none" -> "order"
+//    <- output : served_by = "order"   BECAUSE order management maps to the order service
 // <- service_count : 4 · services correspond to subdomains, not to technical layers · queries route to the owning service (read path)
 //    alt merge two subdomains : services : 4 -> 3  (a service may contain more than one subdomain)
 ```
@@ -112,8 +134,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 4 · microservices
 // DEF: identify · CALLED BY: ARC deriving subdomains from two starting points
 // -> group : "Fulfillment Team"
 //    step 1 · an org group suggests a subdomain : subdomains : [] -> ["fulfillment"]
+//    -> input  : org_groups = { "Catalog Team":{}, "Fulfillment Team":{} }
+//    <- output : subdomains = ["fulfillment"]   BECAUSE the "Fulfillment Team" org group corresponds to the fulfillment subdomain
 //    step 2 · a key domain object suggests another : domain_model["Order"].subdomain : "none" -> "order management"   BECAUSE subdomains often have a key domain object
+//    -> input  : domain_model["Order"].subdomain = "none"
+//    <- output : domain_model["Order"].subdomain = "order management"   BECAUSE subdomains often have a key domain object
 //    step 3 · confirm the area of expertise : expertise : "none" -> "fulfillment operations"   BECAUSE areas of expertise mark distinct subdomains
+//    -> input  : expertise = "none"
+//    <- output : expertise = "fulfillment operations"   BECAUSE areas of expertise mark distinct subdomains
 // <- subdomains : ["fulfillment","order management"] · found from org structure + domain model
 //    alt a subdomain is missed : subdomains : 2 -> 3 on a later pass (identification is iterative)
 ```
@@ -160,9 +188,19 @@ _Role: service (owns its data)_
 // DEF: classify_and_map · CALLED BY: the architect turning subdomains into services
 // -> subdomain : "order management"
 //    step 1 · classify the subdomain    class : "unset" -> "core"   BECAUSE order management is the key differentiator
+//    -> input  : subdomain = "order management"
+//    <- output : class = "core"   BECAUSE order management is the key differentiator
 //    step 2 · map it to one service    services : "none" -> "order"
+//    -> input  : class = "core"
+//    <- output : services = "order"   BECAUSE each subdomain maps to one service
 //    step 3 · the service writes its rows    orders : {} -> { "O-1": {status:"NEW"} }
+//    -> input  : orders = {}
+//    <- output : orders = { "O-1": {status:"NEW"} }   BECAUSE the order service owns its subdomain data
 //    step 4 · a client query reads it back    GET /orders/O-1 -> { id:"O-1", status:"NEW" }
+//    -> input  : GET /orders/O-1 (read key "O-1")
+//    decode 4a · send the GET for key O-1 -> request : "none" -> "GET /orders/O-1"
+//    decode 4b · the order service's own DB looks up the row by id -> row : {} -> { id:"O-1", status:"NEW" }
+//    <- output : { id:"O-1", status:"NEW" }   BECAUSE PostgreSQL 16 @ order-db-1 returns the row the write path just stored
 // <- outcome : subdomain "order management" -> service "order", data owned and served · core is invested in-house, generic is bought off the shelf
 ```
 

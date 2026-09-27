@@ -25,8 +25,14 @@ _Also known as: Chris Richardson · Microservice Patterns p.380 · microservices
 // DEF: intercept outbound call 1 to DB · CALLED BY: SVC sending a query
 // -> call : "SELECT * FROM orders" · -> target : "db:5432"
 //    step 1 · intercept · request : {} -> {"call":"SELECT * FROM orders","to":"db:5432"}  BECAUSE the mesh mediates ALL traffic in and out
+//    -> input  : call = "SELECT * FROM orders" (target = "db:5432")
+//    <- output : request = {"call":"SELECT * FROM orders","to":"db:5432"}   BECAUSE the mesh mediates ALL traffic in and out
 //    step 2 · trace · trace_id : null -> "trc-9f2a"                                        // the proxy assigns a unique id to the request
+//    -> input  : request = {"call":"SELECT * FROM orders","to":"db:5432"}
+//    <- output : trace_id = "trc-9f2a"   BECAUSE the proxy assigns a unique id to the request
 //    step 3 · forward · sent : 0 -> 1                                                      // the proxy forwards the traced call to the DB
+//    -> input  : trace_id = "trc-9f2a"
+//    <- output : sent = 1   BECAUSE the proxy forwards the traced call to the DB
 // <- call : "SELECT * FROM orders" delivered to db:5432 · trace_id "trc-9f2a" attached
 //    alt inbound reply : reply : 0 -> 1   BECAUSE the same proxy also mediates the response back into SVC
 ```
@@ -51,8 +57,14 @@ _Also known as: Chris Richardson · Microservice Patterns p.380 · microservices
 // DEF: propagate id trc-9f2a to next hop · CALLED BY: Order Service calling Customer Service
 // -> next : "customer-service"
 //    step 1 · carry · hops : [] -> ["order-service"]   BECAUSE the proxy passes the SAME unique id between services
+//    -> input  : trace_id = "trc-9f2a"
+//    <- output : hops = ["order-service"]   BECAUSE the proxy passes the SAME unique id between services
 //    step 2 · forward · hops : ["order-service"] -> ["order-service","customer-service"]  // the id rides to the next service
+//    -> input  : hops = ["order-service"]
+//    <- output : hops = ["order-service","customer-service"]   BECAUSE the id rides to the next service
 //    step 3 · record · spans : 0 -> 1                    // each hop records a span against the shared id
+//    -> input  : hops = ["order-service","customer-service"]
+//    <- output : spans = 1   BECAUSE each hop records a span against the shared id
 // <- trace_id : "trc-9f2a"  · spans : 1  · the whole chain is reconstructable from one id
 //    alt untraced call : trace_id : "trc-9f2a" -> null   BECAUSE a call that bypasses the mesh carries no id
 ```
@@ -76,8 +88,14 @@ _Also known as: Chris Richardson · Microservice Patterns p.380 · microservices
 // DEF: ping health URL every 10 s · CALLED BY: MON
 // -> health_url : "/health"
 //    step 1 · ping · health : {} -> {"status":"UP"}   BECAUSE the proxy exposes a URL the monitor can ping
+//    -> input  : health_url = "/health"
+//    <- output : health = {"status":"UP"}   BECAUSE the proxy exposes a URL the monitor can ping
 //    step 2 · measure · metric : 0 -> 1               // the proxy counts one successful request
+//    -> input  : health = {"status":"UP"}
+//    <- output : metric = 1   BECAUSE the proxy counts one successful request
 //    step 3 · report · samples : 0 -> 1               // the measurement is emitted to the monitor
+//    -> input  : metric = 1
+//    <- output : samples = 1   BECAUSE the measurement is emitted to the monitor
 // <- health : "UP"  · metric : 1  · insight into what the service is doing, with no code change
 //    alt DOWN : health : {"status":"UP"} -> {"status":"DOWN"}   BECAUSE the service process failed, so the ping reports DOWN
 ```
@@ -101,8 +119,14 @@ _Also known as: Chris Richardson · Microservice Patterns p.380 · microservices
 // DEF: inject config with 3 entries · CALLED BY: PROXY at startup
 // -> env : "prod"
 //    step 1 · load config · config : {} -> {"db":"db:5432","broker":"brk:9092","secret":"s3cr3t"}  BECAUSE credentials and external locations are externalized
+//    -> input  : env = "prod"
+//    <- output : config = {"db":"db:5432","broker":"brk:9092","secret":"s3cr3t"}   BECAUSE credentials and external locations are externalized
 //    step 2 · configure logging · logger : null -> "logback"                                        // the proxy configures the logging framework once
+//    -> input  : config = {"db":"db:5432","broker":"brk:9092","secret":"s3cr3t"}
+//    <- output : logger = "logback"   BECAUSE the proxy configures the logging framework once
 //    step 3 · hand to SVC · injected : 0 -> 1                                                       // the service reads config from the proxy, not from code
+//    -> input  : logger = "logback"
+//    <- output : injected = 1   BECAUSE the service reads config from the proxy, not from code
 // <- config : 3 entries  · logger : "logback"  · cross-cutting concerns live outside the service
 //    alt no mesh : injected : 1 -> 0   BECAUSE without a mesh each service must implement these concerns itself
 ```
@@ -152,9 +176,17 @@ _Role: control plane_
 // DEF: mediate_one_call · CALLED BY: the Order Service sending a query
 // -> call : "SELECT * FROM orders" · -> target : "db:5432"
 //    step 1 · the proxy intercepts the call    request : {} -> {"call":"SELECT * FROM orders","to":"db:5432"}   BECAUSE the mesh mediates ALL traffic in and out
+//    -> input  : call = "SELECT * FROM orders" (target = "db:5432")
+//    <- output : request = {"call":"SELECT * FROM orders","to":"db:5432"}   BECAUSE the mesh mediates ALL traffic in and out
 //    step 2 · the proxy records the trace id    trace_id : "" -> "trc-9f2a"   // the data plane stamps a unique id
+//    -> input  : request = {"call":"SELECT * FROM orders","to":"db:5432"}
+//    <- output : trace_id = "trc-9f2a"   BECAUSE the data plane stamps a unique id
 //    step 3 · the proxy reads the route and applies mTLS    sent : 0 -> 1   // cert "cert-7f21" encrypts the hop to the route "orders-db-1"
+//    -> input  : trace_id = "trc-9f2a" (route = "db:5432")
+//    <- output : sent = 1   BECAUSE cert "cert-7f21" encrypts the hop to the route "orders-db-1"
 //    step 4 · the control plane pushes fresh routes    route_table : { "db:5432":"orders-db-1" } -> { "db:5432":"orders-db-1", "brk:9092":"broker-1" }   BECAUSE CP distributes config
+//    -> input  : route_table = { "db:5432":"orders-db-1" }
+//    <- output : route_table = { "db:5432":"orders-db-1", "brk:9092":"broker-1" }   BECAUSE CP distributes config
 // <- call : "SELECT * FROM orders" delivered to "db:5432" · trace_id "trc-9f2a"   BECAUSE the sidecar sits between the service and the network, and the response is routed back to SVC
 ```
 

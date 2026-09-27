@@ -25,15 +25,27 @@ _Also known as: Chris Richardson · Microservice Patterns · microservices.io /p
 // DEF: create order · CALLED BY: SVC processing a CreateOrderCommand
 // -> customerId : "C-100" · -> orderTotal : 125.00
 //    step 1 · build the event : E1 = OrderCreatedEvent("C-100", 125.00)   // the command becomes an event
+//    -> input  : event = "none" (customerId = "C-100", orderTotal = 125.00)
+//    <- output : event = E1 = OrderCreatedEvent("C-100", 125.00)   BECAUSE the command becomes an event
 //    step 2 · append to the store : events : [] -> [E1:OrderCreated("C-100",125.00)]   BECAUSE saving an event is a single operation, inherently atomic
+//    -> input  : events = [] (event = E1:OrderCreated("C-100",125.00))
+//    <- output : events = [E1:OrderCreated("C-100",125.00)]   BECAUSE saving an event is a single operation, inherently atomic
 //    step 3 · apply to memory : state.orderState : null -> "CREATED" · state.customerId : null -> "C-100"
+//    -> input  : state = { orderState:null, customerId:null } (event = E1:OrderCreated("C-100",125.00))
+//    <- output : state = { orderState:"CREATED", customerId:"C-100" }   BECAUSE applying E1 sets the created state and copies the customer id
 // <- event : E1:OrderCreated("C-100",125.00) · delivered to every subscriber, including CS
 //
 // DEF: approve order · CALLED BY: SVC processing an ApproveOrderCommand
 // -> customerId : "C-100"
 //    step 1 · build : E2 = OrderApprovedEvent("C-100")
+//    -> input  : event = "none" (customerId = "C-100")
+//    <- output : event = E2 = OrderApprovedEvent("C-100")   BECAUSE the approve command becomes an event
 //    step 2 · append : events : [E1:OrderCreated("C-100",125.00)] -> [E1:OrderCreated("C-100",125.00), E2:OrderApproved("C-100")]
+//    -> input  : events = [E1:OrderCreated("C-100",125.00)] (event = E2:OrderApproved("C-100"))
+//    <- output : events = [E1:OrderCreated("C-100",125.00), E2:OrderApproved("C-100")]   BECAUSE the new event is appended to the store
 //    step 3 · apply : state.orderState : "CREATED" -> "APPROVED"
+//    -> input  : state.orderState = "CREATED" (event = E2:OrderApproved("C-100"))
+//    <- output : state.orderState = "APPROVED"   BECAUSE applying E2 sets the state to APPROVED
 // <- event : E2:OrderApproved("C-100") · delivered to every subscriber
 ```
 
@@ -56,8 +68,14 @@ _Also known as: Chris Richardson · Microservice Patterns · microservices.io /p
 // DEF: replay · CALLED BY: SVC loading the Order — reads the event list and applies each event in sequence
 // -> entityId : "PO-100"
 //    step 1 · apply E1 sets state : state.orderState : null -> "CREATED"
+//    -> input  : state.orderState = null (event = E1:OrderCreated("C-100",125.00))
+//    <- output : state.orderState = "CREATED"   BECAUSE apply(OrderCreatedEvent) sets the state to CREATED
 //    step 2 · apply E1 copies id : state.customerId : null -> "C-100"   BECAUSE apply(OrderCreatedEvent) sets state and copies the customer id
+//    -> input  : state.customerId = null (event = E1:OrderCreated("C-100",125.00))
+//    <- output : state.customerId = "C-100"   BECAUSE apply(OrderCreatedEvent) sets state and copies the customer id
 //    step 3 · apply E2 : state.orderState : "CREATED" -> "APPROVED"   BECAUSE apply(OrderApprovedEvent) sets state to APPROVED
+//    -> input  : state.orderState = "CREATED" (event = E2:OrderApproved("C-100"))
+//    <- output : state.orderState = "APPROVED"   BECAUSE apply(OrderApprovedEvent) sets state to APPROVED
 // <- state : { orderState:"APPROVED", customerId:"C-100" } · replayed from 2 events
 //    alt wrong order : replaying E2 before E1 would leave orderState "CREATED", so event order must be preserved
 ```
@@ -81,8 +99,14 @@ _Also known as: Chris Richardson · Microservice Patterns · microservices.io /p
 // DEF: load · CALLED BY: SVC reading the Customer — finds the most recent snapshot, then only the events since it
 // -> entityId : "C-100"
 //    step 1 · start from the snapshot : state.balance : null -> 100.00   BECAUSE the snapshot already folded E1..E3
+//    -> input  : state.balance = null (snapshot = { balance:100.00, seq:3 })
+//    <- output : state.balance = 100.00   BECAUSE the snapshot already folded E1..E3
 //    step 2 · replay only E4 : state.balance : 100.00 -> 75.00   BECAUSE Debit-25.00 subtracts from the snapshot balance
+//    -> input  : state.balance = 100.00 (event = E4:Debit-25.00)
+//    <- output : state.balance = 75.00   BECAUSE Debit-25.00 subtracts from the snapshot balance
 //    step 3 · count the replay : replayed : 4 -> 1   BECAUSE only the events after seq 3 need folding
+//    -> input  : replayed = 4 (snapshot seq = 3)
+//    <- output : replayed = 1   BECAUSE only the events after seq 3 need folding
 // <- state : { balance:75.00 } · rebuilt from 1 event instead of 4
 ```
 
@@ -105,8 +129,14 @@ _Also known as: Chris Richardson · Microservice Patterns · microservices.io /p
 // DEF: reserveCredit · CALLED BY: ES delivering an OrderCreatedEvent to the subscribed CustomerService
 // -> event : OrderCreatedEvent("C-100", 125.00) · -> orderId : "PO-100"
 //    step 1 · read the payload : customerId : null -> "C-100" · orderTotal : null -> 125.00   BECAUSE the handler unpacks the event it received
+//    -> input  : event = OrderCreatedEvent("C-100", 125.00) (customerId = null, orderTotal = null)
+//    <- output : customerId = "C-100" · orderTotal = 125.00   BECAUSE the handler unpacks the event it received
 //    step 2 · reserve credit : balance : 200.00 -> 75.00   BECAUSE reserveCredit subtracts the order total 125.00 from the 200.00 available
+//    -> input  : balance = 200.00 (orderTotal = 125.00)
+//    <- output : balance = 75.00   BECAUSE reserveCredit subtracts the order total 125.00 from the 200.00 available
 //    step 3 · record the reservation : reserved : {} -> { "PO-100":125.00 }
+//    -> input  : reserved = {} (orderId = "PO-100", orderTotal = 125.00)
+//    <- output : reserved = { "PO-100":125.00 }   BECAUSE the handler records the credit reserved for the order
 // <- state : { balance:75.00, reserved:{"PO-100":125.00} } · the Customer's own state updated from the Order's event
 ```
 
@@ -160,9 +190,17 @@ _Role: query side_
 // DEF: approve_order · CALLED BY: CMD processing command "approve_order"
 // -> command : "approve_order"
 //    step 1 · CMD appends E2    events : [ E1:OrderCreated("C-100",125.00) ] -> [ E1:OrderCreated("C-100",125.00), E2:OrderApproved("C-100") ]  BECAUSE one append is one atomic write
+//    -> input  : events = [ E1:OrderCreated("C-100",125.00) ] (command = "approve_order")
+//    <- output : events = [ E1:OrderCreated("C-100",125.00), E2:OrderApproved("C-100") ]   BECAUSE one append is one atomic write
 //    step 2 · ES delivers E2 to PH    delivered : "none" -> "E2:OrderApproved"
+//    -> input  : delivered = "none" (event = E2:OrderApproved("C-100"))
+//    <- output : delivered = "E2:OrderApproved"   BECAUSE the event store publishes the saved event to the projector
 //    step 3 · PH folds E2 into the view    view : { orderState:"CREATED", customerId:"C-100" } -> { orderState:"APPROVED", customerId:"C-100" }
+//    -> input  : view = { orderState:"CREATED", customerId:"C-100" } (event = E2:OrderApproved("C-100"))
+//    <- output : view = { orderState:"APPROVED", customerId:"C-100" }   BECAUSE apply(E2) sets the view state to APPROVED
 //    step 4 · QR reads the current state    read : "none" -> { orderState:"APPROVED", customerId:"C-100" }  (query, no replay)
+//    -> input  : read = "none" (view = { orderState:"APPROVED", customerId:"C-100" })
+//    <- output : read = { orderState:"APPROVED", customerId:"C-100" }   BECAUSE the query side reads the view directly, no replay
 // <- outcome : QR returns orderState "APPROVED"  BECAUSE CMD wrote E2 to the event store, ES delivered it, PH folded it into the view, and QR read the view back
 ```
 

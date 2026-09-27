@@ -25,8 +25,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. · microservices.i
 // DEF: call_get_order · CALLED BY: TST exercising the client against the service contract
 // -> order_id : "ORD-4007"
 //    step 1 · form request : request.method : "" -> "GET" · request.path : "" -> "/orders/ORD-4007"  BECAUSE the client must send the service's expected method and path
+//    -> input  : request = { method:"", path:"", headers:{} } (order_id = "ORD-4007")
+//    <- output : request.method = "GET" · request.path = "/orders/ORD-4007"   BECAUSE the client must send the service's expected method and path
 //    step 2 · send and receive : response.status : 0 -> 200  BECAUSE the service answers the well-formed request
+//    -> input  : response.status = 0 (request = { method:"GET", path:"/orders/ORD-4007" })
+//    <- output : response.status = 200   BECAUSE the service answers the well-formed request
 //    step 3 · parse body : response.body : {} -> {"orderId":"ORD-4007","state":"CREATED"}  BECAUSE the client reads the order's JSON from the reply
+//    -> input  : response.body = {} (response.status = 200)
+//    <- output : response.body = {"orderId":"ORD-4007","state":"CREATED"}   BECAUSE the client reads the order's JSON from the reply
 // <- verdict : "pass" · response.status : 200  BECAUSE the client sent a valid request and consumed the reply
 //    alt client cannot communicate : response.status : 200 -> 500  BECAUSE the client sent a malformed path
 //       verdict : "pass" -> "fail"  BECAUSE the client no longer reaches the service's contract
@@ -51,8 +57,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. · microservices.i
 // DEF: build_request · CALLED BY: the client-side test
 // -> order_id : "ORD-4007" · -> accept : "application/json"
 //    step 1 · method : outbound.method : "" -> "GET"  BECAUSE the contract says GET /orders/{orderId}
+//    -> input  : outbound.method = "" (order_id = "ORD-4007")
+//    <- output : outbound.method = "GET"   BECAUSE the contract says GET /orders/{orderId}
 //    step 2 · path : outbound.path : "" -> "/orders/ORD-4007"  BECAUSE the client substitutes the order id into the path template
+//    -> input  : outbound.path = "" (order_id = "ORD-4007")
+//    <- output : outbound.path = "/orders/ORD-4007"   BECAUSE the client substitutes the order id into the path template
 //    step 3 · headers : outbound.headers : {} -> {"Accept":"application/json"}  BECAUSE the client advertises the format it can read
+//    -> input  : outbound.headers = {} (accept = "application/json")
+//    <- output : outbound.headers = {"Accept":"application/json"}   BECAUSE the client advertises the format it can read
 // <- outbound : {"method":"GET","path":"/orders/ORD-4007","headers":{"Accept":"application/json"}}
 //    alt wrong path : outbound.path : "/orders/ORD-4007" -> "/order/ORD-4007"  BECAUSE a client typo drops the plural
 //       verdict : "pass" -> "fail"  BECAUSE the service expects /orders, not /order
@@ -77,8 +89,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. · microservices.i
 // DEF: consume_response · CALLED BY: the client-side test after the call returns
 // -> raw_reply : {"status":200,"headers":{"Content-Type":"application/json"},"body":{"orderId":"ORD-4007","state":"CREATED"}}
 //    step 1 · read status : received.status : 0 -> 200  BECAUSE the client confirms the call succeeded before parsing
+//    -> input  : received.status = 0 (raw_reply.status = 200)
+//    <- output : received.status = 200   BECAUSE the client confirms the call succeeded before parsing
 //    step 2 · read headers : received.headers : {} -> {"Content-Type":"application/json"}  BECAUSE the client checks the body is JSON before decoding
+//    -> input  : received.headers = {} (raw_reply.headers = {"Content-Type":"application/json"})
+//    <- output : received.headers = {"Content-Type":"application/json"}   BECAUSE the client checks the body is JSON before decoding
 //    step 3 · decode body : parsed.orderId : "" -> "ORD-4007" · parsed.state : "" -> "CREATED"  BECAUSE the client decodes the JSON body into its own fields
+//    -> input  : parsed = { orderId:"", state:"" } (received.body = {"orderId":"ORD-4007","state":"CREATED"})
+//    <- output : parsed.orderId = "ORD-4007" · parsed.state = "CREATED"   BECAUSE the client decodes the JSON body into its own fields
 // <- parsed : {"orderId":"ORD-4007","state":"CREATED"} · received.status : 200
 //    alt unexpected body : received.body : {} -> {"error":"not found"}  BECAUSE the service returned an error shape instead
 //       parsed.orderId : "ORD-4007" -> ""  BECAUSE an error body carries no orderId to decode
@@ -105,8 +123,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. · microservices.i
 // DEF: assert_client_can_talk · CALLED BY: the consumer-side test
 // -> order_id : "ORD-4007"
 //    step 1 · check outgoing : cli_behavior.sends : "" -> "GET /orders/ORD-4007"  BECAUSE the test asserts the client forms the correct request
+//    -> input  : cli_behavior.sends = "" (order_id = "ORD-4007")
+//    <- output : cli_behavior.sends = "GET /orders/ORD-4007"   BECAUSE the test asserts the client forms the correct request
 //    step 2 · check incoming : cli_behavior.reads : "" -> "orderId,state"  BECAUSE the test asserts the client parses the reply's fields
+//    -> input  : cli_behavior.reads = "" (response.body = {"orderId":"ORD-4007","state":"CREATED"})
+//    <- output : cli_behavior.reads = "orderId,state"   BECAUSE the test asserts the client parses the reply's fields
 //    step 3 · tally : checks : 0 -> 2  BECAUSE both the request and the response assertions pass
+//    -> input  : checks = 0 (cli_behavior.sends = "GET /orders/ORD-4007", cli_behavior.reads = "orderId,state")
+//    <- output : checks = 2   BECAUSE both the request and the response assertions pass
 // <- failures : 0  BECAUSE the client can communicate with the service
 //    alt client cannot talk : cli_behavior.sends : "GET /orders/ORD-4007" -> "GET /order/ORD-4007"  BECAUSE the client used the wrong path
 //       failures : 0 -> 1  BECAUSE the wrong path means the client cannot reach the service's endpoint
@@ -155,8 +179,14 @@ _Role: provider service_
 // DEF: exercise_client · CALLED BY: the client-side test driving CLI against STUB
 // -> order_id : "ORD-4007"
 //    step 1 · CLI forms the request    request : { method:"", path:"" } -> { method:"GET", path:"/orders/ORD-4007" }
+//    -> input  : request = { method:"", path:"", headers:{} } (order_id = "ORD-4007")
+//    <- output : request = { method:"GET", path:"/orders/ORD-4007" }   BECAUSE the client builds the outbound request
 //    step 2 · STUB returns the canned reply    reply : { status:0, body:{} } -> { status:200, body:{"orderId":"ORD-4007","state":"CREATED"} }
+//    -> input  : reply = { status:0, body:{} } (request = { method:"GET", path:"/orders/ORD-4007" })
+//    <- output : reply = { status:200, body:{"orderId":"ORD-4007","state":"CREATED"} }   BECAUSE the mock provider returns the contract's canned reply
 //    step 3 · CLI parses the reply    verdict : "" -> "pass"  BECAUSE the client read status 200 and decoded orderId and state
+//    -> input  : verdict = "" (reply = { status:200, body:{"orderId":"ORD-4007","state":"CREATED"} })
+//    <- output : verdict = "pass"   BECAUSE the client read status 200 and decoded orderId and state
 // <- outcome : verdict "pass" · the client can communicate  BECAUSE it sent a well-formed request and consumed the stub's reply, which mirrors SVC's real contract
 ```
 

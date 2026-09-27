@@ -25,8 +25,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 43 · microservice
 // DEF: fetch_customer · CALLED BY: NEW when it needs customer 1042
 // -> customer_id : "C-1042"
 //    step 1 · SELECT the legacy row by cust_id   // leg_customer : {} -> { "cust_id": "C-1042", "cust_dob": "1987-04-03", "status_cd": "A" }
+//    -> input  : customer_id = "C-1042" · leg_customer = {}
+//    <- output : leg_customer = { "cust_id": "C-1042", "cust_dob": "1987-04-03", "status_cd": "A" }   BECAUSE NEW reads the legacy row by its id
 //    step 2 · copy the raw legacy row into the new service's model   // new_customer : {} -> { "cust_id": "C-1042", "cust_dob": "1987-04-03", "status_cd": "A" }
+//    -> input  : leg_customer = { "cust_id": "C-1042", "cust_dob": "1987-04-03", "status_cd": "A" } · new_customer = {}
+//    <- output : new_customer = { "cust_id": "C-1042", "cust_dob": "1987-04-03", "status_cd": "A" }   BECAUSE the raw legacy record is copied with no boundary
 //    step 3 · adopt the legacy 1-letter code as the service's own status   // new_customer.status : "" -> "A"   BECAUSE the code is copied over verbatim
+//    -> input  : new_customer.status = ""
+//    <- output : new_customer.status = "A"   BECAUSE the code is copied over verbatim
 // <- output : new_customer now holds legacy names "cust_dob" and "status_cd" plus the raw code "A" — the legacy model polluted the new service
 
 ```
@@ -52,8 +58,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 43 · microservice
 // DEF: translate · CALLED BY: NEW when it needs a customer in its own vocabulary
 // -> legacy : { "cust_id": "C-1042", "cust_dob": "1987-04-03", "status_cd": "A" }
 //    step 1 · map cust_id to id unchanged   // domain.id : "" -> "C-1042"   BECAUSE the identifier is already clean
+//    -> input  : legacy.cust_id = "C-1042" · domain.id = ""
+//    <- output : domain.id = "C-1042"   BECAUSE the identifier is already clean
 //    step 2 · rename cust_dob to dateOfBirth   // domain.dateOfBirth : "" -> "1987-04-03"
+//    -> input  : legacy.cust_dob = "1987-04-03" · domain.dateOfBirth = ""
+//    <- output : domain.dateOfBirth = "1987-04-03"   BECAUSE the legacy field is renamed to the new service's field
 //    step 3 · translate the 1-letter code to a word   // domain.status : "" -> "ACTIVE"   BECAUSE legacy code "A" means active
+//    -> input  : legacy.status_cd = "A" · domain.status = ""
+//    <- output : domain.status = "ACTIVE"   BECAUSE legacy code "A" means active
 // <- output : domain = { "id": "C-1042", "dateOfBirth": "1987-04-03", "status": "ACTIVE" } — the service sees only its own model
 
 ```
@@ -77,8 +89,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 43 · microservice
 // DEF: absorb_change · CALLED BY: ACL when LEG changes its active code
 // -> legacy_code : "A"
 //    step 1 · LEG starts writing "1" for active   // mapping.status_cd : "A" -> "1"
+//    -> input  : legacy_code = "A" · mapping.status_cd = "A"
+//    <- output : mapping.status_cd = "1"   BECAUSE LEG starts writing the new code for active
 //    step 2 · the ACL retranslates through the updated table   // translated : "" -> "ACTIVE"   BECAUSE the mapping table owns the code, not the service
+//    -> input  : legacy_code = "1" · translated = ""
+//    <- output : translated = "ACTIVE"   BECAUSE the mapping table owns the code, not the service
 //    step 3 · the service reads its own model and sees the word   // read_status : "" -> "ACTIVE"
+//    -> input  : read_status = ""
+//    <- output : read_status = "ACTIVE"   BECAUSE the service reads only its own model
 // <- output : domain.status stays "ACTIVE" while the legacy code is now "1" — the rename is confined to the ACL
 
 ```
@@ -126,9 +144,17 @@ _Role: legacy monolith_
 // DEF: translate · CALLED BY: NEW when it needs customer 1042 in its own vocabulary
 // -> customer_id : "C-1042"
 //    step 1 · the adapter reads the legacy row    legacy : {} -> { "cust_id":"C-1042", "cust_dob":"1987-04-03", "status_cd":"A" }   // SELECT from PostgreSQL 14 @ legacy-db-1
+//    -> input  : customer_id = "C-1042" · legacy = {}
+//    <- output : legacy = { "cust_id":"C-1042", "cust_dob":"1987-04-03", "status_cd":"A" }   BECAUSE the adapter SELECTs the legacy row
 //    step 2 · the translator renames cust_dob    domain.dateOfBirth : "" -> "1987-04-03"   BECAUSE the legacy field is mapped to the modern name
+//    -> input  : legacy.cust_dob = "1987-04-03" · domain.dateOfBirth = ""
+//    <- output : domain.dateOfBirth = "1987-04-03"   BECAUSE the legacy field is mapped to the modern name
 //    step 3 · the translator maps the code to a word    domain.status : "" -> "ACTIVE"   // legacy code "A" means active
+//    -> input  : legacy.status_cd = "A" · domain.status = ""
+//    <- output : domain.status = "ACTIVE"   BECAUSE legacy code "A" means active
 //    step 4 · the adapter returns the clean model    domain : {} -> { "id":"C-1042", "dateOfBirth":"1987-04-03", "status":"ACTIVE" }   // NEW stores only its own model
+//    -> input  : legacy.cust_id = "C-1042" · domain = {}
+//    <- output : domain = { "id":"C-1042", "dateOfBirth":"1987-04-03", "status":"ACTIVE" }   BECAUSE NEW stores only its own model
 // <- output : domain = { "id":"C-1042", "dateOfBirth":"1987-04-03", "status":"ACTIVE" } · the service reads no legacy name   BECAUSE the ACL translates before NEW sees it
 ```
 

@@ -23,8 +23,14 @@ registerChapter({
 // DEF: handle_request · CALLED BY: U1 submitting GET /orders with id REQ-2001
 // -> req_id : "REQ-2001"
 //    step 1 · look up the customer -> null   // req : {status:"OPEN"} -> {status:"FAILED"}
+//    -> input  : req_id = "REQ-2001"
+//    <- output : customer = null · req.status = "FAILED"   BECAUSE DB holds no customer row for REQ-2001
 //    step 2 · throw NullPointerException("customer is null")   // err : null -> "customer is null"
+//    -> input  : customer = null
+//    <- output : err = "customer is null"   BECAUSE the handler dereferences the null customer
 //    step 3 · catch in the handler, capture message + stack trace   // report : {} -> {msg:"customer is null", stack:"SVC.doGet line 42", ts:19}
+//    -> input  : err = "customer is null"
+//    <- output : report = {msg:"customer is null", stack:"SVC.doGet line 42", ts:19}   BECAUSE the handler packages the message plus stack trace before the thread dies
 // <- exception : report = {msg:"customer is null", stack:"SVC.doGet line 42", ts:19} · 1 exception now in hand
 //    alt no catch in place : the thread dies with no record -> the error is invisible to everyone`
     },
@@ -46,8 +52,14 @@ registerChapter({
 // DEF: report_exception · CALLED BY: the handler, right after it catches, over HTTP
 // -> ex_id : "EX-1001"
 //    step 1 · serialize the report into the request body   // payload : {} -> {id:"EX-1001", msg:"customer is null", stack:"SVC.doGet line 42"}
+//    -> input  : report = { id:"EX-1001", msg:"customer is null", stack:"SVC.doGet line 42", ts:19 }
+//    <- output : payload = {id:"EX-1001", msg:"customer is null", stack:"SVC.doGet line 42"}   BECAUSE the report is serialized into the request body
 //    step 2 · POST /exceptions to TRK -> TRK stores the exception   // tracker : [] -> ["EX-1001"]
+//    -> input  : payload = {id:"EX-1001", msg:"customer is null", stack:"SVC.doGet line 42"}
+//    <- output : tracker = ["EX-1001"]   BECAUSE TRK stores the exception it received
 //    step 3 · TRK returns 200, SVC marks it sent   // sent : false -> true
+//    -> input  : tracker = ["EX-1001"] (TRK ack = 200)
+//    <- output : sent = true   BECAUSE TRK acknowledged the stored exception
 // <- ack : "EX-1001 stored" · the exception now lives in the central tracker, not just the local service
 //    alt TRK unreachable : SVC still writes the same line to its local log file -> Log aggregation (ch36) keeps a copy`
     },
@@ -68,8 +80,14 @@ registerChapter({
 // DEF: ingest · CALLED BY: TRK for each reported exception, keyed on the stack-trace hash
 // -> ex1 : { id:"EX-1001", msg:"customer is null", fp:"FP-77A3" }
 //    step 1 · hash the stack trace into a fingerprint   // fp : null -> "FP-77A3"
+//    -> input  : stack = "SVC.doGet line 42"
+//    <- output : fp = "FP-77A3"   BECAUSE the stack trace hashes to one fingerprint
 //    step 2 · look up issues["FP-77A3"] -> not found, so create the issue   // issues : {} -> {"FP-77A3":{count:1}}
+//    -> input  : fp = "FP-77A3"
+//    <- output : issues = {"FP-77A3":{count:1}}   BECAUSE the fingerprint has not been seen before
 //    step 3 · later SVC2 reports the same bug, fp "FP-77A3" -> seen, so increment   // issues["FP-77A3"].count : 1 -> 2
+//    -> input  : fp = "FP-77A3"
+//    <- output : issues["FP-77A3"].count = 2   BECAUSE the same fingerprint is folded into the existing issue
 // <- aggregate : issues = {"FP-77A3": {count:2, msg:"customer is null"}} · 2 exceptions deduplicated into 1 issue
 //    alt a new fingerprint "FP-1B20" : issues : {"FP-77A3":{count:2}} -> {"FP-77A3":{count:2}, "FP-1B20":{count:1}} · a 2nd distinct issue`
     },
@@ -90,8 +108,14 @@ registerChapter({
 // DEF: notify_and_resolve · CALLED BY: TRK when an issue's count crosses the threshold 1
 // -> issue_fp : "FP-77A3"
 //    step 1 · count 2 crosses threshold 1 -> notify DEV   // alert : [] -> ["FP-77A3 -> DEV"]
+//    -> input  : issue.count = 2 (threshold = 1)
+//    <- output : alert = ["FP-77A3 -> DEV"]   BECAUSE the count crossed the threshold
 //    step 2 · DEV investigates, finds the null-customer path, commits a fix   // fix : null -> "commit-9f2c"
+//    -> input  : issue = { fp:"FP-77A3", count:2, msg:"customer is null", state:"OPEN" }
+//    <- output : fix = "commit-9f2c"   BECAUSE DEV found the null-customer path
 //    step 3 · DEV marks the issue resolved   // issue.state : "OPEN" -> "RESOLVED"
+//    -> input  : issue.state = "OPEN"
+//    <- output : issue.state = "RESOLVED"   BECAUSE the fix is committed
 // <- resolution : issue.state = "RESOLVED" · the underlying issue is closed, not just the symptom logged
 //    alt the bug reappears : a new report with fp "FP-77A3" -> count : 2 -> 3 and state : "RESOLVED" -> "OPEN"`
     }
@@ -228,8 +252,14 @@ registerChapter({
 // DEF: track · CALLED BY: SVC throwing, TRK folding, DEV reading
 // -> exception_id : "EX-1001"
 //    step 1 · SVC throws, TRK normalizes the stack   // fingerprint : "" -> "FP-77A3"   BECAUSE msg "customer is null" and stack SVC.doGet line 42 hash to one signature
+//    -> input  : stack = "SVC.doGet line 42" (msg = "customer is null")
+//    <- output : fingerprint = "FP-77A3"   BECAUSE the msg and stack hash to one signature
 //    step 2 · TRK folds the repeat into the store   // issues : {} -> { "FP-77A3": { count:2 } }   BECAUSE EX-7001 was already seen with the same fingerprint, so dedup bumps the count to 2
+//    -> input  : fingerprint = "FP-77A3"
+//    <- output : issues = { "FP-77A3": { count:2 } }   BECAUSE EX-7001 was already seen with the same fingerprint
 //    step 3 · TRK reports the issue to the developer   // reported : 0 -> 1   BECAUSE count 2 crosses the threshold of 1
+//    -> input  : issues["FP-77A3"].count = 2 (threshold = 1)
+//    <- output : reported = 1   BECAUSE count 2 crosses the threshold of 1
 // <- outcome : issues["FP-77A3"].count = 2 · DEV sees one deduplicated issue  BECAUSE the tracker folded EX-1001 and EX-7001 into the same fingerprint`
   },
   concepts: {

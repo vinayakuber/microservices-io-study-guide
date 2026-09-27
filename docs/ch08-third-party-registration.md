@@ -27,11 +27,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 8 · microservices
 // DEF: a second instance boots · CALLED BY: the autoscaler adding capacity
 // -> boot : {"host":"10.0.1.8","port":8080}
 //    step 1 · register on startup : registry["order-service"] : [{"host":"10.0.1.7","port":8080}] -> [{"host":"10.0.1.7","port":8080},{"host":"10.0.1.8","port":8080}]
+//    -> input  : registry["order-service"] = [{"host":"10.0.1.7","port":8080}] (boot = {"host":"10.0.1.8","port":8080})
+//    <- output : registry["order-service"] = [{"host":"10.0.1.7","port":8080},{"host":"10.0.1.8","port":8080}]   BECAUSE an instance must be added to the registry as soon as it comes up
 //    step 2 · live_count : 1 -> 2   BECAUSE the new instance registered itself on startup
+//    -> input  : live_count = 1
+//    <- output : live_count = 2   BECAUSE the new instance registered itself on startup
 // DEF: the 10.0.1.8 instance crashes · CALLED BY: a hard kill with no clean shutdown
 // -> crash : "10.0.1.8"
 //    step 1 · process dies : live_count : 2 -> 1   BECAUSE 10.0.1.8 is now a dead process
+//    -> input  : live_count = 2 (crash = "10.0.1.8")
+//    <- output : live_count = 1   BECAUSE 10.0.1.8 is now a dead process
 //    step 2 · stale entry persists : registry["order-service"] : [2 entries] -> [2 entries, one dead]   BECAUSE no unregister ran
+//    -> input  : registry["order-service"] = [2 entries]
+//    <- output : registry["order-service"] = [2 entries, one dead]   BECAUSE no unregister ran
 // <- discovery result : ["10.0.1.7:8080","10.0.1.8:8080"]   (CLI can be routed to the dead host)
 //    alt clean shutdown : SVC sends unregister -> registry["order-service"] : [{"host":"10.0.1.7","port":8080},{"host":"10.0.1.8","port":8080}] -> [{"host":"10.0.1.7","port":8080}]
 ```
@@ -59,8 +67,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 8 · microservices
 // DEF: registrar watches the service process · CALLED BY: RGR polling the local process every 5s
 // -> observed : "STARTED"   (SVC process on host 10.0.1.7 came up)
 //    step 1 · RGR sees START : svc_proc : "STOPPED" -> "STARTED"
+//    -> input  : svc_proc = "STOPPED" (observed = "STARTED")
+//    <- output : svc_proc = "STARTED"   BECAUSE the registrar polls the local process and sees it came up
 //    step 2 · RGR registers SVC : registry["order-service"] : [] -> [{"host":"10.0.1.7","port":8080}]
+//    -> input  : registry["order-service"] = [] (svc_proc = "STARTED")
+//    <- output : registry["order-service"] = [{"host":"10.0.1.7","port":8080}]   BECAUSE the registrar registers the instance on startup
 //    step 3 · discoverable : "false" -> "true"   BECAUSE the registry now holds the entry
+//    -> input  : discoverable = "false"
+//    <- output : discoverable = "true"   BECAUSE the registry now holds the entry
 // <- registry row : "order-service" -> [{"host":"10.0.1.7","port":8080}]
 //    alt process stops : RGR sees STOP -> registry["order-service"] : [{"host":"10.0.1.7","port":8080}] -> []
 ```
@@ -87,9 +101,15 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 8 · microservices
 // DEF: registrar health-checks SVC · CALLED BY: RGR every 10s
 // -> probe_1 : "GET /health" -> "200 OK"   (healthy)
 //    step 1 · probe passes : pass_count : 0 -> 1   BECAUSE probe_1 answered 200, SVC stays registered
+//    -> input  : pass_count = 0 (probe_1 = "GET /health" -> "200 OK")
+//    <- output : pass_count = 1   BECAUSE probe_1 answered 200, SVC stays registered
 // -> probe_2 : "GET /health" -> "503 Service Unavailable"   (the instance is now broken)
 //    step 2 · health : "PASS" -> "FAIL"   BECAUSE probe_2 answered 503
+//    -> input  : health = "PASS" (probe_2 = "GET /health" -> "503 Service Unavailable")
+//    <- output : health = "FAIL"   BECAUSE probe_2 answered 503
 //    step 3 · RGR unregisters SVC : registry["order-service"] : [{"host":"10.0.1.7","port":8080}] -> []
+//    -> input  : registry["order-service"] = [{"host":"10.0.1.7","port":8080}] (health = "FAIL")
+//    <- output : registry["order-service"] = []   BECAUSE the registrar removes the instance when the health check fails
 // <- registry row : "order-service" -> []   (broken instance removed)
 //    alt shallow registrar : RGR sees only "RUNNING" -> the broken 10.0.1.7 stays registered (superficial state risk)
 ```
@@ -138,9 +158,17 @@ _Role: registry_
 // DEF: register_instance · CALLED BY: RGR when the service instance boots
 // -> instance : {"host":"10.0.2.5","port":8080}
 //    step 1 · SVC starts, doing nothing registry-related : process_state : "STOPPED" -> "RUNNING"
+//    -> input  : process_state = "STOPPED" (instance = {"host":"10.0.2.5","port":8080})
+//    <- output : process_state = "RUNNING"   BECAUSE the service instance boots and never talks to the registry itself
 //    step 2 · RGR polls SVC and writes the entry to REG : registry : {} -> { "order-service": [{"host":"10.0.2.5","port":8080}] }
+//    -> input  : registry = {} (process_state = "RUNNING")
+//    <- output : registry = { "order-service": [{"host":"10.0.2.5","port":8080}] }   BECAUSE the third-party registrar registers the instance on startup
 //    step 3 · REG stores the entry and serves discovery lookups : lookup : "none" -> "10.0.2.5:8080"
+//    -> input  : lookup = "none" (registry = { "order-service": [{"host":"10.0.2.5","port":8080}] })
+//    <- output : lookup = "10.0.2.5:8080"   BECAUSE the service registry resolves the service name to the stored endpoint
 //    step 4 · a client reads the registry and reaches SVC : request : "none" -> "GET /orders"
+//    -> input  : lookup = "10.0.2.5:8080" (request = "none")
+//    <- output : request = "GET /orders"   BECAUSE the client uses the discovered endpoint to reach the service
 // <- entry : "order-service" -> [{"host":"10.0.2.5","port":8080}] · the service never talked to the registry itself
 //    alt registrar down : no register/unregister runs and the registry drifts stale  BECAUSE the registrar sits on the discovery path
 ```

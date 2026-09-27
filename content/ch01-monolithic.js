@@ -28,8 +28,14 @@ registerChapter({
 // DEF: placeOrder · CALLED BY: CLI sending a synchronous request to APP
 // -> order_id : "PO-2001" · -> sku : "SKU-77" · -> qty : 2
 //    step 1 · reserve stock : inventory_entities["SKU-77"].qty : 5 -> 3   BECAUSE the operation mutates the Inventory subdomain's entity
+//    -> input  : inventory_entities["SKU-77"].qty = 5
+//    <- output : inventory_entities["SKU-77"].qty = 3   BECAUSE the operation mutates the Inventory subdomain's entity
 //    step 2 · mark the order : order_entities["PO-2001"].status : "DRAFT" -> "CONFIRMED"
+//    -> input  : order_entities["PO-2001"].status = "DRAFT"
+//    <- output : order_entities["PO-2001"].status = "CONFIRMED"   BECAUSE the operation advances the order's status
 //    step 3 · record the credit check : credit_check : "none" -> "approved"   BECAUSE the Credit subdomain runs in the same process
+//    -> input  : credit_check = "none"
+//    <- output : credit_check = "approved"   BECAUSE the Credit subdomain runs in the same process
 // <- order_status : "CONFIRMED" · 0 network hops (all subdomains share one component)`
     },
     {
@@ -53,8 +59,14 @@ registerChapter({
 // DEF: change · CALLED BY: TA committing a one-line fix in the Orders subdomain
 // -> commit : "fix tax rounding in Orders"
 //    step 1 · rebuild the whole artifact : build_scope : "Orders only" -> "Orders + Billing (entire WAR)"
+//    -> input  : build_scope = "Orders only"
+//    <- output : build_scope = "Orders + Billing (entire WAR)"   BECAUSE one artifact means the whole WAR rebuilds
 //    step 2 · rerun every subdomain's tests : tests_run : 20 -> 200   BECAUSE one artifact means every subdomain retests
+//    -> input  : tests_run = 20
+//    <- output : tests_run = 200   BECAUSE one artifact means every subdomain retests
 //    step 3 · redeploy all instances : instances_restarted : 0 -> 4   BECAUSE a single WAR replaces every instance, including Billing's traffic
+//    -> input  : instances_restarted = 0
+//    <- output : instances_restarted = 4   BECAUSE a single WAR replaces every instance, including Billing's traffic
 // <- release : "app.war" shipped · both teams' code goes out together
 //    alt TBL has a broken test : TA's fix is blocked -> team autonomy lost`
     },
@@ -80,10 +92,20 @@ registerChapter({
 // DEF: placeOrder · CALLED BY: APP, invoked synchronously
 // -> order_id : "PO-2001" · -> customer : "CUST-9" · -> amount : 40
 //    step 1 · BEGIN local transaction T1 on DB (a single transaction, not a saga)
+//    -> input  : T1 = "none"
+//    <- output : T1 = "active"   BECAUSE BEGIN opens one local transaction on DB
 //    step 2 · write the order : order_entities["PO-2001"].status : "DRAFT" -> "PLACED"
+//    -> input  : order_entities["PO-2001"].status = "DRAFT"
+//    <- output : order_entities["PO-2001"].status = "PLACED"   BECAUSE the operation writes the order inside T1
 //    step 3 · record the total : order_entities["PO-2001"].total : 0 -> 40
+//    -> input  : order_entities["PO-2001"].total = 0
+//    <- output : order_entities["PO-2001"].total = 40   BECAUSE the order amount 40 is recorded into the row
 //    step 4 · consume credit : credit_entities["CUST-9"].used : 100 -> 140   BECAUSE both subdomains' rows live in the one database
+//    -> input  : credit_entities["CUST-9"].used = 100
+//    <- output : credit_entities["CUST-9"].used = 140   BECAUSE both subdomains' rows live in the one database
 //    step 5 · COMMIT T1 -> both writes durable together (atomic)
+//    -> input  : T1 = "active"
+//    <- output : T1 = "COMMITTED"   BECAUSE COMMIT makes both writes durable together (atomic)
 // <- result : "COMMITTED" · no eventual consistency, no distributed transaction
 //    alt credit limit exceeded : ROLLBACK T1 -> total back to 0 and used back to 100 (all-or-nothing)`
     },
@@ -108,9 +130,17 @@ registerChapter({
 // DEF: change · CALLED BY: DEV editing one file in the orders slice
 // -> file : "orders/pricing.kt"
 //    step 1 · detect the dirty module : modules["orders"].changed : false -> true
+//    -> input  : modules["orders"].changed = false
+//    <- output : modules["orders"].changed = true   BECAUSE the edited file belongs to the orders module
 //    step 2 · incremental build : rebuilt_modules : [] -> ["orders"]   BECAUSE only the orders module changed
+//    -> input  : rebuilt_modules = [] (0 modules)
+//    <- output : rebuilt_modules = ["orders"]   BECAUSE only the orders module changed
 //    step 3 · skip the clean module : skipped_modules : 0 -> 1
+//    -> input  : skipped_modules = 0
+//    <- output : skipped_modules = 1   BECAUSE the billing module is clean and not recompiled
 //    step 4 · run only orders tests : tests_run : 200 -> 20   BECAUSE billing was not recompiled
+//    -> input  : tests_run = 200
+//    <- output : tests_run = 20   BECAUSE billing was not recompiled
 // <- build : "orders" rebuilt · billing skipped
 //    alt layered (non-modular) monolith : rebuild ALL slices -> tests_run : 20 -> 200 (back to full)`
     }
@@ -258,9 +288,19 @@ registerChapter({
 // DEF: placeOrder · CALLED BY: CLI sending a synchronous request to APP
 // -> order_id : "PO-2001" · -> amount : 40
 //    step 1 · the presentation tier receives the request    request : "none" -> "placeOrder(PO-2001)"
+//    -> input  : request = "none"
+//    <- output : request = "placeOrder(PO-2001)"   BECAUSE the presentation tier accepts the CLI's call
 //    step 2 · the business logic mutates the entity    orders : {} -> { "PO-2001": {status:"DRAFT", total:0} }
+//    -> input  : orders = {} (empty)
+//    <- output : orders = { "PO-2001": {status:"DRAFT", total:0} }   BECAUSE the business logic creates the order entity
 //    step 3 · the data-access layer writes the row    orders["PO-2001"].status : "DRAFT" -> "PLACED"
+//    -> input  : orders["PO-2001"].status = "DRAFT"
+//    <- output : orders["PO-2001"].status = "PLACED"   BECAUSE the data-access layer writes the row into the DB
 //    step 4 · the data-access layer reads it back    GET /orders/PO-2001 -> { id:"PO-2001", status:"PLACED", total:40 }
+//    -> input  : GET /orders/PO-2001 (read key "PO-2001")
+//    decode 4a · send the GET for key PO-2001 -> request : "none" -> "GET /orders/PO-2001"
+//    decode 4b · the DB looks up the row by id -> row : {} -> { id:"PO-2001", status:"PLACED", total:40 }
+//    <- output : { id:"PO-2001", status:"PLACED", total:40 }   BECAUSE the single DB returns the row the write path just stored
 // <- outcome : CLI sees order "PO-2001" status "PLACED"   BECAUSE all three tiers run in one process against one DB, so the operation is local and ACID`
   },
   concepts: {

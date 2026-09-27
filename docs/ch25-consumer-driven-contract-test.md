@@ -24,9 +24,17 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. · microservices.i
 // DEF: expect_order_endpoint · CALLED BY: GW team encoding what OrderServiceProxy needs
 // -> order_id : "ORD-4007"
 //    step 1 · expected method+path : shape.method : "" -> "GET" · shape.path : "" -> "/orders/{orderId}"  BECAUSE OrderServiceProxy calls GET /orders/{orderId}
+//    -> input  : shape = { method:"", path:"", headers:{}, status:0, body:{} } (order_id = "ORD-4007")
+//    <- output : shape.method = "GET" · shape.path = "/orders/{orderId}"   BECAUSE OrderServiceProxy calls GET /orders/{orderId}
 //    step 2 · expected headers : shape.headers : {} -> {"Accept":"application/json"}  BECAUSE the proxy sends Accept and reads JSON
+//    -> input  : shape.headers = {} (shape.method = "GET", shape.path = "/orders/{orderId}")
+//    <- output : shape.headers = {"Accept":"application/json"}   BECAUSE the proxy sends Accept and reads JSON
 //    step 3 · expected status : shape.status : 0 -> 200  BECAUSE the proxy needs a success code to parse the body
+//    -> input  : shape.status = 0 (shape.headers = {"Accept":"application/json"})
+//    <- output : shape.status = 200   BECAUSE the proxy needs a success code to parse the body
 //    step 4 · expected body : shape.body : {} -> {"orderId":"ORD-4007","state":"CREATED"}  BECAUSE the proxy reads the order's JSON from the reply
+//    -> input  : shape.body = {} (shape.status = 200)
+//    <- output : shape.body = {"orderId":"ORD-4007","state":"CREATED"}   BECAUSE the proxy reads the order's JSON from the reply
 // <- contract : {"method":"GET","path":"/orders/ORD-4007","headers":{"Accept":"application/json"},"status":200,"body":{"orderId":"ORD-4007","state":"CREATED"}}
 //    alt provider deviates : SVC answers 404  BECAUSE the provider changed the endpoint -> the suite fails with "expected 200, got 404"
 ```
@@ -50,13 +58,21 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. · microservices.i
 // DEF: contribute_suite · CALLED BY: GW team opening a pull request
 // -> contributor : "GW" · -> suite_name : "gateway-orders"
 //    step 1 · author tests : test_count : 0 -> 1  BECAUSE the gateway suite needs one test for GET /orders/{orderId}
+//    -> input  : test_count = 0 (contributor = "GW", suite_name = "gateway-orders")
+//    <- output : test_count = 1   BECAUSE the gateway suite needs one test for GET /orders/{orderId}
 //    step 2 · merge PR : suites : [] -> [{"owner":"GW","name":"gateway-orders","tests":1}]  BECAUSE the suite is added to the provider's test suite via pull request
+//    -> input  : suites = [] (suite = {"owner":"GW","name":"gateway-orders","tests":1})
+//    <- output : suites = [{"owner":"GW","name":"gateway-orders","tests":1}]   BECAUSE the suite is added to the provider's test suite via pull request
 // <- suites : 1 entry · owner : "GW" · test_count : 1
 //
 // DEF: contribute_suite · CALLED BY: OH team, a second consumer, via another pull request
 // -> contributor : "OH" · -> suite_name : "history-events"
 //    step 1 · author tests : test_count : 1 -> 2  BECAUSE Order History adds a suite that checks the published events
+//    -> input  : test_count = 1 (contributor = "OH", suite_name = "history-events")
+//    <- output : test_count = 2   BECAUSE Order History adds a suite that checks the published events
 //    step 2 · merge PR : suites : [{"owner":"GW","name":"gateway-orders","tests":1}] -> [{"owner":"GW","name":"gateway-orders","tests":1},{"owner":"OH","name":"history-events","tests":1}]  BECAUSE the second suite tests the event aspects relevant to this consumer
+//    -> input  : suites = [{"owner":"GW","name":"gateway-orders","tests":1}] (suite = {"owner":"OH","name":"history-events","tests":1})
+//    <- output : suites = [{"owner":"GW","name":"gateway-orders","tests":1},{"owner":"OH","name":"history-events","tests":1}]   BECAUSE the second suite tests the event aspects relevant to this consumer
 // <- suites : 2 entries · owners : ["GW"] -> ["GW","OH"]
 ```
 
@@ -80,9 +96,17 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. · microservices.i
 // DEF: verify_one_request · CALLED BY: PIPE running the gateway-orders suite
 // -> order_id : "ORD-4007"
 //    step 1 · invoke provider : actual.status : 0 -> 200  BECAUSE SVC serves GET /orders/ORD-4007
+//    -> input  : actual = { status:0, body:{} } (order_id = "ORD-4007")
+//    <- output : actual.status = 200   BECAUSE SVC serves GET /orders/ORD-4007
 //    step 2 · read body : actual.body : {} -> {"orderId":"ORD-4007","state":"CREATED"}  BECAUSE SVC returns the order's JSON
+//    -> input  : actual.body = {} (actual.status = 200)
+//    <- output : actual.body = {"orderId":"ORD-4007","state":"CREATED"}   BECAUSE SVC returns the order's JSON
 //    step 3 · compare status : matches : 0 -> 1  BECAUSE actual.status 200 equals expected.status 200
+//    -> input  : matches = 0 (actual.status = 200, expected.status = 200)
+//    <- output : matches = 1   BECAUSE actual.status 200 equals expected.status 200
 //    step 4 · compare body : matches : 1 -> 2  BECAUSE actual.body equals expected.body, so both checks hold
+//    -> input  : matches = 1 (actual.body = {"orderId":"ORD-4007","state":"CREATED"}, expected.body = {"orderId":"ORD-4007","state":"CREATED"})
+//    <- output : matches = 2   BECAUSE actual.body equals expected.body, so both checks hold
 // <- verdict : "pass"  BECAUSE matches equals 2 (status and body both agree)
 //    alt provider breaks the API : SVC drops GET /orders/{orderId}
 //       actual.status : 200 -> 404  BECAUSE the endpoint was removed or renamed
@@ -109,8 +133,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. · microservices.i
 // DEF: define_contract · CALLED BY: GW team, using testing by example
 // -> order_id : "ORD-4007"
 //    step 1 · example request : contract.request : {} -> {"method":"GET","path":"/orders/ORD-4007","headers":{"Accept":"application/json"}}  BECAUSE the example request is one message of the interaction
+//    -> input  : contract.request = {} (order_id = "ORD-4007")
+//    <- output : contract.request = {"method":"GET","path":"/orders/ORD-4007","headers":{"Accept":"application/json"}}   BECAUSE the example request is one message of the interaction
 //    step 2 · example reply : contract.reply : {} -> {"status":200,"body":{"orderId":"ORD-4007","state":"CREATED"}}  BECAUSE the example reply is the second message of the interaction
+//    -> input  : contract.reply = {} (contract.request = {"method":"GET","path":"/orders/ORD-4007"})
+//    <- output : contract.reply = {"status":200,"body":{"orderId":"ORD-4007","state":"CREATED"}}   BECAUSE the example reply is the second message of the interaction
 //    step 3 · identify the test style : kind : "" -> "mock-controller"  BECAUSE consumer contract tests for a REST API are mock controller tests
+//    -> input  : kind = "" (contract.reply = {"status":200,"body":{"orderId":"ORD-4007","state":"CREATED"}})
+//    <- output : kind = "mock-controller"   BECAUSE consumer contract tests for a REST API are mock controller tests
 // <- contract : {"request":{"method":"GET","path":"/orders/ORD-4007"},"reply":{"status":200,"body":{"orderId":"ORD-4007","state":"CREATED"}}}
 //    alt another example : order_id : "ORD-4007" -> "ORD-4008"  BECAUSE each contract is one example; a second contract covers a second order
 ```
@@ -158,8 +188,14 @@ _Role: provider verification + provider_
 // DEF: pin_and_verify · CALLED BY: GW publishing its expectation, then PIPE verifying SVC
 // -> order_id : "ORD-4007"
 //    step 1 · GW defines the expectation and PACT stores it    contracts : {} -> {"gateway-orders":{"request":{"method":"GET","path":"/orders/ORD-4007"},"reply":{"status":200,"body":{"orderId":"ORD-4007","state":"CREATED"}}}}
+//    -> input  : contracts = {} (order_id = "ORD-4007")
+//    <- output : contracts = {"gateway-orders":{"request":{"method":"GET","path":"/orders/ORD-4007"},"reply":{"status":200,"body":{"orderId":"ORD-4007","state":"CREATED"}}}}   BECAUSE the consumer publishes its expectation to the broker
 //    step 2 · PIPE reads the contract and invokes SVC    actual.status : 0 -> 200 · actual.body : {} -> {"orderId":"ORD-4007","state":"CREATED"}
+//    -> input  : actual = { status:0, body:{} } (contract = {"request":{"method":"GET","path":"/orders/ORD-4007"},"reply":{"status":200,"body":{"orderId":"ORD-4007","state":"CREATED"}}})
+//    <- output : actual.status = 200 · actual.body = {"orderId":"ORD-4007","state":"CREATED"}   BECAUSE PIPE invokes SVC with the pinned request
 //    step 3 · PIPE compares actual against expected    verdict : "" -> "pass"  BECAUSE actual 200 equals expected 200 and the body matches
+//    -> input  : verdict = "" (actual.status = 200, expected.status = 200, actual.body = {"orderId":"ORD-4007","state":"CREATED"})
+//    <- output : verdict = "pass"   BECAUSE actual 200 equals expected 200 and the body matches
 // <- outcome : verdict "pass" · SVC keeps its promise  BECAUSE the provider serves GET /orders/ORD-4007 exactly as the contract pins it
 ```
 

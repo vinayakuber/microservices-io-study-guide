@@ -23,8 +23,14 @@ registerChapter({
 // DEF: startup · CALLED BY: the runtime launching SVC
 // -> env : {"DB_URL":"jdbc:mysql://prod-db:3306/orders","DB_PASSWORD":"prod-secret"}
 //    step 1 · SVC reads DB_URL from the environment    // config : {} -> {"db_url":"jdbc:mysql://prod-db:3306/orders"}
+//    -> input  : config = {} (env = {"DB_URL":"jdbc:mysql://prod-db:3306/orders","DB_PASSWORD":"prod-secret"})
+//    <- output : config = {"db_url":"jdbc:mysql://prod-db:3306/orders"}   BECAUSE SVC reads the URL from the environment
 //    step 2 · SVC reads DB_PASSWORD from the environment    // config : {"db_url":"jdbc:mysql://prod-db:3306/orders"} -> {"db_url":"jdbc:mysql://prod-db:3306/orders","db_password":"prod-secret"}
+//    -> input  : config = {"db_url":"jdbc:mysql://prod-db:3306/orders"} (env DB_PASSWORD = "prod-secret")
+//    <- output : config = {"db_url":"jdbc:mysql://prod-db:3306/orders","db_password":"prod-secret"}   BECAUSE SVC reads the password from the environment
 //    step 3 · SVC opens a connection using those values    // connection : "" -> "open"  BECAUSE the config now holds a URL and a password the DB accepts
+//    -> input  : connection = "" (config = {"db_url":"jdbc:mysql://prod-db:3306/orders","db_password":"prod-secret"})
+//    <- output : connection = "open"   BECAUSE the config now holds a URL and a password the DB accepts
 // <- config : {"db_url":"jdbc:mysql://prod-db:3306/orders","db_password":"prod-secret"} · connection : "open"
 //    alt DB_PASSWORD missing from ENV : connection : "" -> "failed"  BECAUSE the supplied configuration does not match what the service expects`
     },
@@ -50,9 +56,17 @@ registerChapter({
 // DEF: deploy · CALLED BY: a release pipeline pushing the same artifact to two environments
 // -> artifact : "orders-service.jar"      // one build, no recompilation for either environment
 //    step 1 · ENV-QA injects its DB values    // qa_config : {} -> {"db_url":"jdbc:mysql://qa-db:3306/orders","db_password":"qa-secret"}
+//    -> input  : qa_config = {} (artifact = "orders-service.jar")
+//    <- output : qa_config = {"db_url":"jdbc:mysql://qa-db:3306/orders","db_password":"qa-secret"}   BECAUSE QA supplies its own DB values
 //    step 2 · ENV-PROD injects different DB values    // prod_config : {} -> {"db_url":"jdbc:mysql://prod-db:3306/orders","db_password":"prod-secret"}
+//    -> input  : prod_config = {} (artifact = "orders-service.jar")
+//    <- output : prod_config = {"db_url":"jdbc:mysql://prod-db:3306/orders","db_password":"prod-secret"}   BECAUSE production supplies different DB values
 //    step 3 · the QA instance connects to its own DB    // qa_connection : "" -> "qa-db"  BECAUSE qa_config points at the QA database
+//    -> input  : qa_connection = "" (qa_config = {"db_url":"jdbc:mysql://qa-db:3306/orders","db_password":"qa-secret"})
+//    <- output : qa_connection = "qa-db"   BECAUSE qa_config points at the QA database
 //    step 4 · the production instance connects to its own DB    // prod_connection : "" -> "prod-db"  BECAUSE prod_config points at the production database
+//    -> input  : prod_connection = "" (prod_config = {"db_url":"jdbc:mysql://prod-db:3306/orders","db_password":"prod-secret"})
+//    <- output : prod_connection = "prod-db"   BECAUSE prod_config points at the production database
 // <- connections : qa = "qa-db" · prod = "prod-db" — one artifact "orders-service.jar", two different databases`
     },
     {
@@ -77,8 +91,14 @@ registerChapter({
 // DEF: startup · CALLED BY: the runtime launching WEB with an injected environment variable
 // -> env : {"USER_REGISTRATION_URL":"http://REGISTRATION-SERVICE/user"}
 //    step 1 · WEB binds the variable user_registration_url from the environment    // config : {} -> {"user_registration_url":"http://REGISTRATION-SERVICE/user"}
+//    -> input  : config = {} (env = {"USER_REGISTRATION_URL":"http://REGISTRATION-SERVICE/user"})
+//    <- output : config = {"user_registration_url":"http://REGISTRATION-SERVICE/user"}   BECAUSE WEB binds the env variable into its config
 //    step 2 · WEB asks DISC to resolve the logical name REGISTRATION-SERVICE    // resolved_url : "" -> "http://10.0.0.7:8080/user"  BECAUSE REGISTRATION-SERVICE is a logical name, not a network location
+//    -> input  : resolved_url = "" (config.user_registration_url = "http://REGISTRATION-SERVICE/user")
+//    <- output : resolved_url = "http://10.0.0.7:8080/user"   BECAUSE REGISTRATION-SERVICE is a logical name, not a network location
 //    step 3 · the proxy calls the resolved instance    // call_target : "" -> "http://10.0.0.7:8080/user"
+//    -> input  : call_target = "" (resolved_url = "http://10.0.0.7:8080/user")
+//    <- output : call_target = "http://10.0.0.7:8080/user"   BECAUSE the proxy calls the resolved address
 // <- resolved_url : "http://10.0.0.7:8080/user" — RegistrationServiceProxy reaches REG`
     }
   ],
@@ -169,8 +189,14 @@ registerChapter({
 // DEF: pull_and_connect · CALLED BY: the runtime launching SVC
 // -> env : {"DB_URL":"jdbc:mysql://prod-db:3306/orders","DB_PASSWORD":"prod-secret"}
 //    step 1 · SVC pulls the config from CS at startup    config : {} -> {"db_url":"jdbc:mysql://prod-db:3306/orders","db_password":"prod-secret"}
+//    -> input  : config = {} (env = {"DB_URL":"jdbc:mysql://prod-db:3306/orders","DB_PASSWORD":"prod-secret"})
+//    <- output : config = {"db_url":"jdbc:mysql://prod-db:3306/orders","db_password":"prod-secret"}   BECAUSE SVC pulls its settings from the config server
 //    step 2 · CS reads the file from GIT and serves it over HTTP    config : {"db_url":"jdbc:mysql://prod-db:3306/orders"} -> {"db_url":"jdbc:mysql://prod-db:3306/orders","db_password":"prod-secret"}  BECAUSE git stores the versioned property file
+//    -> input  : config = {"db_url":"jdbc:mysql://prod-db:3306/orders"} (repo file keys = "db_url","db_password")
+//    <- output : config = {"db_url":"jdbc:mysql://prod-db:3306/orders","db_password":"prod-secret"}   BECAUSE git stores the versioned property file
 //    step 3 · SVC opens a connection with the values    connection : "" -> "open"  BECAUSE the config now holds the URL and password the database accepts
+//    -> input  : connection = "" (config = {"db_url":"jdbc:mysql://prod-db:3306/orders","db_password":"prod-secret"})
+//    <- output : connection = "open"   BECAUSE the config now holds the URL and password the database accepts
 // <- outcome : connection "open" · the same artifact runs unchanged in every environment`
   },
   concepts: {

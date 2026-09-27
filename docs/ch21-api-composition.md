@@ -27,8 +27,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 21 · microservice
 // DEF: get_order_with_name · CALLED BY: CLI assembling an order page
 // -> order_id : "O-101"
 //    step 1 · ORD.fetch(order_id)    // order_row : null -> {cust_id:"C-77", total:120.00}  BECAUSE the order row lives in ORD's own database
+//    -> input  : order_row = null (order_id = "O-101")
+//    <- output : order_row = {cust_id:"C-77", total:120.00}   BECAUSE the order row lives in ORD's own database
 //    step 2 · CUST.fetch("C-77")     // cust_row  : null -> {name:"Ada"}                      BECAUSE the customer row lives in CUST's own database
+//    -> input  : cust_row = null (customer_id = "C-77")
+//    <- output : cust_row = {name:"Ada"}   BECAUSE the customer row lives in CUST's own database
 //    step 3 · join the two rows in memory    // result : {} -> {"O-101":{name:"Ada", total:120.00}}
+//    -> input  : result = {} (order_row = {cust_id:"C-77", total:120.00}, cust_row = {name:"Ada"})
+//    <- output : result = {"O-101":{name:"Ada", total:120.00}}   BECAUSE the composer merges the two fragments on the order id
 // <- result : {"O-101":{name:"Ada", total:120.00}}
 //    alt pre-microservice monolith : one database held both tables -> one SQL JOIN returned this same row in a single statement
 ```
@@ -52,8 +58,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 21 · microservice
 // DEF: compose_order_details · CALLED BY: CMP answering one order query
 // -> query : {"order_id":"O-101"}         // the one logical query to answer
 //    step 1 · ORD.fetch("O-101")    // joined : {} -> {cust_id:"C-77", total:120.00}     · calls : 0 -> 1
+//    -> input  : joined = {} (order_id = "O-101", calls = 0)
+//    <- output : joined = {cust_id:"C-77", total:120.00} · calls = 1   BECAUSE ORD returns the order fragment and one round-trip is made
 //    step 2 · CUST.fetch("C-77")    // joined : {cust_id:"C-77", total:120.00} -> {cust_id:"C-77", total:120.00, name:"Ada"}    · calls : 1 -> 2
+//    -> input  : joined = {cust_id:"C-77", total:120.00} (customer_id = "C-77", calls = 1)
+//    <- output : joined = {cust_id:"C-77", total:120.00, name:"Ada"} · calls = 2   BECAUSE CUST adds the customer name and one more round-trip is made
 //    step 3 · INV.fetch("O-101")    // joined : {cust_id:"C-77", total:120.00, name:"Ada"} -> {cust_id:"C-77", total:120.00, name:"Ada", stock:3}    · calls : 2 -> 3
+//    -> input  : joined = {cust_id:"C-77", total:120.00, name:"Ada"} (order_id = "O-101", calls = 2)
+//    <- output : joined = {cust_id:"C-77", total:120.00, name:"Ada", stock:3} · calls = 3   BECAUSE INV adds the stock level and one more round-trip is made
 // <- output : {cust_id:"C-77", total:120.00, name:"Ada", stock:3}
 //    alt INV is down : step 3 raises -> calls stays at 2 -> the joined result is missing the stock field
 ```
@@ -80,8 +92,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 21 · microservice
 // DEF: join_fragments · CALLED BY: CMP merging two partial results
 // -> key : "O-101"                                    // the shared id the join matches on
 //    step 1 · match ord_rows[0]    // matched : null -> {"O-101":{total:120.00}}
+//    -> input  : matched = null (key = "O-101", ord_rows = [{"O-101":{total:120.00}}, {"O-102":{total:80.00}}])
+//    <- output : matched = {"O-101":{total:120.00}}   BECAUSE ord_rows[0] carries the key "O-101"
 //    step 2 · attach name by id    // matched : {"O-101":{total:120.00}} -> {"O-101":{total:120.00, name:"Ada"}}
+//    -> input  : matched = {"O-101":{total:120.00}} (cust_rows = [{"C-77":{name:"Ada"}}])
+//    <- output : matched = {"O-101":{total:120.00, name:"Ada"}}   BECAUSE the composer attaches the customer name on the shared id
 //    step 3 · append to joined    // joined : [] -> [{"O-101":{total:120.00, name:"Ada"}}]
+//    -> input  : joined = [] (matched = {"O-101":{total:120.00, name:"Ada"}})
+//    <- output : joined = [{"O-101":{total:120.00, name:"Ada"}}]   BECAUSE the merged row is appended to the result
 // <- joined : [{"O-101":{total:120.00, name:"Ada"}}]
 //    alt the key "O-102" has no matching cust row : matched : {"O-102":{total:80.00}} -> {"O-102":{total:80.00, name:null}}  BECAUSE the composer cannot invent a name it was never given
 ```
@@ -107,8 +125,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 21 · microservice
 // DEF: join_large_dataset · CALLED BY: CMP answering a full-history query
 // -> scope : "last 30 days"                 // the query asks for the whole set, not one row
 //    step 1 · ORD.fetch_all(scope)    // ord_rows  : [] -> [900000 rows]  BECAUSE the query selects the full history rather than one id
+//    -> input  : ord_rows = [] (scope = "last 30 days")
+//    <- output : ord_rows = [900000 rows]   BECAUSE the query selects the full history rather than one id
 //    step 2 · CUST.fetch_all()        // cust_rows : [] -> [120000 rows]  BECAUSE every referenced customer must also be pulled
+//    -> input  : cust_rows = [] (ord_rows = [900000 rows])
+//    <- output : cust_rows = [120000 rows]   BECAUSE every referenced customer must also be pulled
 //    step 3 · join in CMP memory      // joined    : [] -> [900000 rows]  BECAUSE all 900000 order rows are combined in the composer's RAM
+//    -> input  : joined = [] (ord_rows = [900000 rows], cust_rows = [120000 rows])
+//    <- output : joined = [900000 rows]   BECAUSE all 900000 order rows are combined in the composer's RAM
 // <- joined : [900000 rows] · CMP materializes 900000 rows in memory at once
 //    alt the query targets one order : ORD.fetch_all returns 1 row -> CMP joins 1 row -> the in-memory cost is negligible
 ```
@@ -158,9 +182,19 @@ _Role: databases_
 // DEF: compose_order · CALLED BY: CLI asking for order "O-101"
 // -> order_id : "O-101"
 //    step 1 · CMP queries ORD    order_row : "none" -> { order_id:"O-101", cust_id:"C-77", total:120.00 }  BECAUSE ORD reads its own ORDDB
+//    -> input  : order_row = "none" (order_id = "O-101")
+//    <- output : order_row = { order_id:"O-101", cust_id:"C-77", total:120.00 }   BECAUSE ORD reads its own ORDDB
 //    step 2 · CMP queries CUST by the foreign key    cust_row : "none" -> { id:"C-77", name:"Ada" }
+//    -> input  : order_row = { order_id:"O-101", cust_id:"C-77", total:120.00 } (cust_row = "none")
+//    decode 2a · extract the foreign key from the order row -> fk : "none" -> "C-77"
+//    decode 2b · resolve fk in CUST's database -> cust_row : "none" -> { id:"C-77", name:"Ada" }
+//    <- output : cust_row = { id:"C-77", name:"Ada" }   BECAUSE CUST reads its own CUSTDB by id "C-77"
 //    step 3 · CMP joins in memory    joined : {} -> { order_id:"O-101", cust_id:"C-77", total:120.00, name:"Ada" }
+//    -> input  : joined = {} (order_row = { order_id:"O-101", cust_id:"C-77", total:120.00 }, cust_row = { id:"C-77", name:"Ada" })
+//    <- output : joined = { order_id:"O-101", cust_id:"C-77", total:120.00, name:"Ada" }   BECAUSE the composer merges the fragments on the foreign key
 //    step 4 · CMP returns one response    response : "none" -> { order_id:"O-101", name:"Ada", total:120.00 }
+//    -> input  : response = "none" (joined = { order_id:"O-101", cust_id:"C-77", total:120.00, name:"Ada" })
+//    <- output : response = { order_id:"O-101", name:"Ada", total:120.00 }   BECAUSE the composer returns the joined view to the client
 // <- outcome : CLI gets { order_id:"O-101", name:"Ada", total:120.00 }  BECAUSE the composer read each provider's fragment from its own database and joined them in memory
 ```
 

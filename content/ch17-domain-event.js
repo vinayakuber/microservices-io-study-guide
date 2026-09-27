@@ -24,8 +24,14 @@ registerChapter({
 // DEF: place_order_without_publish · CALLED BY: SVC
 // -> command : "place_order"
 //    step 1 · SVC writes its own data locally   // order.state : "NEW" -> "PLACED"
+//    -> input  : order.state = "NEW" (command = "place_order")
+//    <- output : order.state = "PLACED"   BECAUSE SVC writes its own data locally
 //    step 2 · the CQRS view is not notified and stays stale   // view.placed_count : 0 -> 0
+//    -> input  : view.placed_count = 0 (event = "none")
+//    <- output : view.placed_count = 0   BECAUSE no publish step tells the CQRS view the order was placed
 //    step 3 · the saga is not triggered and never advances   // saga.next_step : "none" -> "none"
+//    -> input  : saga.next_step = "none" (event = "none")
+//    <- output : saga.next_step = "none"   BECAUSE no event reaches the choreography-based saga
 // <- outcome : order.state : "PLACED" · but every consumer still sees the old state, so the service needs a way to publish events when it updates data`
     },
     {
@@ -46,12 +52,20 @@ registerChapter({
 // DEF: place_order · CALLED BY: the service on the aggregate
 // -> command : "place_order"
 //    step 1 · aggregate changes state   // order.state : "NEW" -> "PLACED"
+//    -> input  : order.state = "NEW" (command = "place_order")
+//    <- output : order.state = "PLACED"   BECAUSE the aggregate applies the command
 //    step 2 · aggregate emits an event   // events : [] -> [{type:"OrderPlaced", order_id:"PO-2001"}]
+//    -> input  : events = [] (order.state = "PLACED")
+//    <- output : events = [{type:"OrderPlaced", order_id:"PO-2001"}]   BECAUSE the aggregate was updated
 //    step 3 · service publishes "OrderPlaced" to BRK (via transactional outbox, same database transaction)
+//    -> input  : event = {type:"OrderPlaced", order_id:"PO-2001"} (outbox = [{event:"OrderPlaced", order_id:"PO-2001"}])
+//    <- output : published = "OrderPlaced"   BECAUSE the service publishes the emitted event to BRK via the transactional outbox
 // <- output : event "OrderPlaced" { order_id:"PO-2001" } published
 // DEF: consume · CALLED BY: the consumer's event handler when BRK delivers "OrderPlaced"
 // -> event : { type:"OrderPlaced", order_id:"PO-2001" }
 //    step 1 · handler updates the read model   // view : { order_count : 0 } -> { order_count : 1 }  BECAUSE one more order was placed
+//    -> input  : view = { order_count : 0 } (event = {type:"OrderPlaced", order_id:"PO-2001"})
+//    <- output : view = { order_count : 1 }   BECAUSE one more order was placed
 // <- outcome : view.order_count : 1 · the CQRS view now reflects the aggregate's change, without the consumer calling the aggregate`
     },
     {
@@ -71,10 +85,20 @@ registerChapter({
 // DEF: place_order_and_publish · CALLED BY: SVC
 // -> command : "place_order"
 //    step 1 · begin one local transaction on DB (the broker is NOT enlisted — no distributed transaction)
+//    -> input  : tx = "none" (command = "place_order")
+//    <- output : tx = "open"   BECAUSE SVC begins one local transaction on DB, with the broker NOT enlisted
 //    step 2 · update the data   // order.state : "NEW" -> "PLACED"
+//    -> input  : order.state = "NEW"
+//    <- output : order.state = "PLACED"   BECAUSE SVC applies the command to the order
 //    step 3 · write the event to the outbox in the same transaction   // outbox : [] -> [{event:"OrderPlaced", order_id:"PO-2001"}]
+//    -> input  : outbox = [] (event = "OrderPlaced", order_id = "PO-2001")
+//    <- output : outbox = [{event:"OrderPlaced", order_id:"PO-2001"}]   BECAUSE the event is written in the same local transaction
 //    step 4 · COMMIT -> both rows durable or neither, so the event cannot be lost or published for a rolled-back change
+//    -> input  : tx = "open" (order.state = "PLACED", outbox = [{event:"OrderPlaced", order_id:"PO-2001"}])
+//    <- output : tx = "committed"   BECAUSE both rows become durable together, or neither does
 //    step 5 · a relay later polls the outbox and marks the row sent   // outbox : [{event:"OrderPlaced",sent:false}] -> [{event:"OrderPlaced",sent:true}]
+//    -> input  : outbox = [{event:"OrderPlaced",sent:false}]
+//    <- output : outbox = [{event:"OrderPlaced",sent:true}]   BECAUSE the relay publishes the row and marks it sent
 // <- outcome : event "OrderPlaced" published to BRK, atomically coupled to the data update`
     }
   ],
@@ -242,9 +266,17 @@ registerChapter({
 // DEF: place_order_and_publish · CALLED BY: AG handling command "place_order"
 // -> command : "place_order"
 //    step 1 · AG changes state    order : { id:"PO-2001", state:"NEW" } -> { id:"PO-2001", state:"PLACED" }
+//    -> input  : order = { id:"PO-2001", state:"NEW" } (command = "place_order")
+//    <- output : order = { id:"PO-2001", state:"PLACED" }   BECAUSE the aggregate applies the command
 //    step 2 · AG emits the event and DB writes the outbox row in the SAME transaction    outbox : [] -> [{event:"OrderPlaced", order_id:"PO-2001", sent:false}]
+//    -> input  : outbox = [] (event = "OrderPlaced", order_id = "PO-2001")
+//    <- output : outbox = [{event:"OrderPlaced", order_id:"PO-2001", sent:false}]   BECAUSE the event row is written in the SAME transaction as the data change
 //    step 3 · COMMIT makes both durable, then the relay publishes    outbox : [{sent:false}] -> [{sent:true}]  BECAUSE the relay polls the outbox and ships the row to BRK
+//    -> input  : outbox = [{sent:false}] (committed = true)
+//    <- output : outbox = [{sent:true}]   BECAUSE the relay polls the outbox and ships the row to BRK
 //    step 4 · SUB consumes the event and reacts    view : { order_count : 0 } -> { order_count : 1 }  BECAUSE one more order was placed
+//    -> input  : view = { order_count : 0 } (event = "OrderPlaced")
+//    <- output : view = { order_count : 1 }   BECAUSE one more order was placed
 // <- outcome : BRK delivered "OrderPlaced" { order_id:"PO-2001" } and SUB's view now reads order_count 1  BECAUSE the publisher wrote the outbox row atomically with the data change and the relay shipped it to the broker`
   },
   concepts: {

@@ -25,8 +25,14 @@ registerChapter({
 // DEF: treat_as_unit · CALLED BY: SVC when it makes the objects one aggregate
 // -> aggregate_root : "PO-2001"
 //    step 1 · item_a hangs off the root   // item_a : {product:"BOOK-1"} -> order.items[0]  BECAUSE the root now owns it
+//    -> input  : item_a = {product:"BOOK-1"} (aggregate_root = "PO-2001")
+//    <- output : order.items[0] = {product:"BOOK-1"}   BECAUSE the root now owns it
 //    step 2 · item_b hangs off the root   // item_b : {product:"BOOK-2"} -> order.items[1]  BECAUSE both children are reached through the one root
+//    -> input  : item_b = {product:"BOOK-2"} (aggregate_root = "PO-2001")
+//    <- output : order.items[1] = {product:"BOOK-2"}   BECAUSE both children are reached through the one root
 //    step 3 · the root recomputes the total over its items   // order.total : 0.00 -> 35.00  BECAUSE 30.00 + 5.00 = 35.00
+//    -> input  : order.total = 0.00 (items = [{product:"BOOK-1",price:30.00},{product:"BOOK-2",price:5.00}])
+//    <- output : order.total = 35.00   BECAUSE 30.00 + 5.00 = 35.00
 // <- outcome : order : { id:"PO-2001", items:[{BOOK-1},{BOOK-2}], total:35.00 } · a graph treated as a unit
 //    alt read path : a query loads the root and reads it back : query "GET /orders/PO-2001" -> returns { total:35.00 }   BECAUSE all children are reached through the one root`
     },
@@ -48,23 +54,41 @@ registerChapter({
 // DEF: add_line_item · CALLED BY: SVC on the aggregate root
 // -> item : { product:"BOOK-1", price:30.00, quantity:1 }
 //    step 1 · root appends the item        // order.items : [] -> [{product:"BOOK-1",price:30.00,quantity:1}]
+//    -> input  : order.items = [] (item = {product:"BOOK-1",price:30.00,quantity:1})
+//    <- output : order.items = [{product:"BOOK-1",price:30.00,quantity:1}]   BECAUSE the root owns the new line item
 //    step 2 · root recomputes total        // order.total : 0.00 -> 30.00  BECAUSE 30.00 × 1 = 30.00
+//    -> input  : order.total = 0.00
+//    <- output : order.total = 30.00   BECAUSE 30.00 × 1 = 30.00
 //    step 3 · invariant total >= MINIMUM : 30.00 >= 25.00 -> holds
+//    -> input  : total = 30.00 (MINIMUM = 25.00)
+//    <- output : invariant = "holds" (30.00 >= 25.00)   BECAUSE the total meets the minimum
 // <- outcome : order.total : 30.00
 // DEF: add_line_item (second call) · CALLED BY: SVC on the aggregate root
 // -> item : { product:"BOOK-2", price:5.00, quantity:2 }
 //    step 1 · root appends the item        // order.items : [{BOOK-1}] -> [{BOOK-1},{BOOK-2}]
+//    -> input  : order.items = [{product:"BOOK-1",price:30.00,quantity:1}] (item = {product:"BOOK-2",price:5.00,quantity:2})
+//    <- output : order.items = [{BOOK-1},{BOOK-2}]   BECAUSE the root owns the new line item
 //    step 2 · root recomputes total        // order.total : 30.00 -> 40.00  BECAUSE 30.00 + (5.00 × 2) = 40.00
+//    -> input  : order.total = 30.00
+//    <- output : order.total = 40.00   BECAUSE 30.00 + (5.00 × 2) = 40.00
 //    step 3 · invariant total >= MINIMUM : 40.00 >= 25.00 -> holds
+//    -> input  : total = 40.00 (MINIMUM = 25.00)
+//    <- output : invariant = "holds" (40.00 >= 25.00)   BECAUSE the total meets the minimum
 // <- outcome : order.total : 40.00
 // DEF: place_order · CALLED BY: SVC when the customer confirms
 // -> command : "place_order"
 //    step 1 · invariant total >= MINIMUM : 40.00 >= 25.00 -> holds
+//    -> input  : total = 40.00 (MINIMUM = 25.00)
+//    <- output : invariant = "holds" (40.00 >= 25.00)   BECAUSE the total meets the minimum
 //    step 2 · state transition NEW -> PLACED   // order.state : "NEW" -> "PLACED"
+//    -> input  : order.state = "NEW"
+//    <- output : order.state = "PLACED"   BECAUSE the invariant holds and the customer confirmed
 // <- outcome : order.state : "PLACED"
 // DEF: remove_line_item · CALLED BY: SVC trying to drop BOOK-1 from a placed order
 // -> item : "BOOK-1"
 //    step 1 · root refuses BECAUSE state is "PLACED" (a placed order is immutable)   // order.total : 40.00 -> 40.00 (no change)
+//    -> input  : order.total = 40.00 (item = "BOOK-1", order.state = "PLACED")
+//    <- output : order.total = 40.00 (no change)   BECAUSE state is "PLACED" (a placed order is immutable)
 // <- outcome : order.total : 40.00 · the root rejected a mutation that would violate the state invariant`
     },
     {
@@ -84,8 +108,14 @@ registerChapter({
 // DEF: place_order · CALLED BY: SVC on the Order aggregate root
 // -> aggregate_id : "PO-2001"
 //    step 1 · the change is routed through the root   // aggregates["PO-2001"].state : "NEW" -> "PLACED"
+//    -> input  : aggregates["PO-2001"].state = "NEW" (aggregate_id = "PO-2001")
+//    <- output : aggregates["PO-2001"].state = "PLACED"   BECAUSE the change goes through the root
 //    step 2 · the aggregate emits an event on update   // events : [] -> [{type:"OrderPlaced", order_id:"PO-2001"}]
+//    -> input  : events = []
+//    <- output : events = [{type:"OrderPlaced", order_id:"PO-2001"}]   BECAUSE the aggregate was updated
 //    step 3 · other aggregates are untouched by this transaction   // aggregates["CUST-7"].credit : 500.00 -> 500.00 (one transaction = one aggregate)
+//    -> input  : aggregates["CUST-7"].credit = 500.00
+//    <- output : aggregates["CUST-7"].credit = 500.00   BECAUSE one transaction changes exactly one aggregate
 // <- outcome : events : [{type:"OrderPlaced", order_id:"PO-2001"}] · the service publishes these events for other services`
     }
   ],
@@ -259,9 +289,17 @@ registerChapter({
 // DEF: add_item · CALLED BY: CLI adding CHAIR-1 to PO-77
 // -> command : {"order_id":"PO-77","item":"CHAIR-1","price":25.00}
 //    step 1 · REPO loads the aggregate    status : "none" -> "loaded"   BECAUSE the repository reads order PO-77 and its line items from DB
+//    -> input  : status = "none" (command = {"order_id":"PO-77","item":"CHAIR-1","price":25.00})
+//    <- output : status = "loaded"   BECAUSE the repository reads order PO-77 and its line items from DB
 //    step 2 · AG adds CHAIR-1    items : [{"BOOK-1",25.00}] -> [{"BOOK-1",25.00},{"CHAIR-1",25.00}]   BECAUSE the aggregate root updates its line items as one unit
+//    -> input  : items = [{"BOOK-1",25.00}] (item = {"CHAIR-1",25.00})
+//    <- output : items = [{"BOOK-1",25.00},{"CHAIR-1",25.00}]   BECAUSE the aggregate root updates its line items as one unit
 //    step 3 · AG recomputes the total    total : 35.00 -> 60.00   BECAUSE the new total is the sum of all line items
+//    -> input  : total = 35.00 (items = [{"BOOK-1",25.00},{"CHAIR-1",25.00}])
+//    <- output : total = 60.00   BECAUSE the new total is the sum of all line items
 //    step 4 · REPO saves the aggregate    orders : [("PO-77",total 35.00)] -> [("PO-77",total 60.00)]   BECAUSE the repository persists the changed aggregate
+//    -> input  : orders = [("PO-77",total 35.00)] (total = 60.00)
+//    <- output : orders = [("PO-77",total 60.00)]   BECAUSE the repository persists the changed aggregate
 // <- outcome : status "saved" · order PO-77 total 35.00 -> 60.00 (one consistency boundary)`
   },
   concepts: {

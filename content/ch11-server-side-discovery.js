@@ -28,9 +28,17 @@ registerChapter({
 // DEF: a client sends a request · CALLED BY: CLI calling the router's well-known address
 // -> request : "POST http://router.example.com/orders"
 //    step 0 · the instances write these rows at startup : registry["order-service"] : [] -> [{"host":"10.0.1.7","port":8080},{"host":"10.0.1.8","port":8080}]   BECAUSE each instance writes its own row on boot (self-registration)
+//    -> input  : registry["order-service"] = []
+//    <- output : registry["order-service"] = [{"host":"10.0.1.7","port":8080},{"host":"10.0.1.8","port":8080}]   BECAUSE each instance writes its own row on boot (self-registration)
 //    step 1 · RTR queries REG : lookup : [] -> ["10.0.1.7:8080","10.0.1.8:8080"]   BECAUSE the router asks the registry for available instances
+//    -> input  : lookup = [] (registry = {"order-service" -> [{"host":"10.0.1.7","port":8080},{"host":"10.0.1.8","port":8080}]})
+//    <- output : lookup = ["10.0.1.7:8080","10.0.1.8:8080"]   BECAUSE the router asks the registry for available instances
 //    step 2 · RTR picks one : router_target : "unset" -> "10.0.1.7:8080"
+//    -> input  : lookup = ["10.0.1.7:8080","10.0.1.8:8080"] (router_target = "unset")
+//    <- output : router_target = "10.0.1.7:8080"   BECAUSE the router load-balances across the returned instances
 //    step 3 · RTR forwards : forwarded : "none" -> "10.0.1.7:8080"   BECAUSE the router relays the request to the chosen instance
+//    -> input  : router_target = "10.0.1.7:8080" (forwarded = "none")
+//    <- output : forwarded = "10.0.1.7:8080"   BECAUSE the router relays the request to the chosen instance
 // <- forwarded call : "POST http://10.0.1.7:8080/orders"   (the client never resolved the instance itself)`
     },
     {
@@ -51,7 +59,11 @@ registerChapter({
 // DEF: an autoscaling group adds an instance · CALLED BY: the ASG scaling out
 // -> scale_out : {"id":"i-ghi","host":"10.0.3.3"}
 //    step 1 · ASG registers with ELB : elb_targets["order-service"] : [{"id":"i-abc","host":"10.0.3.1"},{"id":"i-def","host":"10.0.3.2"}] -> [{"id":"i-abc","host":"10.0.3.1"},{"id":"i-def","host":"10.0.3.2"},{"id":"i-ghi","host":"10.0.3.3"}]
+//    -> input  : elb_targets["order-service"] = [{"id":"i-abc","host":"10.0.3.1"},{"id":"i-def","host":"10.0.3.2"}] (scale_out = {"id":"i-ghi","host":"10.0.3.3"})
+//    <- output : elb_targets["order-service"] = [{"id":"i-abc","host":"10.0.3.1"},{"id":"i-def","host":"10.0.3.2"},{"id":"i-ghi","host":"10.0.3.3"}]   BECAUSE the autoscaling group registers the new instance with the ELB
 //    step 2 · target count : 2 -> 3   BECAUSE the autoscaling group registered the new EC2 instance
+//    -> input  : target_count = 2
+//    <- output : target_count = 3   BECAUSE the autoscaling group registered the new EC2 instance
 // <- load-balanced set : ["10.0.3.1","10.0.3.2","10.0.3.3"]   (ELB now spreads traffic across 3 instances)
 //    alt explicit API call : an operator calls the ELB register-target API -> target count : 3 -> 3 (the same i-ghi is already present)`
     },
@@ -77,8 +89,14 @@ registerChapter({
 // DEF: a client calls a service · CALLED BY: CLI connecting to the local proxy
 // -> connect : "localhost:8080"   (the port assigned to order-service)
 //    step 1 · proxy resolves the port : proxy_target : "unset" -> "order-service"   BECAUSE port 8080 is assigned to order-service in the cluster
+//    -> input  : proxy_target = "unset" (connect = "localhost:8080")
+//    <- output : proxy_target = "order-service"   BECAUSE port 8080 is assigned to order-service in the cluster
 //    step 2 · proxy finds an instance : selected : [] -> ["10.0.4.9:8080"]   BECAUSE the proxy looks up the cluster for order-service
+//    -> input  : selected = [] (cluster_map = {"order-service" -> "port 8080"})
+//    <- output : selected = ["10.0.4.9:8080"]   BECAUSE the proxy looks up the cluster for order-service
 //    step 3 · proxy forwards : forwarded : "none" -> "10.0.4.9:8080"   BECAUSE it relays the request to that instance
+//    -> input  : selected = ["10.0.4.9:8080"] (forwarded = "none")
+//    <- output : forwarded = "10.0.4.9:8080"   BECAUSE it relays the request to that instance
 // <- forwarded call : "POST http://10.0.4.9:8080/orders"   (the client only ever spoke to localhost:8080)
 //    alt another host : its local proxy forwards the same port to a different pod 10.0.4.12`
     },
@@ -101,8 +119,14 @@ registerChapter({
 // DEF: measure one request's cost · CALLED BY: CLI sending a request through the router
 // -> request : "POST /orders"
 //    step 1 · hops : 0 -> 3   BECAUSE the path is CLI -> RTR -> REG -> SVC, one more hop than client-side discovery's 2
+//    -> input  : hops = 0 (request = "POST /orders")
+//    <- output : hops = 3   BECAUSE the path is CLI -> RTR -> REG -> SVC, one more hop than client-side discovery's 2
 //    step 2 · replicate the router : router_replicas : 1 -> 2   BECAUSE the router must be replicated for availability and capacity
+//    -> input  : router_replicas = 1
+//    <- output : router_replicas = 2   BECAUSE the router must be replicated for availability and capacity
 //    step 3 · protocol check : supported : ["http"] -> ["http","tcp"]   BECAUSE the router must speak the clients' protocols unless it is a TCP-based router
+//    -> input  : supported = ["http"]
+//    <- output : supported = ["http","tcp"]   BECAUSE the router must speak the clients' protocols unless it is a TCP-based router
 // <- cost summary : "3 hops, 2 replicas, protocols [http, tcp]"   (more moving parts than client-side)`
     }
   ],
@@ -257,8 +281,14 @@ registerChapter({
 // DEF: forward_request · CALLED BY: CLI calling the router's well-known address
 // -> request : "POST http://router.example.com/orders"
 //    step 1 · RTR queries REG for "order-service"    list : [] -> ["10.0.1.7:8080", "10.0.1.8:8080"]   BECAUSE the router asks the registry for available instances
+//    -> input  : list = [] (registry = {"order-service" -> ["10.0.1.7:8080", "10.0.1.8:8080"]})
+//    <- output : list = ["10.0.1.7:8080", "10.0.1.8:8080"]   BECAUSE the router asks the registry for available instances
 //    step 2 · RTR picks an instance    target : "unset" -> "10.0.1.7:8080"   BECAUSE the router load-balances across the returned set
+//    -> input  : list = ["10.0.1.7:8080", "10.0.1.8:8080"] (target = "unset")
+//    <- output : target = "10.0.1.7:8080"   BECAUSE the router load-balances across the returned set
 //    step 3 · RTR forwards to the instance    status : "none" -> "200 OK"   BECAUSE the router relays the request to the chosen instance
+//    -> input  : target = "10.0.1.7:8080" (status = "none")
+//    <- output : status = "200 OK"   BECAUSE the router relays the request to the chosen instance
 // <- forwarded call : "POST http://10.0.1.7:8080/orders"   (the client never resolved an instance itself)`
   },
   concepts: {

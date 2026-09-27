@@ -24,9 +24,17 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.5 · microservices.
 // DEF: createOrder · CALLED BY: the presentation tier issuing a POST /orders request
 // -> orderId : "PO-100" · -> lineItems : [{sku:"S1", qty:2, unit:25.00}]
 //    step 1 · allocate the data object : order : null -> { orderId:null, lineItems:[] }   BECAUSE the script builds an Order (pure data) from the request
+//    -> input  : order = null (request = POST /orders)
+//    <- output : order = { orderId:null, lineItems:[] }   BECAUSE the script builds an Order (pure data) from the request
 //    step 2 · fill from the request : order.orderId : null -> "PO-100" · order.lineItems : [] -> [{sku:"S1",qty:2,unit:25.00}]
+//    -> input  : order = { orderId:null, lineItems:[] } (request = { orderId:"PO-100", lineItems:[{sku:"S1",qty:2,unit:25.00}] })
+//    <- output : order = { orderId:"PO-100", lineItems:[{sku:"S1",qty:2,unit:25.00}] }   BECAUSE the script copies the request fields onto the data object
 //    step 3 · hand off to the DAO : DAO.save(order)     // save(Order) is data access, not business logic
+//    -> input  : order = { orderId:"PO-100", lineItems:[{sku:"S1",qty:2,unit:25.00}] }
+//    <- output : dao_call = "save(order)"   BECAUSE the script delegates persistence to the DAO
 //    step 4 · persist : orders : {} -> { "PO-100": { orderId:"PO-100", lineItems:[{sku:"S1",qty:2,unit:25.00}] } }
+//    -> input  : orders = {} (dao_call = "save(order)")
+//    <- output : orders = { "PO-100": { orderId:"PO-100", lineItems:[{sku:"S1",qty:2,unit:25.00}] } }   BECAUSE DAO.save writes the row to the database
 // <- order : { orderId:"PO-100", lineItems:[{sku:"S1",qty:2,unit:25.00}] } · saved to DB
 ```
 
@@ -48,8 +56,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.5 · microservices.
 // DEF: reviseOrder · CALLED BY: the presentation tier issuing a revise request
 // -> orderId : "PO-100" · -> newQty : 5
 //    step 1 · load : order : null -> { orderId:"PO-100", lineItems:[{sku:"S1",qty:2,unit:25.00}] }   BECAUSE DAO.findOrderById returns the stored data object
+//    -> input  : order = null (orderId = "PO-100")
+//    <- output : order = { orderId:"PO-100", lineItems:[{sku:"S1",qty:2,unit:25.00}] }   BECAUSE DAO.findOrderById returns the stored data object
 //    step 2 · the SCRIPT mutates a field : order.lineItems[0].qty : 2 -> 5   BECAUSE the change is written by the script, not by the Order
+//    -> input  : order.lineItems[0].qty = 2 (newQty = 5)
+//    <- output : order.lineItems[0].qty = 5   BECAUSE the change is written by the script, not by the Order
 //    step 3 · persist : orders : { "PO-100": {...,qty:2,...} } -> { "PO-100": {...,qty:5,...} }   BECAUSE DAO.save writes the object back
+//    -> input  : orders = { "PO-100": {...,qty:2,...} } (order.lineItems[0].qty = 5)
+//    <- output : orders = { "PO-100": {...,qty:5,...} }   BECAUSE DAO.save writes the object back
 // <- order : { orderId:"PO-100", lineItems:[{sku:"S1",qty:5,unit:25.00}] }
 ```
 
@@ -71,9 +85,17 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.5 · microservices.
 // DEF: cancelOrder · CALLED BY: the presentation tier issuing a cancel request
 // -> orderId : "PO-100"
 //    step 1 · load : order : null -> { orderId:"PO-100", status:"CREATED", lineItems:[{sku:"S1",qty:2,unit:25.00}] }
+//    -> input  : order = null (orderId = "PO-100")
+//    <- output : order = { orderId:"PO-100", status:"CREATED", lineItems:[{sku:"S1",qty:2,unit:25.00}] }   BECAUSE DAO.findOrderById returns the stored row
 //    step 2 · evaluate the rule : cancellable : false -> true   BECAUSE status "CREATED" is cancellable
+//    -> input  : order.status = "CREATED" (cancellable = false)
+//    <- output : cancellable = true   BECAUSE status "CREATED" is cancellable
 //    step 3 · set the field : order.status : "CREATED" -> "CANCELLED"
+//    -> input  : order.status = "CREATED" (cancellable = true)
+//    <- output : order.status = "CANCELLED"   BECAUSE the script flips the field after the guard passes
 //    step 4 · persist : orders : { "PO-100": {...,status:"CREATED",...} } -> { "PO-100": {...,status:"CANCELLED",...} }   BECAUSE DAO.save writes it back
+//    -> input  : orders = { "PO-100": {...,status:"CREATED",...} } (order.status = "CANCELLED")
+//    <- output : orders = { "PO-100": {...,status:"CANCELLED",...} }   BECAUSE DAO.save writes it back
 // <- order : { orderId:"PO-100", status:"CANCELLED", lineItems:[{sku:"S1",qty:2,unit:25.00}] }
 //    alt complex rules : each extra rule adds another if-block to the SAME method, so the script grows with the logic
 ```
@@ -128,9 +150,17 @@ _Role: database_
 // DEF: create_order · CALLED BY: WEB issuing POST /orders
 // -> order_id : "PO-100" · -> line_items : [{sku:"S1", qty:2, unit:25.00}]
 //    step 1 · script fills the data object    order : { orderId:null, lineItems:[] } -> { orderId:"PO-100", lineItems:[{sku:"S1", qty:2, unit:25.00}] }
+//    -> input  : order = { orderId:null, lineItems:[] } (request = { order_id:"PO-100", line_items:[{sku:"S1", qty:2, unit:25.00}] })
+//    <- output : order = { orderId:"PO-100", lineItems:[{sku:"S1", qty:2, unit:25.00}] }   BECAUSE the script copies the request onto the pure-data object
 //    step 2 · script hands off to the DAO    DAO.save(order) -> rows : {} -> { "PO-100" : { lineItems:[{sku:"S1", qty:2, unit:25.00}] } }
+//    -> input  : rows = {} (order = { orderId:"PO-100", lineItems:[{sku:"S1", qty:2, unit:25.00}] })
+//    <- output : rows = { "PO-100" : { lineItems:[{sku:"S1", qty:2, unit:25.00}] } }   BECAUSE DAO.save(order) writes the row to the database
 //    step 3 · script reads it back through the DAO    findOrderById("PO-100") -> rows["PO-100"] : { orderId:"PO-100", lineItems:[{sku:"S1", qty:2, unit:25.00}] } returned
+//    -> input  : orderId = "PO-100" (rows = { "PO-100" : { lineItems:[{sku:"S1", qty:2, unit:25.00}] } })
+//    <- output : row = { orderId:"PO-100", lineItems:[{sku:"S1", qty:2, unit:25.00}] }   BECAUSE findOrderById looks the row up by its id
 //    step 4 · WEB receives the row    response : "none" -> { orderId:"PO-100", lineItems:[{sku:"S1", qty:2, unit:25.00}] }
+//    -> input  : response = "none" (row = { orderId:"PO-100", lineItems:[{sku:"S1", qty:2, unit:25.00}] })
+//    <- output : response = { orderId:"PO-100", lineItems:[{sku:"S1", qty:2, unit:25.00}] }   BECAUSE the script returns the row to the presentation tier
 // <- outcome : DB row "PO-100" persisted and returned  BECAUSE the script wrote through OrderDao.save and read back through OrderDao.findOrderById
 ```
 

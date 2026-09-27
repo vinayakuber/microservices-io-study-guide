@@ -23,8 +23,14 @@ registerChapter({
 // DEF: build version 3.1.0 · CALLED BY: BLD on commit
 // -> service : "restaurant-service" · -> version : "3.1.0"
 //    step 1 · compile · artifact : null -> "restaurant-service-3.1.0.jar"  BECAUSE a Spring Boot app packages as an executable JAR
+//    -> input  : service = "restaurant-service" (version = "3.1.0")
+//    <- output : artifact = "restaurant-service-3.1.0.jar"   BECAUSE a Spring Boot app packages as an executable JAR
 //    step 2 · choose format · format : "unknown" -> "jar"                   // a JAR or WAR; a WAR would add a web container
+//    -> input  : artifact = "restaurant-service-3.1.0.jar"
+//    <- output : format = "jar"   BECAUSE a JAR or WAR; a WAR would add a web container
 //    step 3 · hand off · pipeline : 0 -> 1                                  BECAUSE the pipeline invokes the service management interface
+//    -> input  : format = "jar"
+//    <- output : pipeline = 1   BECAUSE the pipeline invokes the service management interface
 // <- artifact : "restaurant-service-3.1.0.jar"  · one executable JAR to deploy
 //    alt WAR packaging : artifact : null -> "restaurant-service-3.1.0.war"  BECAUSE a WAR also needs a web container installed`
     },
@@ -45,8 +51,14 @@ registerChapter({
 // DEF: deploy JAR 3.1.0 · CALLED BY: the service management interface
 // -> artifact : "restaurant-service-3.1.0.jar"
 //    step 1 · install JDK · runtime : {} -> {"jdk":"17"}   BECAUSE a Java service needs the JDK installed first
+//    -> input  : artifact = "restaurant-service-3.1.0.jar"
+//    <- output : runtime = {"jdk":"17"}   BECAUSE a Java service needs the JDK installed first
 //    step 2 · copy package · process : null -> "pending"   // the JAR is copied onto the machine
+//    -> input  : runtime = {"jdk":"17"}
+//    <- output : process = "pending"   BECAUSE the JAR is copied onto the machine
 //    step 3 · start · process : "pending" -> "jvm-8121"    // the service starts as a JVM process
+//    -> input  : process = "pending"
+//    <- output : process = "jvm-8121"   BECAUSE the service starts as a JVM process
 // <- process : "jvm-8121"  · one JVM running one service instance
 //    alt WAR path : runtime : {"jdk":"17"} -> {"jdk":"17","tomcat":"10"}  BECAUSE a WAR also needs Apache Tomcat installed`
     },
@@ -67,8 +79,14 @@ registerChapter({
 // DEF: start 3 instances · CALLED BY: a scale-up on one machine
 // -> instance_count : 3
 //    step 1 · launch JVMs · jvms : {} -> {"jvm-1","jvm-2","jvm-3"}  BECAUSE each JVM runs a single service instance
+//    -> input  : instance_count = 3
+//    <- output : jvms = {"jvm-1","jvm-2","jvm-3"}   BECAUSE each JVM runs a single service instance
 //    step 2 · bind ports · ports : 0 -> 3                          // each instance binds its own port on the machine
+//    -> input  : jvms = {"jvm-1","jvm-2","jvm-3"}
+//    <- output : ports = 3   BECAUSE each instance binds its own port on the machine
 //    step 3 · serve · serving : 0 -> 3                             // 3 instances share the same machine and JDK
+//    -> input  : ports = 3
+//    <- output : serving = 3   BECAUSE 3 instances share the same machine and JDK
 // <- instances : 3  · multiple JVMs share one machine
 //    alt single instance : instance_count : 3 -> 1   BECAUSE some deployments keep one instance per machine`
     },
@@ -89,8 +107,14 @@ registerChapter({
 // DEF: prepare machine for 3.1.0 · CALLED BY: an operator
 // -> service : "restaurant-service"
 //    step 1 · install runtime · setup : [] -> ["install jdk","install tomcat"]  BECAUSE the package does not carry its own runtime
+//    -> input  : service = "restaurant-service"
+//    <- output : setup = ["install jdk","install tomcat"]   BECAUSE the package does not carry its own runtime
 //    step 2 · configure · jdk : null -> "17"                                     // the operator pins the JDK version by hand
+//    -> input  : jdk = null
+//    <- output : jdk = "17"   BECAUSE the operator pins the JDK version by hand
 //    step 3 · contrast · stack_encapsulated : 0 -> 1                             BECAUSE a VM or container image WOULD encapsulate the stack
+//    -> input  : setup = ["install jdk","install tomcat"]
+//    <- output : stack_encapsulated = 1   BECAUSE a VM or container image WOULD encapsulate the stack
 // <- setup : 2 manual steps  · this unmanaged runtime is the drawback that motivates the other options
 //    alt VM packaging : setup : ["install jdk","install tomcat"] -> []  BECAUSE a VM image encapsulates the whole technology stack`
     }
@@ -225,8 +249,14 @@ registerChapter({
 // DEF: deploy_jar · CALLED BY: BLD building, MACH provisioning, JVM serving
 // -> artifact : "restaurant-service-3.1.0.jar"
 //    step 1 · BLD produces the JAR   // package : "" -> "restaurant-service-3.1.0.jar"   BECAUSE the build pipeline compiles the service into one runnable JAR
+//    -> input  : artifact = "restaurant-service-3.1.0.jar"
+//    <- output : package = "restaurant-service-3.1.0.jar"   BECAUSE the build pipeline compiles the service into one runnable JAR
 //    step 2 · MACH installs JDK 17 and Tomcat 10   // runtime : {} -> { "jdk":17, "tomcat":10 }   BECAUSE a JAR needs the JDK and a web container to run
+//    -> input  : package = "restaurant-service-3.1.0.jar"
+//    <- output : runtime = { "jdk":17, "tomcat":10 }   BECAUSE a JAR needs the JDK and a web container to run
 //    step 3 · the JVM starts and serves   // process : "" -> "jvm-8121"   BECAUSE the machine launches the packaged service
+//    -> input  : runtime = { "jdk":17, "tomcat":10 }
+//    <- output : process = "jvm-8121"   BECAUSE the machine launches the packaged service
 // <- outcome : process = "jvm-8121" · restaurant-service serves  BECAUSE the JAR plus JDK 17 plus Tomcat 10 boot one JVM process`
   },
   concepts: {

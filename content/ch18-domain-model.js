@@ -23,8 +23,14 @@ registerChapter({
 // DEF: Order.create · CALLED BY: SVC.createOrder() delegating to the static factory on the class
 // -> orderId : "PO-100" · -> lineItems : [{sku:"S1", qty:2, unit:25.00}]
 //    step 1 · copy identity : order.orderId : null -> "PO-100"   BECAUSE the factory writes the command id onto the object
+//    -> input  : order.orderId = null (orderId = "PO-100")
+//    <- output : order.orderId = "PO-100"   BECAUSE the factory writes the command id onto the object
 //    step 2 · attach the lines : order.lineItems : [] -> [{sku:"S1",qty:2,unit:25.00}]
+//    -> input  : order.lineItems = [] (lineItems = [{sku:"S1", qty:2, unit:25.00}])
+//    <- output : order.lineItems = [{sku:"S1",qty:2,unit:25.00}]   BECAUSE the factory attaches the supplied lines to the order
 //    step 3 · compute the total : order.total : 0.00 -> 50.00   BECAUSE 2 lines x 25.00 per unit = 50.00
+//    -> input  : order.total = 0.00 (lineItems = [{sku:"S1",qty:2,unit:25.00}])
+//    <- output : order.total = 50.00   BECAUSE 2 lines x 25.00 per unit = 50.00
 // <- order : { orderId:"PO-100", status:"CREATED", lineItems:[{sku:"S1",qty:2,unit:25.00}], total:50.00 }
 //    alt empty order : lineItems = [] -> create() returns an Order with total 0.00 and no lines`
     },
@@ -45,8 +51,14 @@ registerChapter({
 // DEF: revise · CALLED BY: SVC.reviseOrder(orderId, newQty) — the service hands the command to the aggregate
 // -> newQty : 5
 //    step 1 · evaluate the invariant : guard : false -> true   BECAUSE status "CREATED" is not "CANCELLED", so revision is allowed
+//    -> input  : guard = false (order.status = "CREATED", newQty = 5)
+//    <- output : guard = true   BECAUSE status "CREATED" is not "CANCELLED", so revision is allowed
 //    step 2 · mutate the line : order.lineItems[0].qty : 2 -> 5
+//    -> input  : order.lineItems[0].qty = 2 (newQty = 5)
+//    <- output : order.lineItems[0].qty = 5   BECAUSE the method applies the new quantity to its own line
 //    step 3 · re-derive the total : order.total : 50.00 -> 125.00   BECAUSE the aggregate recomputes 5 x 25.00 = 125.00 from its own lines
+//    -> input  : order.total = 50.00 (lineItems = [{sku:"S1",qty:5,unit:25.00}])
+//    <- output : order.total = 125.00   BECAUSE the aggregate recomputes 5 x 25.00 = 125.00 from its own lines
 // <- order : { orderId:"PO-100", status:"CREATED", lineItems:[{sku:"S1",qty:5,unit:25.00}], total:125.00 }
 //    alt revise a cancelled order : status "CANCELLED" fails step 1 -> no mutation, order stays at total 50.00`
     },
@@ -68,8 +80,14 @@ registerChapter({
 // DEF: cancel · CALLED BY: SVC.cancelOrder(orderId) — the service locates the aggregate and invokes its behavior
 // -> orderId : "PO-100"
 //    step 1 · check the transition : guard : false -> true   BECAUSE cancel is valid only from status "CREATED"
+//    -> input  : guard = false (order.status = "CREATED", orderId = "PO-100")
+//    <- output : guard = true   BECAUSE cancel is valid only from status "CREATED"
 //    step 2 · transition the state : order.status : "CREATED" -> "CANCELLED"
+//    -> input  : order.status = "CREATED"
+//    <- output : order.status = "CANCELLED"   BECAUSE the method flips the state itself
 //    step 3 · persist the aggregate : store : {} -> { "PO-100": {status:"CANCELLED", total:125.00} }   BECAUSE REPO.save writes the object back
+//    -> input  : store = {} (order = {orderId:"PO-100", status:"CANCELLED", total:125.00})
+//    <- output : store = { "PO-100": {status:"CANCELLED", total:125.00} }   BECAUSE REPO.save writes the object back
 // <- order : { orderId:"PO-100", status:"CANCELLED", lineItems:[{sku:"S1",qty:5,unit:25.00}], total:125.00 }
 //    alt already cancelled : status "CANCELLED" fails step 1 -> the method throws, and the object is left unchanged`
     },
@@ -90,13 +108,21 @@ registerChapter({
 // DEF: REPO.findOrderById · CALLED BY: SVC before invoking a behavior — a behavior-only class with no fields of its own
 // -> orderId : "PO-100"
 //    step 1 · look up the aggregate : found : false -> true   BECAUSE orders contains the key "PO-100"
+//    -> input  : found = false (orderId = "PO-100", orders = {"PO-100": {...}})
+//    <- output : found = true   BECAUSE orders contains the key "PO-100"
 //    step 2 · return it : result : null -> { orderId:"PO-100", status:"CREATED", lineItems:[{sku:"S1",qty:2,unit:25.00}], total:50.00 }
+//    -> input  : result = null (found = true)
+//    <- output : result = { orderId:"PO-100", status:"CREATED", lineItems:[{sku:"S1",qty:2,unit:25.00}], total:50.00 }   BECAUSE the repository returns the aggregate it loaded
 // <- order : { orderId:"PO-100", status:"CREATED", lineItems:[{sku:"S1",qty:2,unit:25.00}], total:50.00 }
 //
 // DEF: DI · a state-only class — filled with the request's delivery values, and it has no methods
 // -> deliveryTime : "2026-09-21 09:00" · -> deliveryAddress : "12 Main St"
 //    step 1 · hold the time : DI.deliveryTime : null -> "2026-09-21 09:00"
+//    -> input  : DI.deliveryTime = null (deliveryTime = "2026-09-21 09:00")
+//    <- output : DI.deliveryTime = "2026-09-21 09:00"   BECAUSE the value object stores the request's delivery time
 //    step 2 · hold the address : DI.deliveryAddress : null -> "12 Main St"
+//    -> input  : DI.deliveryAddress = null (deliveryAddress = "12 Main St")
+//    <- output : DI.deliveryAddress = "12 Main St"   BECAUSE the value object stores the request's delivery address
 // <- DI : { deliveryTime:"2026-09-21 09:00", deliveryAddress:"12 Main St" }`
     }
   ],
@@ -259,9 +285,17 @@ registerChapter({
 // DEF: revise_order · CALLED BY: CLI via SVC.reviseOrder("PO-100", 5)
 // -> order_id : "PO-100" · -> new_qty : 5
 //    step 1 · SVC delegates to the aggregate    REPO.findOrderById -> order : { status:"CREATED" } loaded
+//    -> input  : order_id = "PO-100" (new_qty = 5)
+//    <- output : order = { status:"CREATED" } loaded   BECAUSE SVC delegates the command to the aggregate
 //    step 2 · ORD.revise mutates its own line and re-derives the total    order.lineItems[0].qty : 2 -> 5 · order.total : 50.00 -> 125.00  BECAUSE 5 x 25.00 = 125.00
+//    -> input  : order.lineItems[0].qty = 2 · order.total = 50.00 (new_qty = 5)
+//    <- output : order.lineItems[0].qty = 5 · order.total = 125.00   BECAUSE 5 x 25.00 = 125.00
 //    step 3 · REPO.save persists the aggregate    store : {} -> { "PO-100" : { status:"CREATED", total:125.00 } }
+//    -> input  : store = {} (order = {orderId:"PO-100", status:"CREATED", total:125.00})
+//    <- output : store = { "PO-100" : { status:"CREATED", total:125.00 } }   BECAUSE REPO.save writes the aggregate back
 //    step 4 · a later read    findOrderById("PO-100") -> store["PO-100"] : { status:"CREATED", total:125.00 } returned
+//    -> input  : order_id = "PO-100" (store = { "PO-100" : { status:"CREATED", total:125.00 } })
+//    <- output : store["PO-100"] = { status:"CREATED", total:125.00 } returned   BECAUSE a later read resolves the key "PO-100" to the stored row
 // <- outcome : DB row "PO-100" holds total 125.00 and is read back  BECAUSE the service wrote via the repository and the repository writes to the database`
   },
   concepts: {

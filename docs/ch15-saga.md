@@ -26,9 +26,17 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.15 (p.114) · micro
 // DEF: create_order · CALLED BY: CLIENT via POST /orders
 // -> order_id : "PO-2001" · -> total : 100.00
 //    step 1 · BEGIN a local transaction on ORDDB (the broker and CSDB are NOT enlisted)
+//    -> input  : tx = "none" (order_id = "PO-2001", total = 100.00)
+//    <- output : tx = "open"   BECAUSE ORD begins a local transaction on ORDDB only
 //    step 2 · INSERT the order   // orders : {} -> {"PO-2001":"PENDING"}
+//    -> input  : orders = {}
+//    <- output : orders = {"PO-2001":"PENDING"}   BECAUSE the INSERT writes the order into ORDDB
 //    step 3 · try to deduct credit   // customer_credit : {} -> ERROR "no such table"  BECAUSE customers lives in CSDB, not ORDDB
+//    -> input  : customer_credit = {} (total = 100.00)
+//    <- output : customer_credit = ERROR "no such table"   BECAUSE customers lives in CSDB, not ORDDB
 //    step 4 · the UPDATE fails, so the transaction aborts   // orders : {"PO-2001":"PENDING"} -> {} (rolled back)
+//    -> input  : orders = {"PO-2001":"PENDING"}
+//    <- output : orders = {} (rolled back)   BECAUSE the UPDATE failed and the transaction aborts
 // <- outcome : "ROLLBACK" · the one-database transaction cannot span the two services
 //    alt 2PC : would enlist ORDDB and CSDB, but 2PC is not an option BECAUSE it couples the services and can block
 ```
@@ -59,13 +67,29 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.15 (p.114) · micro
 // DEF: create-order saga orchestrator · created by ORD when CLIENT POSTs /orders
 // -> order_id : "PO-2001" · -> customer_id : "CUST-7" · -> total : 100.00
 //    step 1 · LT1 on ORD : create the order   // orders : {} -> {"PO-2001":"PENDING"}
+//    -> input  : orders = {}
+//    <- output : orders = {"PO-2001":"PENDING"}   BECAUSE LT1 on ORD creates the order in the PENDING state
 //    step 2 · send ReserveCredit(saga="SAGA-1", amount=100.00) to CS
+//    -> input  : out_msg = "none"
+//    <- output : out_msg = "ReserveCredit(saga=SAGA-1, amount=100.00) -> CS"   BECAUSE the orchestrator sends the command to Customer Service
 //    step 3 · LT2 on CS : if "SAGA-1" already in reserved -> skip (idempotent retry); else reserve   // reserved : {} -> {"SAGA-1"} · customer_credit : {"CUST-7":500.00} -> {"CUST-7":400.00}  BECAUSE 100.00 of the 500.00 is held
+//    -> input  : reserved = {} (customer_credit = {"CUST-7":500.00}, saga = "SAGA-1")
+//    <- output : reserved = {"SAGA-1"} · customer_credit = {"CUST-7":400.00}   BECAUSE 100.00 of the 500.00 is held
 //    step 4 · CS replies "credit_reserved" -> orchestrator sends CreateTicket(order_id="PO-2001") to KIT
+//    -> input  : reply = "none" (credit_reserved = true)
+//    <- output : reply = "credit_reserved" · out_msg = "CreateTicket(order_id=PO-2001) -> KIT"   BECAUSE the orchestrator advances on the reply
 //    step 5 · LT3 on KIT : the ticket is rejected BECAUSE the item is not available   // tickets : {} -> {} (nothing created)
+//    -> input  : tickets = {} (order_id = "PO-2001")
+//    <- output : tickets = {} (nothing created)   BECAUSE the item is not available
 //    step 6 · KIT replies "ticket_rejected" -> the orchestrator runs the COMPENSATING transactions
+//    -> input  : reply = "none" (ticket_rejected = true)
+//    <- output : reply = "ticket_rejected"   BECAUSE Kitchen Service reports the rejection
 //    step 7 · COMPENSATE LT2 : ReleaseCredit(saga="SAGA-1", amount=100.00) to CS   // customer_credit : {"CUST-7":400.00} -> {"CUST-7":500.00}  BECAUSE the held 100.00 is returned
+//    -> input  : customer_credit = {"CUST-7":400.00} (amount = 100.00)
+//    <- output : customer_credit = {"CUST-7":500.00}   BECAUSE the held 100.00 is returned
 //    step 8 · COMPENSATE LT1 : reject the order   // orders : {"PO-2001":"PENDING"} -> {"PO-2001":"REJECTED"}
+//    -> input  : orders = {"PO-2001":"PENDING"}
+//    <- output : orders = {"PO-2001":"REJECTED"}   BECAUSE the orchestrator rejects the order to compensate
 // <- outcome : "OrderRejected" · order REJECTED, credit fully released, no ticket created
 //    alt success : KIT replies "ticket_created" -> orders : {"PO-2001":"PENDING"} -> {"PO-2001":"APPROVED"} (no compensation)
 //       -> a retried ReserveCredit(saga="SAGA-1") is skipped BECAUSE "SAGA-1" is already in reserved (ON CONFLICT / already-seen guard)
@@ -97,10 +121,20 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.15 (p.114) · micro
 // DEF: choreographed handler chain · one event carries the saga forward, no orchestrator
 // -> POST /orders : total = 100.00
 //    step 1 · LT1 on ORD : create the order   // orders : {} -> {"PO-2001":"PENDING"}
+//    -> input  : orders = {}
+//    <- output : orders = {"PO-2001":"PENDING"}   BECAUSE LT1 on ORD creates the order in the PENDING state
 //    step 2 · ORD publishes "OrderCreated"   // the event triggers the next local transaction in CS
+//    -> input  : event = "none"
+//    <- output : event = "OrderCreated"   BECAUSE ORD publishes the event that triggers the next local transaction in CS
 //    step 3 · CS handler receives "OrderCreated" and reserves credit   // customer_credit : {"CUST-7":500.00} -> {"CUST-7":400.00}  BECAUSE 100.00 is reserved
+//    -> input  : customer_credit = {"CUST-7":500.00} (event = "OrderCreated")
+//    <- output : customer_credit = {"CUST-7":400.00}   BECAUSE 100.00 is reserved
 //    step 4 · CS publishes "CreditReserved"   // credit_events : [] -> ["CreditReserved"]
+//    -> input  : credit_events = []
+//    <- output : credit_events = ["CreditReserved"]   BECAUSE CS publishes the outcome event
 //    step 5 · ORD handler receives "CreditReserved" and approves   // orders : {"PO-2001":"PENDING"} -> {"PO-2001":"APPROVED"}
+//    -> input  : orders = {"PO-2001":"PENDING"} (event = "CreditReserved")
+//    <- output : orders = {"PO-2001":"APPROVED"}   BECAUSE ORD approves the order on the CreditReserved event
 // <- outcome : order "PO-2001" APPROVED · no central coordinator — each event is the trigger for the next step
 ```
 
@@ -125,11 +159,21 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.15 (p.114) · micro
 // DEF: client outcome for order "PO-2001" · the POST returned the id while the saga was still running
 // -> GET /orders/PO-2001 : poll #1
 //    step 1 · first poll   // poll_count : 0 -> 1  BECAUSE the client issued its first status query
+//    -> input  : poll_count = 0 (request = "GET /orders/PO-2001")
+//    <- output : poll_count = 1   BECAUSE the client issued its first status query
 //    step 2 · ORD returns status "PENDING"   // the saga has not finished — credit not yet reserved
+//    -> input  : orders = {"PO-2001":{"status":"PENDING"}}
+//    <- output : status = "PENDING"   BECAUSE the saga has not finished — credit not yet reserved
 //    step 3 · in the background the saga completes: credit reserved, then approved   // orders : {"PO-2001":{status:"PENDING"}} -> {"PO-2001":{status:"APPROVED"}}
+//    -> input  : orders = {"PO-2001":{"status":"PENDING"}} (credit reserved, then approved)
+//    <- output : orders = {"PO-2001":{"status":"APPROVED"}}   BECAUSE the saga completes its remaining steps in the background
 // -> GET /orders/PO-2001 : poll #2
 //    step 4 · second poll   // poll_count : 1 -> 2  BECAUSE the client polls again
+//    -> input  : poll_count = 1 (request = "GET /orders/PO-2001")
+//    <- output : poll_count = 2   BECAUSE the client polls again
 //    step 5 · ORD returns status "APPROVED"
+//    -> input  : orders = {"PO-2001":{"status":"APPROVED"}}
+//    <- output : status = "APPROVED"   BECAUSE the saga has completed
 // <- outcome : "APPROVED" · alt = reply only when the saga completes, or push "OrderApproved" over a websocket/webhook instead of polling
 ```
 
@@ -185,9 +229,17 @@ _Role: broker_
 // DEF: run_saga · CALLED BY: ORCH receiving "OrderCreated" for PO-77
 // -> command : "reserve credit 100.00 for CUST-7"
 //    step 1 · ORCH orders CS to reserve credit    customers : [("CUST-7", credit 500.00)] -> [("CUST-7", credit 400.00)]   BECAUSE CS debits 100.00 for the reservation
+//    -> input  : customers = [("CUST-7", credit 500.00)] (command = "reserve credit 100.00 for CUST-7")
+//    <- output : customers = [("CUST-7", credit 400.00)]   BECAUSE CS debits 100.00 for the reservation
 //    step 2 · CS publishes CreditReserved    events : [] -> [ "OrderCreated", "CreditReserved" ]   BECAUSE the participant publishes its outcome back to the orchestrator
+//    -> input  : events = []
+//    <- output : events = [ "OrderCreated", "CreditReserved" ]   BECAUSE the participant publishes its outcome back to the orchestrator
 //    step 3 · ORCH orders KIT to create the ticket    events : ["OrderCreated","CreditReserved"] -> ["OrderCreated","CreditReserved","ticket_created"]   BECAUSE the next participant acts on the reserved credit
+//    -> input  : events = ["OrderCreated","CreditReserved"] (command = "CreateTicket")
+//    <- output : events = ["OrderCreated","CreditReserved","ticket_created"]   BECAUSE the next participant acts on the reserved credit
 //    step 4 · saga completes    state : "NEW" -> "COMPLETED"   BECAUSE every step succeeded with no compensation needed
+//    -> input  : state = "NEW"
+//    <- output : state = "COMPLETED"   BECAUSE every step succeeded with no compensation needed
 // <- outcome : state "COMPLETED" for saga SAGA-1 · credit debited 100.00 from CUST-7
 ```
 

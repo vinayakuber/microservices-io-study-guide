@@ -31,8 +31,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 9 · microservices
 // DEF: an autoscaling event moves the instance · CALLED BY: the EC2 Autoscaling Group
 // -> scale_event : "replace 10.0.1.7 with 10.0.1.9"
 //    step 1 · instance_ip : "10.0.1.7" -> "10.0.1.9"   BECAUSE the autoscaler replaced the VM
+//    -> input  : instance_ip = "10.0.1.7" (scale_event = "replace 10.0.1.7 with 10.0.1.9")
+//    <- output : instance_ip = "10.0.1.9"   BECAUSE the autoscaler replaced the VM
 //    step 2 · endpoint : "http://10.0.1.7:8080" -> "http://10.0.1.7:8080 (stale)"   BECAUSE the client still points at the old IP
+//    -> input  : endpoint = "http://10.0.1.7:8080" (instance_ip = "10.0.1.9")
+//    <- output : endpoint = "http://10.0.1.7:8080 (stale)"   BECAUSE the client still points at the old IP
 //    step 3 · call_status : "ok" -> "connection refused"   BECAUSE the client dials the dead 10.0.1.7
+//    -> input  : call_status = "ok" (endpoint = "http://10.0.1.7:8080 (stale)")
+//    <- output : call_status = "connection refused"   BECAUSE the client dials the dead 10.0.1.7
 // <- call result : "connection refused"   (the client never learned the new location)
 //    alt with discovery : CLI queries a registry -> endpoint : "http://10.0.1.7:8080 (stale)" -> "http://10.0.1.9:8080"
 ```
@@ -59,8 +65,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 9 · microservices
 // DEF: a client wants to call order-service · CALLED BY: CLI placing an order
 // -> request : "POST /orders"
 //    step 1 · query the registry : CLI asks REG for "order-service"
+//    -> input  : request = "POST /orders" (logical name = "order-service")
+//    <- output : query_sent = "order-service"   BECAUSE the client asks the registry for the locations of all instances
 //    step 2 · resolve : resolved : [] -> ["10.0.1.7:8080","10.0.1.8:8080"]   BECAUSE the registry returns all known instances
+//    -> input  : resolved = [] (registry = {"order-service" -> [{"host":"10.0.1.7","port":8080},{"host":"10.0.1.8","port":8080}]})
+//    <- output : resolved = ["10.0.1.7:8080","10.0.1.8:8080"]   BECAUSE the registry returns all known instances
 //    step 3 · pick one : target : "none" -> "10.0.1.7:8080"   BECAUSE the client load-balances across the returned set
+//    -> input  : resolved = ["10.0.1.7:8080","10.0.1.8:8080"] (target = "none")
+//    <- output : target = "10.0.1.7:8080"   BECAUSE the client load-balances across the returned set
 // <- call : "POST http://10.0.1.7:8080/orders"   (the client calls the instance directly)
 //    alt second attempt : the first instance is busy -> target : "10.0.1.7:8080" -> "10.0.1.8:8080"
 ```
@@ -89,8 +101,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 9 · microservices
 // DEF: the proxy registers a user · CALLED BY: CLI calling restTemplate.postForEntity
 // -> request_url : "http://REGISTRATION-SERVICE/user"   (a logical name, not an IP)
 //    step 1 · @LoadBalanced intercepts : restTemplate_target : "unresolved" -> "REGISTRATION-SERVICE"   BECAUSE the URL host is a logical service name
+//    -> input  : restTemplate_target = "unresolved" (request_url = "http://REGISTRATION-SERVICE/user")
+//    <- output : restTemplate_target = "REGISTRATION-SERVICE"   BECAUSE the URL host is a logical service name
 //    step 2 · Ribbon asks Eureka : instances : [] -> [{"host":"10.0.2.4","port":8080}]   BECAUSE Ribbon queried Eureka for "registration-service"
+//    -> input  : instances = [] (eureka_registry = {"registration-service" -> [{"host":"10.0.2.4","port":8080}]})
+//    <- output : instances = [{"host":"10.0.2.4","port":8080}]   BECAUSE Ribbon queried Eureka for "registration-service"
 //    step 3 · route to the instance : restTemplate_target : "REGISTRATION-SERVICE" -> "10.0.2.4:8080"   BECAUSE Ribbon rewrites the logical name to a network location
+//    -> input  : restTemplate_target = "REGISTRATION-SERVICE" (instances = [{"host":"10.0.2.4","port":8080}])
+//    <- output : restTemplate_target = "10.0.2.4:8080"   BECAUSE Ribbon rewrites the logical name to a network location
 // <- http call : "POST http://10.0.2.4:8080/user"   (the request now hits a real instance)
 //    alt no instance found : Ribbon gets [] -> restTemplate_target : "REGISTRATION-SERVICE" -> "unresolved" (the call fails)
 ```
@@ -119,8 +137,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 9 · microservices
 // DEF: measure one request's cost · CALLED BY: CLI sending one request
 // -> request : "POST /orders"
 //    step 1 · hops_client_side : 0 -> 2   BECAUSE the client hops to REG then to SVC (two hops)
+//    -> input  : hops_client_side = 0 (request = "POST /orders")
+//    <- output : hops_client_side = 2   BECAUSE the client hops to REG then to SVC (two hops)
 //    step 2 · hops_server_side : 0 -> 3   BECAUSE the client hops to RTR, which hops to REG then SVC (three hops)
+//    -> input  : hops_server_side = 0 (request = "POST /orders")
+//    <- output : hops_server_side = 3   BECAUSE the client hops to RTR, which hops to REG then SVC (three hops)
 //    step 3 · moving parts : parts_client_side : 0 -> 2, parts_server_side : 0 -> 3   BECAUSE server-side adds the router as an extra component
+//    -> input  : parts_client_side = 0, parts_server_side = 0
+//    <- output : parts_client_side = 2, parts_server_side = 3   BECAUSE server-side adds the router as an extra component
 // <- comparison : "2 hops vs 3 hops"   (client-side wins on hops, but couples the client to the registry)
 //    alt non-JVM client : Netflix Prana runs a local HTTP proxy -> the client keeps its 2-hop path without JVM discovery code
 ```
@@ -171,8 +195,14 @@ _Role: service instances_
 // DEF: resolve_and_call · CALLED BY: CLI placing an order
 // -> request : "POST /orders"
 //    step 1 · CLI queries REG for "order-service"    list : [] -> ["10.0.1.7:8080", "10.0.1.8:8080"]   BECAUSE REG returns every known instance for the name
+//    -> input  : list = [] (registry = {"order-service" -> ["10.0.1.7:8080", "10.0.1.8:8080"]})
+//    <- output : list = ["10.0.1.7:8080", "10.0.1.8:8080"]   BECAUSE REG returns every known instance for the name
 //    step 2 · CLI load-balances across the set    target : "none" -> "10.0.1.7:8080"   BECAUSE the client picks one instance from the returned list
+//    -> input  : list = ["10.0.1.7:8080", "10.0.1.8:8080"] (target = "none")
+//    <- output : target = "10.0.1.7:8080"   BECAUSE the client picks one instance from the returned list
 //    step 3 · CLI calls the instance directly    status : "none" -> "200 OK"   BECAUSE the request goes straight to the chosen instance, no router
+//    -> input  : target = "10.0.1.7:8080" (status = "none")
+//    <- output : status = "200 OK"   BECAUSE the request goes straight to the chosen instance, no router
 // <- call : "POST http://10.0.1.7:8080/orders"   (2 hops: CLI->REG then CLI->SVC)
 ```
 

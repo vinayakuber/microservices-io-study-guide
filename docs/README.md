@@ -1,4 +1,4 @@
-# Microservices Patterns Study Guide — Read on GitHub
+# Microservice Patterns Study Guide — Read on GitHub
 
 Each chapter: diagram, flow, key concepts, and quiz (tap to reveal answers).
 

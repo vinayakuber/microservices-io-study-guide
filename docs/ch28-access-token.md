@@ -27,8 +27,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 28 · microservice
 // DEF: authenticate · CALLED BY: CL posting credentials to the login route
 // -> credentials : {"user":"alice","password":"hunter2"}
 //    step 1 · GW verifies the credentials    // gw_auth : {} -> {"alice":"verified"}
+//    -> input  : gw_auth = {} (credentials = {"user":"alice","password":"hunter2"})
+//    <- output : gw_auth = {"alice":"verified"}   BECAUSE GW confirms who the requestor is
 //    step 2 · GW builds the identity claim    // payload : "" -> {"sub":"alice"}
+//    -> input  : payload = "" (gw_auth = {"alice":"verified"})
+//    <- output : payload = {"sub":"alice"}   BECAUSE GW stamps the verified identity into a claim
 //    step 3 · GW signs the claim into a JSON Web Token    // token : "" -> "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"  BECAUSE the signature lets any service verify the identity without re-authenticating
+//    -> input  : token = "" (payload = {"sub":"alice"})
+//    <- output : token = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"   BECAUSE the signature lets any service verify the identity without re-authenticating
 // <- token : "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig" returned to CL for every later request
 //    alt unknown user : gw_auth : {} -> {"alice":"unknown"} · token : "" -> ""  BECAUSE there is no verified identity to sign, so no token is issued
 ```
@@ -55,8 +61,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 28 · microservice
 // DEF: handle_order · CALLED BY: GW forwarding a request that carries the token
 // -> token : "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig" · -> operation : "place_order"
 //    step 1 · SVC verifies the token signature    // verdict : "pending" -> "authentic"
+//    -> input  : verdict = "pending" (token = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig")
+//    <- output : verdict = "authentic"   BECAUSE SVC confirms the token was signed by the issuer
 //    step 2 · SVC reads the identity from the token claims    // requestor : "" -> "alice"
+//    -> input  : requestor = "" (token claims = {"sub":"alice"})
+//    <- output : requestor = "alice"   BECAUSE the token's sub claim names the requestor
 //    step 3 · SVC checks the role against the operation    // verdict : "authentic" -> "authorized"  BECAUSE allowed_roles maps "alice" to "customer", which may place an order
+//    -> input  : verdict = "authentic" (requestor = "alice", operation = "place_order")
+//    <- output : verdict = "authorized"   BECAUSE allowed_roles maps "alice" to "customer", which may place an order
 // <- verdict : "authorized" — SVC proceeds with "place_order"
 //    alt invalid signature : verdict : "pending" -> "rejected" — SVC refuses the request
 ```
@@ -82,8 +94,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 28 · microservice
 // DEF: invoke_payment · CALLED BY: SVC needing to charge the customer's card
 // -> token : "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"
 //    step 1 · SVC stores the token it received    // incoming : "" -> "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"
+//    -> input  : incoming = "" (token = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig")
+//    <- output : incoming = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"   BECAUSE SVC records the token it received
 //    step 2 · SVC attaches the same token to its call to PAY    // forwarded : "" -> "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"
+//    -> input  : forwarded = "" (incoming = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig")
+//    <- output : forwarded = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"   BECAUSE SVC carries the same token onward
 //    step 3 · PAY verifies the token and authorizes the charge    // pay_verdict : "pending" -> "authorized"  BECAUSE the token still identifies "alice", whose role permits the charge
+//    -> input  : pay_verdict = "pending" (forwarded = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig")
+//    <- output : pay_verdict = "authorized"   BECAUSE the token still identifies "alice", whose role permits the charge
 // <- pay_verdict : "authorized" — the charge is processed for "alice"
 ```
 
@@ -130,9 +148,17 @@ _Role: service_
 // DEF: authenticate_and_route · CALLED BY: CL posting credentials on the login route
 // -> credentials : {"user":"alice","password":"hunter2"}
 //    step 1 · IDP authenticates alice    auth : {} -> {"alice":"verified"}
+//    -> input  : auth = {} (credentials = {"user":"alice","password":"hunter2"})
+//    <- output : auth = {"alice":"verified"}   BECAUSE IDP confirms alice's credentials
 //    step 2 · IDP mints the JWT    token : "" -> "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"  BECAUSE the signature lets any service verify the identity without re-authenticating
+//    -> input  : token = "" (auth = {"alice":"verified"})
+//    <- output : token = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"   BECAUSE the signature lets any service verify the identity without re-authenticating
 //    step 3 · GW validates the signature and routes the token to SVC    token : "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig" -> "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"
+//    -> input  : token = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig" (verdict = "pending")
+//    <- output : token = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"   BECAUSE GW validates and forwards the token unchanged
 //    step 4 · SVC reads the claim and checks the role    verdict : "pending" -> "authorized"  BECAUSE {"sub":"alice"} maps to role "customer" which may place the order
+//    -> input  : verdict = "pending" (token claim = {"sub":"alice"}, operation = "place_order")
+//    <- output : verdict = "authorized"   BECAUSE {"sub":"alice"} maps to role "customer" which may place the order
 // <- outcome : verdict "authorized" · no gateway round-trip  BECAUSE each service validates the token locally
 ```
 

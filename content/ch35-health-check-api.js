@@ -22,8 +22,14 @@ registerChapter({
 // DEF: health_check · CALLED BY: MON polling GET /health every 30 s
 // -> req : "GET /health"
 //    step 1 · probe the DB connection pool -> open   // health.db : "UNKNOWN" -> "UP"
+//    -> input  : req = "GET /health"
+//    <- output : health.db = "UP"   BECAUSE the DB pool has a free connection
 //    step 2 · combine all checks into one verdict   // health.status : null -> "UP"
+//    -> input  : health.db = "UP"
+//    <- output : health.status = "UP"   BECAUSE the db check passed
 //    step 3 · respond with the verdict as the body   // body : {} -> {"status":"UP"}
+//    -> input  : health.status = "UP"
+//    <- output : body = {"status":"UP"}   BECAUSE the verdict is the endpoint's result
 // <- health : {"db":"UP", "status":"UP"} · MON now marks the instance healthy
 //    alt DB pool exhausted : probe -> closed, health.db : "UNKNOWN" -> "DOWN", status : null -> "DOWN", body : {"status":"DOWN"}`
     },
@@ -43,8 +49,14 @@ registerChapter({
 // DEF: run_checks · CALLED BY: the /health handler on each poll
 // -> poll : 1 incoming GET /health
 //    step 1 · check the status of connections to infrastructure services -> open   // checks.db : "UNKNOWN" -> "UP"
+//    -> input  : poll = 1 (checks.db = "UNKNOWN")
+//    <- output : checks.db = "UP"   BECAUSE the DB connection is open
 //    step 2 · check the host's disk space -> 12 free, above the 1 floor   // checks.disk : "UNKNOWN" -> "UP"
+//    -> input  : checks.disk = "UNKNOWN"
+//    <- output : checks.disk = "UP"   BECAUSE 12 free is above the 1 floor
 //    step 3 · run application-specific logic -> passes   // checks.app : "UNKNOWN" -> "UP"
+//    -> input  : checks = {"db":"UP","disk":"UP","app":"UNKNOWN"}
+//    <- output : checks.app = "UP"   BECAUSE the app logic passes
 // <- result : checks = {"db":"UP","disk":"UP","app":"UP"} · healthy only if all 3 are UP
 //    alt one check fails : checks.db : "UP" -> "DOWN" -> the whole instance reports DOWN`
     },
@@ -64,8 +76,14 @@ registerChapter({
 // DEF: poll_loop · CALLED BY: MON's scheduler, every 30 s
 // -> tick : 2
 //    step 1 · GET /health on SVC1 -> "UP"   // seen["SVC1"] : "UP" -> "UP" (no change)
+//    -> input  : tick = 2 (SVC1 = "UP")
+//    <- output : seen["SVC1"] = "UP"   BECAUSE SVC1 answered UP and stays UP
 //    step 2 · GET /health on SVC2 -> "DOWN"   // seen["SVC2"] : "UP" -> "DOWN"
+//    -> input  : seen["SVC2"] = "UP"
+//    <- output : seen["SVC2"] = "DOWN"   BECAUSE SVC2 now reports DOWN
 //    step 3 · count the healthy instances   // healthy : 2 -> 1   BECAUSE SVC2 flipped to DOWN
+//    -> input  : seen = {"SVC1":"UP","SVC2":"DOWN"}
+//    <- output : healthy = 1   BECAUSE only SVC1 is still UP
 // <- observation : seen = {"SVC1":"UP","SVC2":"DOWN"} · MON raises an alert and SVC2 is pulled from routing
 //    alt both UP this tick : healthy : 1 -> 2 -> no alert, routing unchanged`
     },
@@ -85,8 +103,14 @@ registerChapter({
 // DEF: route_and_alert · CALLED BY: LB after a health check reports SVC2 DOWN
 // -> health : "SVC2 DOWN"
 //    step 1 · LB removes SVC2 from its routing table   // pool : {"SVC1":"UP","SVC2":"DOWN"} -> {"SVC1":"UP"}
+//    -> input  : health = "SVC2 DOWN"
+//    <- output : pool = {"SVC1":"UP"}   BECAUSE SVC2 failed its health check
 //    step 2 · the next request is routed only to a working instance   // target : null -> "SVC1"
+//    -> input  : pool = {"SVC1":"UP"}
+//    <- output : target = "SVC1"   BECAUSE SVC1 is the only healthy instance left
 //    step 3 · REG drops SVC2 and MON raises an alert   // alert : null -> "SVC2 DOWN at tick 2"
+//    -> input  : pool = {"SVC1":"UP"}
+//    <- output : alert = "SVC2 DOWN at tick 2"   BECAUSE a failed instance must wake a human
 // <- outcome : pool = {"SVC1":"UP"} · requests route only to working instances, and an alert is generated
 //    alt SVC2 recovers : health "SVC2 UP" -> pool : {"SVC1":"UP"} -> {"SVC1":"UP","SVC2":"UP"}`
     }
@@ -217,8 +241,14 @@ registerChapter({
 // DEF: run_check · CALLED BY: MON polling /health every 30s
 // -> endpoint : "/health"
 //    step 1 · SVC probes db, disk, and app   // probes : 0 -> 3   BECAUSE /health checks all three dependencies in one call
+//    -> input  : endpoint = "/health"
+//    <- output : probes = 3   BECAUSE /health checks all three dependencies in one call
 //    step 2 · the db probe fails   // status : { "db":"UP","disk":"UP","app":"UP" } -> { "db":"DOWN","disk":"UP","app":"UP" }   BECAUSE PostgreSQL 16 @ orders-db-1 stops answering
+//    -> input  : probes = 3
+//    <- output : status.db = "DOWN"   BECAUSE PostgreSQL 16 @ orders-db-1 stops answering
 //    step 3 · MON marks the instance DOWN and LB reroutes   // alerts : 0 -> 1   BECAUSE a failed check flips the instance from UP to DOWN
+//    -> input  : status.db = "DOWN"
+//    <- output : alerts = 1   BECAUSE the instance flipped from UP to DOWN
 // <- outcome : status.db = "DOWN" · LB stops sending traffic  BECAUSE /health reported the db check failed`
   },
   concepts: {

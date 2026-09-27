@@ -27,8 +27,14 @@ _Also known as: Chris Richardson · Microservice Patterns p.393 · microservices
 // DEF: package version 1.4.2 · CALLED BY: BLD on every source commit
 // -> service : "restaurant-service" · -> version : "1.4.2"
 //    step 1 · docker build · image : null -> "rsvc:1.4.2"  BECAUSE the Dockerfile wraps the JAR plus its JVM runtime
+//    -> input  : service = "restaurant-service" (version = "1.4.2")
+//    <- output : image = "rsvc:1.4.2"   BECAUSE the Dockerfile wraps the JAR plus its JVM runtime
 //    step 2 · docker tag · tag : "latest" -> "1.4.2"       // pin the version so the cluster can select releases
+//    -> input  : tag = "latest"
+//    <- output : tag = "1.4.2"   BECAUSE the version is pinned so the cluster can select releases
 //    step 3 · docker push · copies : 0 -> 1                BECAUSE REG now holds one copy the cluster can pull
+//    -> input  : image = "rsvc:1.4.2"
+//    <- output : copies = 1   BECAUSE REG now holds one copy the cluster can pull
 // <- image : "rsvc:1.4.2" in REG · 1 image ready to run as N containers
 //    alt next commit : version : "1.4.2" -> "1.4.3"        BECAUSE a new commit builds a fresh image tag
 ```
@@ -52,8 +58,14 @@ _Also known as: Chris Richardson · Microservice Patterns p.393 · microservices
 // DEF: scale to 4 · CALLED BY: CLUSTER when measured load rises
 // -> desired_replicas : 4
 //    step 1 · set replicas · replicas : 2 -> 4   BECAUSE Kubernetes starts 2 more containers from the same image
+//    -> input  : desired_replicas = 4
+//    <- output : replicas = 4   BECAUSE Kubernetes starts 2 more containers from the same image
 //    step 2 · schedule · unplaced : 2 -> 0       // both new containers land on healthy hosts
+//    -> input  : replicas = 4
+//    <- output : unplaced = 0   BECAUSE both new containers land on healthy hosts
 //    step 3 · route · endpoints : 2 -> 4         // the load balancer now spreads traffic over 4
+//    -> input  : replicas = 4
+//    <- output : endpoints = 4   BECAUSE the load balancer now spreads traffic over 4
 // <- instances : 4  · same image "rsvc:1.4.2", zero rebuilds
 //    alt load drops : replicas : 4 -> 1          BECAUSE Kubernetes terminates 3 containers to save resources
 ```
@@ -77,8 +89,14 @@ _Also known as: Chris Richardson · Microservice Patterns p.393 · microservices
 // DEF: set cpu cap 0.5 · CALLED BY: SVC's pod spec at deploy time
 // -> cpu_limit : 0.5
 //    step 1 · apply cap · caps : {} -> {"cpu":0.5}   BECAUSE the runtime records the limit before the container runs
+//    -> input  : cpu_limit = 0.5
+//    <- output : caps = {"cpu":0.5}   BECAUSE the runtime records the limit before the container runs
 //    step 2 · throttle · usage : 0.9 -> 0.5          // the excess 0.4 is blocked, not granted
+//    -> input  : usage = 0.9
+//    <- output : usage = 0.5   BECAUSE the excess 0.4 is blocked, not granted
 //    step 3 · isolate · neighbors : 0 -> 1           // a second container keeps its own separate cap
+//    -> input  : caps = {"cpu":0.5}
+//    <- output : neighbors = 1   BECAUSE a second container keeps its own separate cap
 // <- cpu_cap : 0.5  · one container cannot consume another's share
 //    alt no cap declared : usage : 0.5 -> 0.9        BECAUSE without a limit the container grabs the idle CPU
 ```
@@ -101,8 +119,14 @@ _Also known as: Chris Richardson · Microservice Patterns p.393 · microservices
 // DEF: time start of service 1.4.2 · CALLED BY: a deploy test on the same service
 // -> service : "rsvc:1.4.2"
 //    step 1 · start container · boot.container : 0 -> 3    BECAUSE only the application process starts
+//    -> input  : service = "rsvc:1.4.2"
+//    <- output : boot.container = 3   BECAUSE only the application process starts
 //    step 2 · start VM · boot.vm : 0 -> 30                 BECAUSE an entire OS must boot first
+//    -> input  : boot.container = 3
+//    <- output : boot.vm = 30   BECAUSE an entire OS must boot first
 //    step 3 · compare · ratio : 0 -> 10                    // 30 s / 3 s = 10x faster container start
+//    -> input  : boot = {"container":3, "vm":30}
+//    <- output : ratio = 10   BECAUSE 30 s / 3 s = 10x faster container start
 // <- container : 3 s · VM : 30 s  · container wins on speed, loses on infrastructure maturity
 //    alt package step : image : 0 -> 1 in ~seconds · AMI : 0 -> 1 in ~minutes  BECAUSE the reference notes ~100x faster packaging
 ```
@@ -148,8 +172,14 @@ _Role: cluster_
 // DEF: scale_out · CALLED BY: BLD building, REG serving, K8S scaling
 // -> image_tag : "rsvc:1.4.2"
 //    step 1 · BLD builds the image and pushes it to REG   // image : "" -> "rsvc:1.4.2"   BECAUSE the build pipeline tags the new restaurant-service artifact
+//    -> input  : image_tag = "rsvc:1.4.2"
+//    <- output : image = "rsvc:1.4.2"   BECAUSE the build pipeline tags the new restaurant-service artifact
 //    step 2 · K8S pulls the image from REG   // pull : 0 -> 1   BECAUSE the registry is the single source for images
+//    -> input  : image = "rsvc:1.4.2"
+//    <- output : pull = 1   BECAUSE the registry is the single source for images
 //    step 3 · K8S schedules 2 more containers   // replicas : 2 -> 4   BECAUSE the cluster starts two more from the same image, cpu cap 0.5
+//    -> input  : pull = 1
+//    <- output : replicas = 4   BECAUSE the cluster starts two more from the same image, cpu cap 0.5
 // <- outcome : replicas = 4 · restaurant-service runs 4 containers  BECAUSE the scheduler pulls rsvc:1.4.2 and scales the replica set
 ```
 

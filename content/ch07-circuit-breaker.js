@@ -23,10 +23,20 @@ registerChapter({
 // DEF: forward · CALLED BY: CLIENT, three requests in a row at 00:00:00, 00:00:01, 00:00:02
 // -> request : "get-user-1"
 //    step 1 · PROXY forwards the call to SVC    : remote_calls : 0 -> 1
+//    -> input  : remote_calls = 0 (request = "get-user-1")
+//    <- output : remote_calls = 1   BECAUSE the proxy forwards the first call to the remote service
 //    step 2 · SVC is down; a failure is counted : consecutive_failures : 0 -> 1
+//    -> input  : consecutive_failures = 0 (remote_calls = 1)
+//    <- output : consecutive_failures = 1   BECAUSE the service is down, so the proxy increments the failure counter
 //    step 3 · the second call fails             : consecutive_failures : 1 -> 2
+//    -> input  : consecutive_failures = 1
+//    <- output : consecutive_failures = 2   BECAUSE the second call also fails and increments the counter
 //    step 4 · the third call hits the threshold : consecutive_failures : 2 -> 3  BECAUSE 3 >= threshold 3
+//    -> input  : consecutive_failures = 2 (threshold = 3)
+//    <- output : consecutive_failures = 3   BECAUSE 3 >= threshold 3
 //    step 5 · PROXY opens the circuit           : state : "CLOSED" -> "OPEN"
+//    -> input  : breaker.state = "CLOSED" (consecutive_failures = 3)
+//    <- output : breaker.state = "OPEN"   BECAUSE the failure count crossed the threshold, so the breaker trips
 // <- verdict : "OPEN" tripped at 00:00:02 · every later attempt fails immediately for the timeout`
     },
     {
@@ -48,9 +58,17 @@ registerChapter({
 // DEF: reject · CALLED BY: CLIENT, requests arriving at 00:00:10 and 00:00:30 inside the 60 s window
 // -> request : "get-user-2" at 00:00:10
 //    step 1 · PROXY sees the window is not over : elapsed : 0 -> 8  BECAUSE 00:00:10 - 00:00:02 = 8 s < 60 s
+//    -> input  : elapsed = 0 (opened_at = "00:00:02", now = "00:00:10")
+//    <- output : elapsed = 8   BECAUSE 00:00:10 - 00:00:02 = 8 s < 60 s
 //    step 2 · PROXY rejects without touching SVC : attempts : 0 -> 1
+//    -> input  : attempts = 0 (breaker.state = "OPEN")
+//    <- output : attempts = 1   BECAUSE the breaker is open, so the attempt fails immediately
 //    step 3 · a second request also fails fast   : attempts : 1 -> 2
+//    -> input  : attempts = 1
+//    <- output : attempts = 2   BECAUSE a second request inside the window also fails fast
 //    step 4 · SVC received nothing               : svc_calls : 0 -> 0  BECAUSE the breaker short-circuits
+//    -> input  : svc_calls = 0
+//    <- output : svc_calls = 0   BECAUSE the breaker short-circuits
 // <- verdict : "FAIL_FAST" twice (00:00:10, 00:00:30) · threads freed at once, SVC untouched`
     },
     {
@@ -70,10 +88,20 @@ registerChapter({
 // DEF: probe · CALLED BY: CLIENT, the first request after the timeout, at 00:01:02
 // -> request : "get-user-3" at 00:01:02
 //    step 1 · the timeout has expired           : state : "OPEN" -> "HALF-OPEN"  BECAUSE 00:01:02 - 00:00:02 = 60 s >= 60 s
+//    -> input  : breaker.state = "OPEN" (opened_at = "00:00:02", now = "00:01:02")
+//    <- output : breaker.state = "HALF-OPEN"   BECAUSE 00:01:02 - 00:00:02 = 60 s >= 60 s
 //    step 2 · PROXY lets the test request pass  : probe_count : 0 -> 1
+//    -> input  : probe_count = 0
+//    <- output : probe_count = 1   BECAUSE the breaker allows a limited number of test requests through
 //    step 3 · SVC answers OK this time          : reply : null -> "user-3"
+//    -> input  : reply = null (request = "get-user-3")
+//    <- output : reply = "user-3"   BECAUSE the recovered service answers the test request successfully
 //    step 4 · success resumes normal operation  : state : "HALF-OPEN" -> "CLOSED"
+//    -> input  : breaker.state = "HALF-OPEN" (reply = "user-3")
+//    <- output : breaker.state = "CLOSED"   BECAUSE the test request succeeded, so the breaker resumes normal operation
 //    step 5 · the failure counter resets        : consecutive_failures : 3 -> 0
+//    -> input  : consecutive_failures = 3
+//    <- output : consecutive_failures = 0   BECAUSE normal operation resumed, so the failure counter is cleared
 // <- verdict : "CLOSED" resumed at 00:01:02 · normal operation restored
 //    alt test request fails : state : "HALF-OPEN" -> "OPEN"  BECAUSE the timeout period begins again`
     },
@@ -97,9 +125,17 @@ registerChapter({
 // DEF: call · CALLED BY: CLIENT, a request against a service that answers in about 450 ms
 // -> request : "get-user-4"
 //    step 1 · PROXY forwards the call          : remote_calls : 0 -> 1
+//    -> input  : remote_calls = 0 (request = "get-user-4")
+//    <- output : remote_calls = 1   BECAUSE the proxy forwards the call to the slow service
 //    step 2 · SVC is alive but needs 450 ms     : reply : null -> "user-4" at 450 ms
+//    -> input  : reply = null (avg_latency_ms = 450)
+//    <- output : reply = "user-4" at 450 ms   BECAUSE the healthy service answers, but only after 450 ms
 //    step 3 · PROXY gave up at 200 ms           : verdict : "UNSET" -> "TIMEOUT"  BECAUSE 450 ms > timeout_ms 200
+//    -> input  : verdict = "UNSET" (timeout_ms = 200, reply at 450 ms)
+//    <- output : verdict = "TIMEOUT"   BECAUSE 450 ms > timeout_ms 200
 //    step 4 · the timeout counts as a failure   : consecutive_failures : 0 -> 1
+//    -> input  : consecutive_failures = 0 (verdict = "TIMEOUT")
+//    <- output : consecutive_failures = 1   BECAUSE the timeout is recorded as a failure, a false positive
 // <- verdict : "TIMEOUT" recorded as a failure · a healthy service is marked down, a false positive
 //    alt timeout too long : 5000 ms waits through real outages  BECAUSE excessive latency hides the failure`
     }
@@ -247,9 +283,17 @@ registerChapter({
 // DEF: call · CALLED BY: CLIENT, a request that keeps timing out
 // -> request : "charge-card-4"
 //    step 1 · CLIENT calls through the proxy : remote_calls : 0 -> 1
+//    -> input  : remote_calls = 0 (request = "charge-card-4")
+//    <- output : remote_calls = 1   BECAUSE the caller makes the remote call through the breaker proxy
 //    step 2 · SVC times out and the proxy records a failure : consecutive_failures : 0 -> 4
+//    -> input  : consecutive_failures = 0 (SVC timed out)
+//    <- output : consecutive_failures = 4   BECAUSE the proxy counts the timeout as a failure, reaching the threshold
 //    step 3 · PROXY reads the counter against the threshold : breaker.state : "CLOSED" -> "OPEN"
+//    -> input  : breaker.state = "CLOSED" (consecutive_failures = 4 >= threshold 4)
+//    <- output : breaker.state = "OPEN"   BECAUSE the counter crossed the threshold, so the breaker trips
 //    step 4 · PROXY fails fast : verdict : "UNSET" -> "OPEN"
+//    -> input  : verdict = "UNSET" (breaker.state = "OPEN")
+//    <- output : verdict = "OPEN"   BECAUSE an open breaker rejects the call immediately
 // <- verdict : "OPEN" · further calls fail immediately without touching SVC
 //    alt after timeout : PROXY lets one test request through  BECAUSE a half-open breaker probes the service before resuming`
   },

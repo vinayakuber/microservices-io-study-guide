@@ -25,8 +25,16 @@ registerChapter({
 // DEF: the service boots · CALLED BY: SVC startup on host 10.0.1.7
 // -> boot : {"host":"10.0.1.7","ip":"10.0.1.7","port":8080}
 //    step 1 · SVC registers itself : registry["order-service"] : [] -> [{"host":"10.0.1.7","ip":"10.0.1.7","port":8080}]
+//    -> input  : registry["order-service"] = [] (boot = {"host":"10.0.1.7","ip":"10.0.1.7","port":8080})
+//    <- output : registry["order-service"] = [{"host":"10.0.1.7","ip":"10.0.1.7","port":8080}]   BECAUSE the instance writes its own host and IP into the registry on startup
 //    step 2 · SVC marks itself available : self_state : "DOWN" -> "AVAILABLE"
+//    -> input  : self_state = "DOWN"
+//    <- output : self_state = "AVAILABLE"   BECAUSE the instance makes itself discoverable after registering
 //    step 3 · discovery reads the entry back : lookup "order-service" -> returns [{"host":"10.0.1.7","ip":"10.0.1.7","port":8080}]   BECAUSE the registry serves the row the instance wrote
+//    -> input  : lookup = "order-service"
+//    decode 3a · send the lookup for name "order-service" -> request : "none" -> "lookup order-service"
+//    decode 3b · the registry resolves the name to the stored row -> row : [] -> [{"host":"10.0.1.7","ip":"10.0.1.7","port":8080}]
+//    <- output : [{"host":"10.0.1.7","ip":"10.0.1.7","port":8080}]   BECAUSE the registry serves the row the instance wrote
 // <- registry row : "order-service" -> [{"host":"10.0.1.7","ip":"10.0.1.7","port":8080}]   (now discoverable: written by SVC, read by discovery)
 //    alt shutdown : SVC unregisters itself -> registry["order-service"] : [{"host":"10.0.1.7","ip":"10.0.1.7","port":8080}] -> []`
     },
@@ -48,7 +56,11 @@ registerChapter({
 // DEF: the lease approaches expiry · CALLED BY: SVC heartbeat timer every 30s
 // -> renew : "heartbeat"   (sent before the ttl lapses)
 //    step 1 · SVC renews : renew_count : 0 -> 1   BECAUSE the timer fired
+//    -> input  : renew_count = 0 (renew = "heartbeat")
+//    <- output : renew_count = 1   BECAUSE the timer fired
 //    step 2 · REG extends the entry : registry["order-service"] : [{"host":"10.0.1.7","port":8080,"ttl":30}] -> [{"host":"10.0.1.7","port":8080,"ttl":60}]
+//    -> input  : registry["order-service"] = [{"host":"10.0.1.7","port":8080,"ttl":30}]
+//    <- output : registry["order-service"] = [{"host":"10.0.1.7","port":8080,"ttl":60}]   BECAUSE the registry keeps the entry alive by pushing the lease out on each renewal
 // <- registry row : "order-service" -> [{"host":"10.0.1.7","port":8080,"ttl":60}]   (the lease was pushed out)
 //    alt missed renewal : no heartbeat arrives -> REG evicts the entry when ttl : 60 -> 0`
     },
@@ -74,8 +86,14 @@ registerChapter({
 // DEF: the instance degrades internally · CALLED BY: a dependency that stops responding
 // -> degrade : "dependency timeout"
 //    step 1 · SVC models its own state : self_state : "AVAILABLE" -> "STARTING"   BECAUSE the instance knows a state model richer than UP/DOWN
+//    -> input  : self_state = "AVAILABLE" (degrade = "dependency timeout")
+//    <- output : self_state = "STARTING"   BECAUSE the instance knows a state model richer than UP/DOWN
 //    step 2 · SVC rewrites its entry : registry["order-service"] : [{"host":"10.0.1.7","port":8080,"state":"AVAILABLE"}] -> [{"host":"10.0.1.7","port":8080,"state":"STARTING"}]
+//    -> input  : registry["order-service"] = [{"host":"10.0.1.7","port":8080,"state":"AVAILABLE"}] (self_state = "STARTING")
+//    <- output : registry["order-service"] = [{"host":"10.0.1.7","port":8080,"state":"STARTING"}]   BECAUSE the instance rewrites its registry entry to reflect its current state
 //    step 3 · traffic steered away : traffic_routed : "all" -> "none"   BECAUSE callers skip STARTING instances
+//    -> input  : traffic_routed = "all"
+//    <- output : traffic_routed = "none"   BECAUSE callers skip STARTING instances
 // <- registry row : "order-service" -> [{"host":"10.0.1.7","port":8080,"state":"STARTING"}]
 //    alt no self-awareness : SVC runs but cannot handle requests -> it never unregisters itself, the stale entry stays`
     }
@@ -216,9 +234,19 @@ registerChapter({
 // DEF: register_and_renew · CALLED BY: SVC booting on host 10.0.1.7
 // -> boot : {"host":"10.0.1.7","port":8080}
 //    step 1 · SVC registers itself    registry : {"order-service" -> []} -> {"order-service" -> [{"host":"10.0.1.7","port":8080}]}   BECAUSE the instance writes its own row at startup
+//    -> input  : registry = {"order-service" -> []} (boot = {"host":"10.0.1.7","port":8080})
+//    <- output : registry = {"order-service" -> [{"host":"10.0.1.7","port":8080}]}   BECAUSE the instance writes its own row at startup
 //    step 2 · SVC marks itself available    state : "DOWN" -> "AVAILABLE"   BECAUSE the registrar flips the self-state after a successful register
+//    -> input  : state = "DOWN"
+//    <- output : state = "AVAILABLE"   BECAUSE the registrar flips the self-state after a successful register
 //    step 3 · SVC renews the lease    lease : 0 -> 60   BECAUSE the heartbeat timer pushes the ttl out before it lapses
+//    -> input  : lease = 0
+//    <- output : lease = 60   BECAUSE the heartbeat timer pushes the ttl out before it lapses
 //    step 4 · discovery reads the row back    lookup "order-service" -> returns [{"host":"10.0.1.7","port":8080}]   BECAUSE the registry serves the row the instance wrote
+//    -> input  : lookup = "order-service"
+//    decode 4a · send the lookup for name "order-service" -> request : "none" -> "lookup order-service"
+//    decode 4b · the registry resolves the name to the stored row -> row : [] -> [{"host":"10.0.1.7","port":8080}]
+//    <- output : [{"host":"10.0.1.7","port":8080}]   BECAUSE the registry serves the row the instance wrote
 // <- registry row : "order-service" -> [{"host":"10.0.1.7","port":8080}]   (written by SVC, read by discovery)`
   },
   concepts: {

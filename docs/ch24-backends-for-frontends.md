@@ -26,8 +26,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 24 · microservice
 // DEF: serve_product_page · CALLED BY: GW answering a mobile request
 // -> request : {"client":"MOB", "product":"P-9"}   // the mobile client asks for the product page
 //    step 1 · gateway sends the full desktop shape    // fields : [] -> ["title","author","price","reviews","buying_options"]
+//    -> input  : fields = [] (request = {"client":"MOB", "product":"P-9"})
+//    <- output : fields = ["title","author","price","reviews","buying_options"]   BECAUSE the shared gateway returns the full desktop shape to every client
 //    step 2 · mobile renders only two of them    // needed : [] -> ["title","price"]
+//    -> input  : needed = [] (fields = ["title","author","price","reviews","buying_options"])
+//    <- output : needed = ["title","price"]   BECAUSE the mobile client renders only the title and the price
 //    step 3 · count the waste    // extra : 0 -> 3  BECAUSE the gateway sent 5 fields and the mobile client uses only 2
+//    -> input  : extra = 0 (fields = 5, needed = 2)
+//    <- output : extra = 3   BECAUSE the gateway sent 5 fields and the mobile client uses only 2
 // <- extra : 3  · fields = 5, needed = 2, so 3 fields travel a slow mobile network for nothing
 //    alt a dedicated mobile gateway existed : fields : [] -> ["title","price"] -> extra : 0 -> 0
 ```
@@ -54,8 +60,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 24 · microservice
 // -> web_request    : "GET /web/product/P-9"
 // -> mobile_request : "GET /mobile/product/P-9"
 //    step 1 · WEB hits GW-W    // gw_web.hits : 0 -> 1  · payload : {} -> {title:"POJOs in Action", author:"Chris Richardson", price:39.99, reviews:12}
+//    -> input  : gw_web.hits = 0 (payload = {}, web_request = "GET /web/product/P-9")
+//    <- output : gw_web.hits = 1 · payload = {title:"POJOs in Action", author:"Chris Richardson", price:39.99, reviews:12}   BECAUSE the web gateway returns the full 4-field shape
 //    step 2 · MOB hits GW-M    // gw_mobile.hits : 0 -> 1  · payload : {} -> {title:"POJOs in Action", price:39.99}
+//    -> input  : gw_mobile.hits = 0 (payload = {}, mobile_request = "GET /mobile/product/P-9")
+//    <- output : gw_mobile.hits = 1 · payload = {title:"POJOs in Action", price:39.99}   BECAUSE the mobile gateway returns only the 2-field shape
 //    step 3 · tally both gateways    // total_hits : 0 -> 2  BECAUSE each request was served by its own separate gateway process
+//    -> input  : total_hits = 0 (gw_web.hits = 1, gw_mobile.hits = 1)
+//    <- output : total_hits = 2   BECAUSE each request was served by its own separate gateway process
 // <- output : GW-W returns 4 fields to WEB · GW-M returns 2 fields to MOB · each gateway writes its client's own payload (write) and serves it back (read)
 //    alt a single shared gateway existed : both requests hit one process -> total_hits : 0 -> 2 on a single gateway returning one compromise shape
 ```
@@ -79,8 +91,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 24 · microservice
 // DEF: crash_one_gateway · CALLED BY: GW-M hitting an out-of-memory fault
 // -> fault : {"api":"mobile", "error":"out-of-memory"}
 //    step 1 · GW-M crashes    // gw_mobile.status : "running" -> "crashed"
+//    -> input  : gw_mobile.status = "running" (fault = {"api":"mobile", "error":"out-of-memory"})
+//    <- output : gw_mobile.status = "crashed"   BECAUSE the mobile gateway hits an out-of-memory fault
 //    step 2 · its error count rises    // gw_mobile.errors : 0 -> 1  BECAUSE the mobile API hit an out-of-memory fault
+//    -> input  : gw_mobile.errors = 0 (gw_mobile.status = "crashed")
+//    <- output : gw_mobile.errors = 1   BECAUSE the mobile API hit an out-of-memory fault
 //    step 3 · GW-W still serves    // gw_web.hits : 0 -> 1  BECAUSE the web gateway runs in a different process and never saw the fault
+//    -> input  : gw_web.hits = 0 (gw_web.status = "running")
+//    <- output : gw_web.hits = 1   BECAUSE the web gateway runs in a different process and never saw the fault
 // <- output : GW-W returns 1 page to its client while GW-M is down  · the crash is contained to one process
 //    alt both APIs shared one process : the same fault crashes the single gateway -> every client loses its API at once
 ```
@@ -105,8 +123,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 24 · microservice
 // DEF: add_edge_function · CALLED BY: GW-M and GW-W both needing the same function
 // -> function : "verify_access_token"          // a common function both gateways need
 //    step 1 · GW-M implements it    // edge_fn : {} -> {owner:"mobile team", code:"verify_access_token"}
+//    -> input  : edge_fn = {} (function = "verify_access_token")
+//    <- output : edge_fn = {owner:"mobile team", code:"verify_access_token"}   BECAUSE the mobile team writes the function first
 //    step 2 · GW-W copies it    // edge_fn : {owner:"mobile team", code:"verify_access_token"} -> {owner:"web team", code:"verify_access_token (copy 2)"}
+//    -> input  : edge_fn = {owner:"mobile team", code:"verify_access_token"}
+//    <- output : edge_fn = {owner:"web team", code:"verify_access_token (copy 2)"}   BECAUSE the web team duplicates the function instead of sharing it
 //    step 3 · refactor into LIB    // edge_fn : {owner:"web team", code:"verify_access_token (copy 2)"} -> {owner:"shared library", code:"verify_access_token"}
+//    -> input  : edge_fn = {owner:"web team", code:"verify_access_token (copy 2)"}
+//    <- output : edge_fn = {owner:"shared library", code:"verify_access_token"}   BECAUSE the common function moves into the shared library
 // <- edge_fn : {owner:"shared library", code:"verify_access_token"}  · one shared implementation used by both gateways, the duplicate removed
 //    alt the two gateways used different stacks : the code could not be shared -> the function stays duplicated in two places
 ```
@@ -150,8 +174,14 @@ _Role: upstream services_
 // DEF: fetch_product · CALLED BY: GWW then GWM, each for its own client
 // -> path : "/products/P-9"
 //    step 1 · GWW calls PROD and keeps 5 fields for the desktop   // response : {} -> {"5 fields"}   BECAUSE the web API team tailors the response to the desktop UI
+//    -> input  : response = {} (path = "/products/P-9", client = WEB)
+//    <- output : response = {"5 fields"}   BECAUSE the web API team tailors the response to the desktop UI
 //    step 2 · GWM calls the SAME PROD and keeps only 2 fields for mobile   // response : {"5 fields"} -> {"2 fields"}   BECAUSE the mobile team trims it for a small screen
+//    -> input  : response = {"5 fields"} (path = "/products/P-9", client = MOB)
+//    <- output : response = {"2 fields"}   BECAUSE the mobile team trims it for a small screen
 //    step 3 · both gateways verify the access token via the shared library   // checks : 0 -> 2   BECAUSE verify_access_token is shared, not duplicated
+//    -> input  : checks = 0 (token = "access_token")
+//    <- output : checks = 2   BECAUSE verify_access_token is shared, not duplicated
 // <- outcome : WEB gets 5 fields, MOB gets 2 · one upstream service, two tailored API shapes, no duplicated auth logic
 ```
 

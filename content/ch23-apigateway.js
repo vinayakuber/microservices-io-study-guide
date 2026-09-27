@@ -23,9 +23,17 @@ registerChapter({
 // DEF: render_product_page · CALLED BY: MOB displaying one product
 // -> product : "P-9"                         // the product the client must display
 //    step 1 · call PROD    // page : {} -> {title:"POJOs in Action", author:"Chris Richardson"}  · roundtrips : 0 -> 1
+//    -> input  : page = {} (product = "P-9", roundtrips = 0)
+//    <- output : page = {title:"POJOs in Action", author:"Chris Richardson"} · roundtrips = 1   BECAUSE PROD returns the title and author
 //    step 2 · call PRI     // page : {title:"POJOs in Action", author:"Chris Richardson"} -> {title:"POJOs in Action", author:"Chris Richardson", price:39.99}  · roundtrips : 1 -> 2
+//    -> input  : page = {title:"POJOs in Action", author:"Chris Richardson"} (roundtrips = 1)
+//    <- output : page = {title:"POJOs in Action", author:"Chris Richardson", price:39.99} · roundtrips = 2   BECAUSE PRI returns the price
 //    step 3 · call INV     // page : {title:"POJOs in Action", author:"Chris Richardson", price:39.99} -> {title:"POJOs in Action", author:"Chris Richardson", price:39.99, stock:3}  · roundtrips : 2 -> 3
+//    -> input  : page = {title:"POJOs in Action", author:"Chris Richardson", price:39.99} (roundtrips = 2)
+//    <- output : page = {title:"POJOs in Action", author:"Chris Richardson", price:39.99, stock:3} · roundtrips = 3   BECAUSE INV returns the stock count
 //    step 4 · call REV     // page : {title:"POJOs in Action", author:"Chris Richardson", price:39.99, stock:3} -> {title:"POJOs in Action", author:"Chris Richardson", price:39.99, stock:3, reviews:12}  · roundtrips : 3 -> 4
+//    -> input  : page = {title:"POJOs in Action", author:"Chris Richardson", price:39.99, stock:3} (roundtrips = 3)
+//    <- output : page = {title:"POJOs in Action", author:"Chris Richardson", price:39.99, stock:3, reviews:12} · roundtrips = 4   BECAUSE REV returns the review count
 // <- page : {title:"POJOs in Action", author:"Chris Richardson", price:39.99, stock:3, reviews:12}  · 4 round-trips over a slow mobile network
 //    alt the client is on a LAN : 4 round-trips are cheap -> a server-side web app can afford them, the mobile client cannot`
     },
@@ -47,8 +55,14 @@ registerChapter({
 // DEF: route_request · CALLED BY: GW handling one request
 // -> request : "GET /products/P-9"             // the client sends one request to the gateway
 //    step 1 · match the path    // path : null -> "/products"  BECAUSE the gateway looks the URL up in its route table
+//    -> input  : path = null (request = "GET /products/P-9")
+//    <- output : path = "/products"   BECAUSE the gateway looks the URL up in its route table
 //    step 2 · forward to the service    // target : null -> "PROD"  BECAUSE route_table maps "/products" to the Product Info Service
+//    -> input  : target = null (path = "/products", route_table = {"/products" : "PROD"})
+//    <- output : target = "PROD"   BECAUSE route_table maps "/products" to the Product Info Service
 //    step 3 · return the response    // response : null -> {title:"POJOs in Action", author:"Chris Richardson"}
+//    -> input  : response = null (target = "PROD")
+//    <- output : response = {title:"POJOs in Action", author:"Chris Richardson"}   BECAUSE PROD answers the proxied request
 // <- response : {title:"POJOs in Action", author:"Chris Richardson"}  · the client never learned PROD's host or port
 //    alt the route table changes : "/products" now maps to "PROD-v2" -> the client keeps sending to the gateway unchanged`
     },
@@ -68,8 +82,14 @@ registerChapter({
 // DEF: compose_product_details · CALLED BY: GW answering one page request
 // -> request : "GET /product/P-9"               // the client sends one request, not four
 //    step 1 · call PROD    // response : {} -> {title:"POJOs in Action", author:"Chris Richardson"}
+//    -> input  : response = {} (request = "GET /product/P-9")
+//    <- output : response = {title:"POJOs in Action", author:"Chris Richardson"}   BECAUSE PROD returns the title and author
 //    step 2 · call PRI     // response : {title:"POJOs in Action", author:"Chris Richardson"} -> {title:"POJOs in Action", author:"Chris Richardson", price:39.99}
+//    -> input  : response = {title:"POJOs in Action", author:"Chris Richardson"}
+//    <- output : response = {title:"POJOs in Action", author:"Chris Richardson", price:39.99}   BECAUSE PRI returns the price
 //    step 3 · call REV     // response : {title:"POJOs in Action", author:"Chris Richardson", price:39.99} -> {title:"POJOs in Action", author:"Chris Richardson", price:39.99, reviews:12}
+//    -> input  : response = {title:"POJOs in Action", author:"Chris Richardson", price:39.99}
+//    <- output : response = {title:"POJOs in Action", author:"Chris Richardson", price:39.99, reviews:12}   BECAUSE REV returns the review count
 // <- response : {title:"POJOs in Action", author:"Chris Richardson", price:39.99, reviews:12}  · one round-trip for the client
 //    alt one service call fails : the gateway's circuit breaker opens -> the gateway returns a partial page instead of hanging`
     },
@@ -90,8 +110,14 @@ registerChapter({
 // DEF: measure_hop · CALLED BY: GW tallying one request's latency
 // -> request : "GET /product/P-9"
 //    step 1 · CLI to GW    // hops : [] -> ["CLI->GW"]  · latency_ms : 0 -> 12
+//    -> input  : hops = [] (latency_ms = 0)
+//    <- output : hops = ["CLI->GW"] · latency_ms = 12   BECAUSE the first leg CLI->GW takes 12 ms
 //    step 2 · GW to PROD   // hops : ["CLI->GW"] -> ["CLI->GW","GW->PROD"]  · latency_ms : 12 -> 24
+//    -> input  : hops = ["CLI->GW"] (latency_ms = 12)
+//    <- output : hops = ["CLI->GW","GW->PROD"] · latency_ms = 24   BECAUSE the second leg GW->PROD adds 12 ms
 //    step 3 · back to CLI  // hops : ["CLI->GW","GW->PROD"] -> ["CLI->GW","GW->PROD","GW->CLI"]  · latency_ms : 24 -> 36
+//    -> input  : hops = ["CLI->GW","GW->PROD"] (latency_ms = 24)
+//    <- output : hops = ["CLI->GW","GW->PROD","GW->CLI"] · latency_ms = 36   BECAUSE the return leg adds 12 ms
 // <- latency_ms : 36 over 3 hops  · the extra gateway hop added 12 ms, insignificant for most applications
 //    alt no gateway existed : the client calls PROD directly in 24 ms -> but it must then locate and call every other service itself`
     }
@@ -183,8 +209,14 @@ registerChapter({
 // DEF: get_product · CALLED BY: WEB requesting the product page for P-9
 // -> path : "/products/P-9"
 //    step 1 · GW looks up the route table   // match : "" -> "PROD"   BECAUSE /products is registered to the product service
+//    -> input  : match = "" (path = "/products/P-9", routes = { "/products": "PROD" })
+//    <- output : match = "PROD"   BECAUSE /products is registered to the product service
 //    step 2 · GW calls PROD for the product, PRI for the price, and REV for the reviews   // gathered : 0 -> 3   BECAUSE the gateway composes several upstream calls into one response
+//    -> input  : gathered = 0 (match = "PROD")
+//    <- output : gathered = 3   BECAUSE the gateway composes several upstream calls into one response
 //    step 3 · GW assembles the pieces and returns one JSON   // response : {} -> {"id":"P-9","price":39.99,"stock":3,"reviews":12}
+//    -> input  : response = {} (gathered = 3)
+//    <- output : response = {"id":"P-9","price":39.99,"stock":3,"reviews":12}   BECAUSE the gateway merges the three upstream results into one JSON
 // <- outcome : response = {"id":"P-9","price":39.99,"stock":3,"reviews":12} · one client call, three upstream calls, one composed reply`
   },
   concepts: {

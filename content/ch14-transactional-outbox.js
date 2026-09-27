@@ -24,9 +24,17 @@ registerChapter({
 // DEF: create_order · CALLED BY: U1 placing an order
 // -> order_id : "PO-2001" · -> total : 100.00
 //    step 1 · begin T1          : tx : "none" -> "open"       BECAUSE SVC starts a local transaction (BRK is NOT enlisted, so no 2PC)
+//    -> input  : tx = "none" (order_id = "PO-2001", total = 100.00)
+//    <- output : tx = "open"   BECAUSE SVC starts a local transaction (BRK is NOT enlisted, so no 2PC)
 //    step 2 · insert business   : orders : { } -> { "PO-2001" : "PENDING" }
+//    -> input  : orders = { } (order_id = "PO-2001")
+//    <- output : orders = { "PO-2001" : "PENDING" }   BECAUSE SVC writes the new order into the orders table
 //    step 3 · insert outbox row : outbox : [ ] -> [ (1, "order_created") ]
+//    -> input  : outbox = [] (event = "order_created")
+//    <- output : outbox = [ (1, "order_created") ]   BECAUSE SVC writes the event into the outbox table
 //    step 4 · commit T1         : tx : "open" -> "committed"  BECAUSE both rows live in the same local transaction
+//    -> input  : tx = "open" (orders = { "PO-2001" : "PENDING" }, outbox = [ (1, "order_created") ])
+//    <- output : tx = "committed"   BECAUSE both rows live in the same local transaction
 // <- result : outbox : [ (1, "order_created") ] · BRK received 0 messages so far
 //    alt rollback T1 : orders : { } -> { } · outbox : [ (1, "order_created") ] -> [ ] · event NOT published  BECAUSE the rollback undoes both inserts`
     },
@@ -47,10 +55,20 @@ registerChapter({
 // DEF: relay_poll · CALLED BY: a polling loop, every 100 ms
 // -> query : SELECT * FROM outbox WHERE sent=false ORDER BY id ASC   // returns id 1 then id 2
 //    step 1 · fetch rows  : pending : [ ] -> [ (1, "E1"), (2, "E2") ]   BECAUSE ORDER BY id returns the committed-first row first
+//    -> input  : pending = [] (query = "SELECT * FROM outbox WHERE sent=false ORDER BY id ASC")
+//    <- output : pending = [ (1, "E1"), (2, "E2") ]   BECAUSE ORDER BY id returns the committed-first row first
 //    step 2 · publish E1  : published : [ ] -> [ "E1" ]                 BECAUSE id 1 is the first row read
+//    -> input  : published = [] (row = (1, "E1"))
+//    <- output : published = [ "E1" ]   BECAUSE id 1 is the first row read
 //    step 3 · mark id 1   : outbox : [(1,"E1",sent=false),(2,"E2",sent=false)] -> [(1,"E1",sent=true),(2,"E2",sent=false)]
+//    -> input  : outbox = [(1,"E1",sent=false),(2,"E2",sent=false)] (row_id = 1)
+//    <- output : outbox = [(1,"E1",sent=true),(2,"E2",sent=false)]   BECAUSE the relay sets row 1's sent flag to true
 //    step 4 · publish E2  : published : [ "E1" ] -> [ "E1", "E2" ]
+//    -> input  : published = [ "E1" ] (row = (2, "E2"))
+//    <- output : published = [ "E1", "E2" ]   BECAUSE id 2 is the next row read
 //    step 5 · mark id 2   : outbox : [(1,"E1",sent=true),(2,"E2",sent=false)] -> [(1,"E1",sent=true),(2,"E2",sent=true)]
+//    -> input  : outbox = [(1,"E1",sent=true),(2,"E2",sent=false)] (row_id = 2)
+//    <- output : outbox = [(1,"E1",sent=true),(2,"E2",sent=true)]   BECAUSE the relay sets row 2's sent flag to true
 // <- output : BRK receives [ "E1", "E2" ] in id order · outbox fully sent`
     },
     {
@@ -71,13 +89,23 @@ registerChapter({
 // DEF: relay_publish · CALLED BY: the relay on its next poll
 // -> row : (1, "E1", sent=false)
 //    step 1 · publish E1 to BRK : published : [ ] -> [ "E1" ]       // BRK now holds one copy
+//    -> input  : published = [] (row = (1, "E1", sent=false))
+//    <- output : published = [ "E1" ]   BECAUSE the relay publishes row 1's event to the broker
 //    step 2 · CRASH before mark : outbox : [(1,"E1",sent=false)] -> [(1,"E1",sent=false)]   // the relay dies; row still unsent
+//    -> input  : outbox = [(1,"E1",sent=false)] (mark = pending)
+//    <- output : outbox = [(1,"E1",sent=false)]   BECAUSE the relay dies before marking the row sent
 // <- outcome : BRK delivered "E1" once · outbox row (1,"E1") still sent=false
 // DEF: relay_restart · CALLED BY: the relay after restart, polling again
 // -> query : SELECT * FROM outbox WHERE sent=false    // returns (1, "E1", sent=false) again
 //    step 1 · re-publish E1 : published : [ "E1" ] -> [ "E1", "E1" ]   BECAUSE the row was never marked sent, so at-least-once duplicate
+//    -> input  : published = [ "E1" ] (query returns (1, "E1", sent=false) again)
+//    <- output : published = [ "E1", "E1" ]   BECAUSE the row was never marked sent, so at-least-once duplicate
 //    step 2 · mark id 1     : outbox : [(1,"E1",sent=false)] -> [(1,"E1",sent=true)]
+//    -> input  : outbox = [(1,"E1",sent=false)] (row_id = 1)
+//    <- output : outbox = [(1,"E1",sent=true)]   BECAUSE the relay sets row 1's sent flag to true
 //    step 3 · CNS dedupes   : processed : { } -> { "E1" : true }       BECAUSE CNS runs INSERT ... ON CONFLICT DO NOTHING on its processed table
+//    -> input  : processed = { } (delivered = [ "E1", "E1" ])
+//    <- output : processed = { "E1" : true }   BECAUSE CNS runs INSERT ... ON CONFLICT DO NOTHING on its processed table
 // <- output : BRK delivered "E1" twice · CNS handled it once (the second copy is idempotently skipped)`
     },
     {
@@ -97,12 +125,20 @@ registerChapter({
 // DEF: tx_T1 · CALLED BY: SVC1 updating aggregate "PO-2001"
 // -> txn : "T1"
 //    step 1 · update aggregate : aggregate : { "PO-2001" : "PENDING" } -> { "PO-2001" : "APPROVED" }
+//    -> input  : aggregate = { "PO-2001" : "PENDING" } (txn = "T1")
+//    <- output : aggregate = { "PO-2001" : "APPROVED" }   BECAUSE SVC1 updates the aggregate inside T1
 //    step 2 · insert outbox    : outbox : [ ] -> [ (1, "E1") ]   BECAUSE T1 commits first, its outbox row gets id 1
+//    -> input  : outbox = [] (event = "E1")
+//    <- output : outbox = [ (1, "E1") ]   BECAUSE T1 commits first, its outbox row gets id 1
 // <- commit T1 : outbox now [ (1, "E1") ]
 // DEF: tx_T2 · CALLED BY: SVC2 updating the same aggregate "PO-2001"
 // -> txn : "T2"
 //    step 1 · update aggregate : aggregate : { "PO-2001" : "APPROVED" } -> { "PO-2001" : "SHIPPED" }
+//    -> input  : aggregate = { "PO-2001" : "APPROVED" } (txn = "T2")
+//    <- output : aggregate = { "PO-2001" : "SHIPPED" }   BECAUSE SVC2 updates the aggregate inside T2
 //    step 2 · insert outbox    : outbox : [ (1, "E1") ] -> [ (1, "E1"), (2, "E2") ]   BECAUSE T2 commits after T1, its row gets id 2
+//    -> input  : outbox = [ (1, "E1") ] (event = "E2")
+//    <- output : outbox = [ (1, "E1"), (2, "E2") ]   BECAUSE T2 commits after T1, its row gets id 2
 // <- commit T2 : outbox now [ (1, "E1"), (2, "E2") ] · relay reads by id and publishes "E1" before "E2"`
     }
   ],
@@ -280,9 +316,17 @@ registerChapter({
 // DEF: place_order · CALLED BY: SVC handling POST /orders
 // -> request : {"order_id":"PO-77"}
 //    step 1 · SVC writes order and outbox row atomically    outbox : [] -> [ (1, "OrderPlaced", "PO-77") ]   BECAUSE both writes share one database transaction
+//    -> input  : outbox = [] (request = {"order_id":"PO-77"})
+//    <- output : outbox = [ (1, "OrderPlaced", "PO-77") ]   BECAUSE both writes share one database transaction
 //    step 2 · SVC commits the transaction    orders : [("PO-77","PENDING"),("PO-2001","APPROVED")] -> [("PO-77","PENDING"),("PO-2001","APPROVED")]   BECAUSE the order and event become visible together, never half-written
+//    -> input  : orders = [("PO-77","PENDING"),("PO-2001","APPROVED")] (outbox = [ (1, "OrderPlaced", "PO-77") ])
+//    <- output : orders = [("PO-77","PENDING"),("PO-2001","APPROVED")]   BECAUSE the order and event become visible together, never half-written
 //    step 3 · RLY publishes the outbox row    event : "none" -> {"type":"OrderPlaced","order_id":"PO-77"}   BECAUSE the relay reads the row and hands it to BRK
+//    -> input  : event = "none" (outbox = [ (1, "OrderPlaced", "PO-77") ])
+//    <- output : event = {"type":"OrderPlaced","order_id":"PO-77"}   BECAUSE the relay reads the row and hands it to BRK
 //    step 4 · RLY marks the row relayed    status : "unsent" -> "sent"   BECAUSE the flag stops the row being republished
+//    -> input  : status = "unsent" (row_id = 1)
+//    <- output : status = "sent"   BECAUSE the flag stops the row being republished
 // <- outcome : BRK holds [ "OrderPlaced" ] · the order and event never diverge (same tx)`
   },
   concepts: {

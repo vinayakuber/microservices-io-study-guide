@@ -24,10 +24,16 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 31 (p.373) · micr
 // DEF: create_order · CALLED BY: client requests arriving at SVC
 // -> request1 : "PO-2001"
 //    step 1 · handle request1, increment the counter    counters.orders_created : 0 -> 1   BECAUSE one create_order completed
+//    -> input  : counters.orders_created = 0 (request1 = "PO-2001")
+//    <- output : counters.orders_created = 1   BECAUSE one create_order completed
 // -> request2 : "PO-2002"
 //    step 2 · handle request2, increment                counters.orders_created : 1 -> 2
+//    -> input  : counters.orders_created = 1 (request2 = "PO-2002")
+//    <- output : counters.orders_created = 2   BECAUSE a second create_order completed
 // -> request3 : "PO-2003"
 //    step 3 · handle request3, increment                counters.orders_created : 2 -> 3
+//    -> input  : counters.orders_created = 2 (request3 = "PO-2003")
+//    <- output : counters.orders_created = 3   BECAUSE a third create_order completed
 // <- outcome : counters : { orders_created: 3 } · the increment is one in-memory add per call, not a per-request network hop
 ```
 
@@ -51,8 +57,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 31 (p.373) · micr
 // DEF: aggregate · CALLED BY: MS reporting and alerting on the values
 // -> counter : 3 · -> sum : 123                // = 3 create_order calls, 3 x 41 ms = 123 ms
 //    step 1 (push) · SVC POSTs {"orders_created":3} to MS      MS.view.orders_created : 0 -> 3
+//    -> input  : MS.view.orders_created = 0 (counter = 3)
+//    <- output : MS.view.orders_created = 3   BECAUSE SVC pushes the counter to MS
 //    step 2 (push) · SVC POSTs {"request_ms_sum":123} to MS    MS.view.request_ms_sum : 0 -> 123
+//    -> input  : MS.view.request_ms_sum = 0 (sum = 123)
+//    <- output : MS.view.request_ms_sum = 123   BECAUSE SVC pushes the sum to MS
 //    step 3 (push) · MS now has both values to report and alert on
+//    -> input  : MS.view = { orders_created: 3, request_ms_sum: 123 } (counter = 3, sum = 123)
+//    <- output : reportable = true   BECAUSE MS now has both values to report and alert on
 // <- outcome : MS.view : { orders_created: 3, request_ms_sum: 123 } · push = the service pushes metrics to the metrics service
 //    alt pull : MS GETs /metrics -> body "orders_created 3 request_ms_sum 123" -> MS.view : {0,0} -> {3,123}   BECAUSE the metrics service pulls the metric from the service
 ```
@@ -77,10 +89,16 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 31 (p.373) · micr
 // DEF: create_order · CALLED BY: three client requests
 // -> request1 : "PO-2004" · started_at : 100 · ended_at : 141
 //    step 1 · save order, then observe : hist.request_ms : [] -> [41]          BECAUSE 141 - 100 = 41 ms
+//    -> input  : hist.request_ms = [] (started_at = 100, ended_at = 141)
+//    <- output : hist.request_ms = [41]   BECAUSE 141 - 100 = 41 ms
 // -> request2 : "PO-2005" · started_at : 200 · ended_at : 237
 //    step 2 · save order, then observe : hist.request_ms : [41] -> [41,37]     BECAUSE 237 - 200 = 37 ms
+//    -> input  : hist.request_ms = [41] (started_at = 200, ended_at = 237)
+//    <- output : hist.request_ms = [41,37]   BECAUSE 237 - 200 = 37 ms
 // -> request3 : "PO-2006" · started_at : 300 · ended_at : 348
 //    step 3 · save order, then observe : hist.request_ms : [41,37] -> [41,37,48]   BECAUSE 348 - 300 = 48 ms
+//    -> input  : hist.request_ms = [41,37] (started_at = 300, ended_at = 348)
+//    <- output : hist.request_ms = [41,37,48]   BECAUSE 348 - 300 = 48 ms
 // <- outcome : hist : { request_ms: [41,37,48] } · three observe() calls are woven between the save() calls
 ```
 
@@ -140,9 +158,17 @@ _Role: reader (dashboard)_
 // DEF: instrument_and_aggregate · CALLED BY: SVC counting completions, MS scraping on an interval
 // -> request1 : "PO-2001"
 //    step 1 · SVC increments the counter across 3 completions    counter.orders_created : 0 -> 3
+//    -> input  : counter.orders_created = 0 (request1 = "PO-2001")
+//    <- output : counter.orders_created = 3   BECAUSE three create_order calls completed
 //    step 2 · SVC pushes {"orders_created":3} to MS    series : {} -> {"orders_created":3,"request_ms":[41,37,48]}
+//    -> input  : series = {} (counter.orders_created = 3, request_ms = [41,37,48])
+//    <- output : series = {"orders_created":3,"request_ms":[41,37,48]}   BECAUSE SVC pushes the metrics to MS
 //    step 3 · MS stores each metric as a series    series : {"orders_created":3} -> {"orders_created":3,"request_ms":[41,37,48]}  BECAUSE orders_created and request_ms each become a stored series
+//    -> input  : series = {"orders_created":3} (request_ms = [41,37,48])
+//    <- output : series = {"orders_created":3,"request_ms":[41,37,48]}   BECAUSE orders_created and request_ms each become a stored series
 //    step 4 · DSH queries the series and renders the chart    series : {"orders_created":3,"request_ms":[41,37,48]} -> {"orders_created":3,"request_ms":[41,37,48]}  BECAUSE the dashboard reads the counts and latencies back
+//    -> input  : series = {"orders_created":3,"request_ms":[41,37,48]} (dashboard query = "orders_created, request_ms")
+//    <- output : series = {"orders_created":3,"request_ms":[41,37,48]}   BECAUSE the dashboard reads the counts and latencies back
 // <- outcome : DSH renders orders_created 3 · request_ms [41,37,48]  BECAUSE the writer shipped the values over the transport, the collector stored them, and the reader pulled them back
 ```
 

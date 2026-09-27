@@ -25,10 +25,20 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.12 · microservices
 // DEF: poll_once · CALLED BY: a timer firing every 100 ms
 // -> query : SELECT * FROM outbox WHERE sent=false   // returns [ (1,"E1",sent=false), (2,"E2",sent=false) ]
 //    step 1 · fetch rows    : rows : [ ] -> [ (1,"E1",sent=false), (2,"E2",sent=false) ]
+//    -> input  : rows = [] (query = "SELECT * FROM outbox WHERE sent=false")
+//    <- output : rows = [ (1,"E1",sent=false), (2,"E2",sent=false) ]   BECAUSE the DB returns the two unsent outbox rows
 //    step 2 · publish row 1 : published : [ ] -> [ "E1" ]
+//    -> input  : rows = [ (1,"E1",sent=false), (2,"E2",sent=false) ] (published = [])
+//    <- output : published = [ "E1" ]   BECAUSE the relay hands row 1's event E1 to the broker
 //    step 3 · mark row 1    : outbox : [(1,"E1",sent=false),(2,"E2",sent=false)] -> [(1,"E1",sent=true),(2,"E2",sent=false)]
+//    -> input  : outbox = [(1,"E1",sent=false),(2,"E2",sent=false)] (row_id = 1)
+//    <- output : outbox = [(1,"E1",sent=true),(2,"E2",sent=false)]   BECAUSE the relay sets row 1's sent flag to true
 //    step 4 · publish row 2 : published : [ "E1" ] -> [ "E1", "E2" ]
+//    -> input  : published = [ "E1" ] (row = (2,"E2",sent=false))
+//    <- output : published = [ "E1", "E2" ]   BECAUSE the relay hands row 2's event E2 to the broker
 //    step 5 · mark row 2    : outbox : [(1,"E1",sent=true),(2,"E2",sent=false)] -> [(1,"E1",sent=true),(2,"E2",sent=true)]
+//    -> input  : outbox = [(1,"E1",sent=true),(2,"E2",sent=false)] (row_id = 2)
+//    <- output : outbox = [(1,"E1",sent=true),(2,"E2",sent=true)]   BECAUSE the relay sets row 2's sent flag to true
 // <- output : BRK received [ "E1", "E2" ] · outbox now fully sent
 ```
 
@@ -51,12 +61,20 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.12 · microservices
 // DEF: poll_without_order · CALLED BY: the relay running a query with no ORDER BY
 // -> query : SELECT * FROM outbox WHERE sent=false   // returns rows in DB order, here id 2 first
 //    step 1 · publish id 2 : published : [ ] -> [ "E2" ]     BECAUSE the query returned id 2 before id 1
+//    -> input  : published = [] (row = (2,"E2",sent=false))
+//    <- output : published = [ "E2" ]   BECAUSE the query returned id 2 before id 1
 //    step 2 · publish id 1 : published : [ "E2" ] -> [ "E2", "E1" ]
+//    -> input  : published = [ "E2" ] (row = (1,"E1",sent=false))
+//    <- output : published = [ "E2", "E1" ]   BECAUSE the query returns id 1 after id 2
 // <- output : BRK receives [ "E2", "E1" ] · order WRONG (E1 should precede E2)
 // DEF: poll_with_order · CALLED BY: the relay adding ORDER BY id to the same query
 // -> query : SELECT * FROM outbox WHERE sent=false ORDER BY id ASC   // returns id 1 then id 2
 //    step 1 · publish id 1 : published : [ ] -> [ "E1" ]     BECAUSE ORDER BY id returns the committed-first row first
+//    -> input  : published = [] (row = (1,"E1",sent=false))
+//    <- output : published = [ "E1" ]   BECAUSE ORDER BY id returns the committed-first row first
 //    step 2 · publish id 2 : published : [ "E1" ] -> [ "E1", "E2" ]
+//    -> input  : published = [ "E1" ] (row = (2,"E2",sent=false))
+//    <- output : published = [ "E1", "E2" ]   BECAUSE ORDER BY id returns id 2 after id 1
 // <- output : BRK receives [ "E1", "E2" ] · order CORRECT
 ```
 
@@ -82,11 +100,17 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.12 · microservices
 // DEF: poll_sql · CALLED BY: the relay against MySQL
 // -> query : SELECT * FROM outbox WHERE sent=false    // matches : 1 unsent row
 //    step 1 · publish E1 : published : [ ] -> [ "E1" ]          BECAUSE MySQL returns the one unsent row
+//    -> input  : published = [] (outbox_sql = [ (1, "E1", sent=false) ])
+//    <- output : published = [ "E1" ]   BECAUSE MySQL returns the one unsent row
 //    step 2 · mark sent  : outbox_sql : [(1,"E1",sent=false)] -> [(1,"E1",sent=true)]
+//    -> input  : outbox_sql = [(1,"E1",sent=false)] (row_id = 1)
+//    <- output : outbox_sql = [(1,"E1",sent=true)]   BECAUSE the relay sets row 1's sent flag to true
 // <- output : BRK receives [ "E1" ] · SQLDB supports polling
 // DEF: poll_nosql · CALLED BY: the relay against a NoSQL store with no unsent-row query
 // -> query : SELECT * FROM outbox WHERE sent=false    // matches : 0 rows (the query cannot be expressed)
 //    step 1 · publish nothing : published : [ ] -> [ ]  (0 messages sent)   BECAUSE the outbox is a per-record property with no global sent index
+//    -> input  : query = "SELECT * FROM outbox WHERE sent=false" (matches = 0 rows)
+//    <- output : published = [ ]  (0 messages sent)   BECAUSE the outbox is a per-record property with no global sent index
 // <- output : BRK receives 0 messages · NOSQL cannot poll, so the relay uses transaction log tailing instead
 ```
 
@@ -140,9 +164,17 @@ _Role: subscriber_
 // DEF: poll_once · CALLED BY: a scheduler tick every 250 ms
 // -> query : "SELECT * FROM outbox WHERE sent=false ORDER BY id ASC"
 //    step 1 · RLY fetches the unsent rows    list : [] -> [ (10, "OrderCreated"), (11, "PaymentAuthorized") ]   BECAUSE the query returns rows whose sent flag is false, ordered by id
+//    -> input  : list = [] (query = "SELECT * FROM outbox WHERE sent=false ORDER BY id ASC")
+//    <- output : list = [ (10, "OrderCreated"), (11, "PaymentAuthorized") ]   BECAUSE the query returns rows whose sent flag is false, ordered by id
 //    step 2 · RLY publishes row 10 to BRK    list : [ (10, "OrderCreated"), (11, "PaymentAuthorized") ] -> [ (11, "PaymentAuthorized") ]   BECAUSE each row is handed to the broker in id order
+//    -> input  : list = [ (10, "OrderCreated"), (11, "PaymentAuthorized") ] (row = (10, "OrderCreated"))
+//    <- output : list = [ (11, "PaymentAuthorized") ]   BECAUSE each row is handed to the broker in id order
 //    step 3 · RLY marks row 10 sent    outbox : [(10,"OrderCreated",sent=false),(11,"PaymentAuthorized",sent=false)] -> [(10,"OrderCreated",sent=true),(11,"PaymentAuthorized",sent=false)]   BECAUSE sent=true makes the next poll skip the row
+//    -> input  : outbox = [(10,"OrderCreated",sent=false),(11,"PaymentAuthorized",sent=false)] (row_id = 10)
+//    <- output : outbox = [(10,"OrderCreated",sent=true),(11,"PaymentAuthorized",sent=false)]   BECAUSE sent=true makes the next poll skip the row
 //    step 4 · SUB consumes "OrderCreated"    status : "unsent" -> "delivered"   BECAUSE the subscriber reads the event off BRK
+//    -> input  : status = "unsent" (brk = [ "OrderCreated", "PaymentAuthorized" ])
+//    <- output : status = "delivered"   BECAUSE the subscriber reads the event off BRK
 // <- output : BRK holds [ "OrderCreated", "PaymentAuthorized" ] · SUB consumes them in id order
 ```
 

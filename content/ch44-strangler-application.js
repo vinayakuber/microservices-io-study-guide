@@ -23,8 +23,14 @@ registerChapter({
 // DEF: migrate · CALLED BY: the team for each feature, one at a time
 // -> feature : "catalog"
 //    step 1 · re-implement "catalog" as a microservice in NEW   // new_features : {} -> { "catalog": true }
+//    -> input  : feature = "catalog" · new_features = {}
+//    <- output : new_features = { "catalog": true }   BECAUSE "catalog" is re-implemented as a microservice in NEW
 //    step 2 · cut "catalog" traffic over to the new service   // mono_features.catalog : true -> false
+//    -> input  : mono_features.catalog = true
+//    <- output : mono_features.catalog = false   BECAUSE "catalog" traffic is cut over to the new service
 //    step 3 · the monolith is left holding only the remaining features   // mono_features : { "catalog": true, "orders": true, "accounts": true } -> { "orders": true, "accounts": true }
+//    -> input  : mono_features = { "catalog": true, "orders": true, "accounts": true }
+//    <- output : mono_features = { "orders": true, "accounts": true }   BECAUSE the monolith is left holding only the remaining features
 // <- state : mono_features = { "orders": true, "accounts": true } · new_features = { "catalog": true } — one piece moved, not the whole monolith at once
 `
     },
@@ -45,8 +51,14 @@ registerChapter({
 // DEF: route · CALLED BY: RTR on each incoming request
 // -> request : { "path": "/catalog" }
 //    step 1 · look up "/catalog" in route_table   // matched : "" -> "NEW"   BECAUSE /catalog was already migrated
+//    -> input  : path = "/catalog" · route_table = { "/catalog": "NEW", "/orders": "MONO" } · matched = ""
+//    <- output : matched = "NEW"   BECAUSE /catalog was already migrated
 //    step 2 · forward the request to the matched backend   // target : "" -> "NEW"
+//    -> input  : matched = "NEW" · target = ""
+//    <- output : target = "NEW"   BECAUSE the request is forwarded to the matched backend
 //    step 3 · NEW serves the catalog from its own service
+//    -> input  : target = "NEW"
+//    <- output : response = "catalog items"   BECAUSE NEW serves the catalog from its own service
 // <- response : "catalog items" from NEW — MONO never receives this request
 //    alt path "/orders" : matched : "NEW" -> "MONO" · target : "" -> "MONO" — MONO still serves it, unchanged (fall back)
 `
@@ -72,8 +84,14 @@ registerChapter({
 // DEF: add_feature · CALLED BY: the team to add a feature the monolith never had
 // -> feature : "recommendations"
 //    step 1 · build "recommendations" as a new microservice   // brand_new : {} -> { "recommendations": true }
+//    -> input  : feature = "recommendations" · brand_new = {}
+//    <- output : brand_new = { "recommendations": true }   BECAUSE "recommendations" is built as a new microservice
 //    step 2 · register it in the router   // route_table : { "/catalog": "NEW" } -> { "/catalog": "NEW", "/recommendations": "NEW" }
+//    -> input  : route_table = { "/catalog": "NEW" }
+//    <- output : route_table = { "/catalog": "NEW", "/recommendations": "NEW" }   BECAUSE the new feature is registered in the router
 //    step 3 · record it as owned by NEW   // new_features : { "catalog": true } -> { "catalog": true, "recommendations": true }
+//    -> input  : new_features = { "catalog": true }
+//    <- output : new_features = { "catalog": true, "recommendations": true }   BECAUSE the feature is recorded as owned by NEW
 // <- state : NEW now serves { "catalog": true, "recommendations": true } — MONO never had a recommendations feature to cut over
 `
     }
@@ -210,9 +228,17 @@ registerChapter({
 // DEF: route_request · CALLED BY: RTR on each incoming request
 // -> request : { "path":"/catalog" }
 //    step 1 · the router reads the path from the request    path : "" -> "/catalog"   BECAUSE the façade fronts both systems
+//    -> input  : request = { "path":"/catalog" } · path = ""
+//    <- output : path = "/catalog"   BECAUSE the façade fronts both systems
 //    step 2 · the router looks up "/catalog" in the route table    matched : "" -> "NEW"   // the path was already migrated
+//    -> input  : path = "/catalog" · route_table = { "/catalog":"NEW", "/orders":"MONO" } · matched = ""
+//    <- output : matched = "NEW"   BECAUSE the path was already migrated
 //    step 3 · the router forwards to the matched backend    target : "" -> "NEW"   // NEW serves the catalog
+//    -> input  : matched = "NEW" · target = ""
+//    <- output : target = "NEW"   BECAUSE NEW serves the catalog
 //    step 4 · the strangler records a migrated feature    migrated : {} -> { "catalog": true }   BECAUSE the strangler replaces the monolith one feature at a time
+//    -> input  : migrated = {}
+//    <- output : migrated = { "catalog": true }   BECAUSE the strangler replaces the monolith one feature at a time
 // <- response : "catalog items" from NEW · MONO never receives this request   BECAUSE the route table sends migrated paths to the new services
 //    alt path "/orders" : matched : "NEW" -> "MONO" · target : "" -> "MONO" — the monolith still serves it, unchanged (fall back)`
   },

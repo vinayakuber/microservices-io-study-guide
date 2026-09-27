@@ -25,8 +25,14 @@ registerChapter({
 // DEF: decompose · CALLED BY: ARC grouping subdomains into services
 // -> subdomain_list : ["ProductCatalog","Inventory","Order","Delivery","CommonLib"]
 //    step 1 · create a service per business subdomain : services : [] -> ["catalog","inventory","order","delivery"]
+//    -> input  : services = [] (0 services)
+//    <- output : services = ["catalog","inventory","order","delivery"]   BECAUSE each business subdomain becomes its own service
 //    step 2 · place each subdomain in exactly one service : placement : "unassigned" -> "one-to-one"
+//    -> input  : placement = "unassigned"
+//    <- output : placement = "one-to-one"   BECAUSE each subdomain belongs to exactly one service
 //    step 3 · share the library across services : CommonLib.owners : 0 -> 4   BECAUSE a shared-library subdomain is the one allowed exception used by multiple services
+//    -> input  : CommonLib.owners = 0
+//    <- output : CommonLib.owners = 4   BECAUSE a shared-library subdomain is the one allowed exception used by multiple services
 // <- service_count : 4 · each non-library subdomain belongs to a single service
 //    alt merge two subdomains into one service : services : 4 -> 3  (a service may hold more than one subdomain)`
     },
@@ -52,9 +58,17 @@ registerChapter({
 // DEF: release · CALLED BY: TO shipping order v1.1 while TI is mid-change
 // -> change : "order v1.1"
 //    step 1 · build only the order service : built_services : [] -> ["order"]
+//    -> input  : built_services = [] (0 services)
+//    <- output : built_services = ["order"]   BECAUSE only the order service is being shipped
 //    step 2 · run only order tests : tests_run : 20 -> 12   BECAUSE each service has its own pipeline and its own tests
+//    -> input  : tests_run = 20
+//    <- output : tests_run = 12   BECAUSE each service has its own pipeline and its own tests
 //    step 3 · deploy order alone : deployed["order"] : "v1.0" -> "v1.1"
+//    -> input  : deployed["order"] = "v1.0"
+//    <- output : deployed["order"] = "v1.1"   BECAUSE the order pipeline deploys its service alone
 //    step 4 · inventory pipeline never runs (its service is unchanged)
+//    -> input  : inventory.change = "none"
+//    <- output : deployed["inventory"] = "v1.0"   BECAUSE the inventory service is unchanged, so its pipeline never runs
 // <- release : "order v1.1 live" · TO did not wait for TI
 //    alt a single shared pipeline : both services rebuild -> tests_run : 12 -> 20 (lockstep)`
     },
@@ -77,9 +91,17 @@ registerChapter({
 // DEF: placeOrder · CALLED BY: API routing a client request to the order service
 // -> order_id : "PO-2001" · -> amount : 40
 //    step 1 · local txn in OSV : local_txns["T1"].state : "NEW" -> "DONE"  (creates the order)
+//    -> input  : local_txns["T1"].state = "NEW"
+//    <- output : local_txns["T1"].state = "DONE"   BECAUSE the order service runs its local txn first
 //    step 2 · local txn in CSV : local_txns["T3"].state : "NEW" -> "DONE"  (reserves credit)
+//    -> input  : local_txns["T3"].state = "NEW"
+//    <- output : local_txns["T3"].state = "DONE"   BECAUSE the credit service reserves credit in its own DB
 //    step 3 · local txn in ISV : local_txns["T2"].state : "NEW" -> "DONE"  (reserves stock)
+//    -> input  : local_txns["T2"].state = "NEW"
+//    <- output : local_txns["T2"].state = "DONE"   BECAUSE the inventory service reserves stock in its own DB
 //    step 4 · each service commits against its OWN database — no single ACID commit
+//    -> input  : local_txns = { "T1": "DONE", "T3": "DONE", "T2": "DONE" }
+//    <- output : saga "PO-2001" = 3 local txns committed   BECAUSE no single ACID commit spans the services
 // <- saga : "PO-2001" completed via 3 local transactions (eventually consistent, not ACID)
 //    alt step 3 fails : compensating transactions undo T1 and T3 -> local_txns["T1"].state : "DONE" -> "UNDONE"`
     },
@@ -102,9 +124,17 @@ registerChapter({
 // DEF: getHomeFeed · CALLED BY: a client device requesting its feed
 // -> device : "smart-tv-8001" · -> api_call : 1
 //    step 1 · fan out the query : pending_calls : 0 -> 6   BECAUSE each API call fans out to an average of six backend services
+//    -> input  : pending_calls = 0
+//    <- output : pending_calls = 6   BECAUSE each API call fans out to an average of six backend services
 //    step 2 · each service queries its OWN database : responses : [] -> ["feed","recs","meta","subs","ads","profile"]
+//    -> input  : responses = [] (0 responses)
+//    <- output : responses = ["feed","recs","meta","subs","ads","profile"]   BECAUSE each of the 6 services queries its own DB
 //    step 3 · compose the six results : composed : "none" -> "6-merged"
+//    -> input  : composed = "none"
+//    <- output : composed = "6-merged"   BECAUSE the gateway merges the 6 local results into one page
 //    step 4 · deliver one page : delivered : 0 -> 1
+//    -> input  : delivered = 0
+//    <- output : delivered = 1   BECAUSE the gateway returns a single assembled page
 // <- page : 1 response assembled from 6 local queries (no shared database)
 //    alt a service is down : responses : 6 -> 5 (a partial page — availability trades off)`
     }
@@ -255,9 +285,19 @@ registerChapter({
 // DEF: placeOrder · CALLED BY: GW routing a client request to the order service
 // -> order_id : "PO-2001" · -> amount : 40
 //    step 1 · GW routes the request to SVC    route : "none" -> "order"
+//    -> input  : route = "none"
+//    <- output : route = "order"   BECAUSE the gateway routes the request to the order service
 //    step 2 · SVC writes the order in its own DB    orders : {} -> { "PO-2001": {status:"DRAFT"} }
+//    -> input  : orders = {} (empty)
+//    <- output : orders = { "PO-2001": {status:"DRAFT"} }   BECAUSE the order service writes the order into its own DB
 //    step 3 · SVC commits the local txn T1    local : "NEW" -> "DONE"   BECAUSE each service commits against its OWN database
+//    -> input  : local = "NEW"
+//    <- output : local = "DONE"   BECAUSE each service commits against its OWN database
 //    step 4 · GW reads the result and composes    GET /orders/PO-2001 -> { id:"PO-2001", status:"PLACED" }
+//    -> input  : GET /orders/PO-2001 (read key "PO-2001")
+//    decode 4a · GW sends the GET for key PO-2001 -> request : "none" -> "GET /orders/PO-2001"
+//    decode 4b · the order service's DB looks up the row by id -> row : {} -> { id:"PO-2001", status:"PLACED" }
+//    <- output : { id:"PO-2001", status:"PLACED" }   BECAUSE the order service's own DB returns the row it just wrote
 // <- outcome : one page composed from local results · a multi-service command runs as a saga of 3 local transactions, not one ACID commit   BECAUSE no single database spans the services`
   },
   concepts: {

@@ -25,13 +25,23 @@ registerChapter({
 // DEF: commit_outbox · CALLED BY: SVC committing a transaction that inserts an outbox row
 // -> event : "E1"
 //    step 1 · insert outbox row  : outbox : [ ] -> [ (1, "E1") ]
+//    -> input  : outbox = [] (event = "E1")
+//    <- output : outbox = [ (1, "E1") ]   BECAUSE SVC's transaction inserts the outbox row 1 for event E1
 //    step 2 · WAL records commit : log : [ ] -> [ { "op":"insert", "table":"outbox", "row":(1,"E1") } ]   BECAUSE the commit is appended to the WAL as a log entry
+//    -> input  : log = [] (commit = outbox row (1,"E1"))
+//    <- output : log = [ { "op":"insert", "table":"outbox", "row":(1,"E1") } ]   BECAUSE the commit is appended to the WAL as a log entry
 // <- output : DB has (1,"E1") committed · WAL has 1 new entry
 // DEF: tail_once · CALLED BY: TLR reading the WAL at its saved position 0
 // -> read : next WAL entry at position 0
 //    step 1 · read next entry : entry : "none" -> { "op":"insert", "row":(1,"E1") }   BECAUSE position 0 is the first unread WAL entry
+//    -> input  : entry = "none" (read = "next WAL entry at position 0")
+//    <- output : entry = { "op":"insert", "row":(1,"E1") }   BECAUSE position 0 is the first unread WAL entry
 //    step 2 · publish E1      : published : [ ] -> [ "E1" ]
+//    -> input  : published = [] (entry = { "op":"insert", "row":(1,"E1") })
+//    <- output : published = [ "E1" ]   BECAUSE the tailer publishes the event embedded in the outbox insert
 //    step 3 · advance position : position : 0 -> 1
+//    -> input  : position = 0
+//    <- output : position = 1   BECAUSE the tailer has consumed the first WAL entry
 // <- output : BRK receives [ "E1" ] · tailer position now 1`
     },
     {
@@ -52,13 +62,23 @@ registerChapter({
 // DEF: commit_tx · CALLED BY: SVC committing a transaction
 // -> event : "E1"
 //    step 1 · insert outbox row : outbox : [ ] -> [ (1, "E1") ]
+//    -> input  : outbox = [] (event = "E1")
+//    <- output : outbox = [ (1, "E1") ]   BECAUSE SVC's transaction inserts the outbox row 1 for event E1
 //    step 2 · binlog append     : binlog : [ ] -> [ { "seq":10, "op":"write", "table":"outbox", "row":(1,"E1") } ]   BECAUSE the commit is written to the binlog
+//    -> input  : binlog = [] (commit = outbox row (1,"E1"))
+//    <- output : binlog = [ { "seq":10, "op":"write", "table":"outbox", "row":(1,"E1") } ]   BECAUSE the commit is written to the binlog
 // <- output : TLR sees seq 10 and publishes "E1" · no 2PC (BRK is never enlisted)
 // DEF: rollback_tx · CALLED BY: SVC rolling back a different transaction
 // -> event : "E2"
 //    step 1 · insert outbox row : outbox : [ (1,"E1") ] -> [ (1,"E1"), (2,"E2") ]
+//    -> input  : outbox = [ (1,"E1") ] (event = "E2")
+//    <- output : outbox = [ (1,"E1"), (2,"E2") ]   BECAUSE SVC's transaction inserts the outbox row 2 for event E2
 //    step 2 · rollback          : outbox : [ (1,"E1"), (2,"E2") ] -> [ (1,"E1") ]   BECAUSE the rollback undoes the insert
+//    -> input  : outbox = [ (1,"E1"), (2,"E2") ] (tx = rollback)
+//    <- output : outbox = [ (1,"E1") ]   BECAUSE the rollback undoes the insert
 //    step 3 · binlog unchanged  : binlog : [ { "seq":10, "op":"write", "table":"outbox", "row":(1,"E1") } ] -> [ { "seq":10, "op":"write", "table":"outbox", "row":(1,"E1") } ]   BECAUSE a rolled-back write is not committed to the binlog
+//    -> input  : binlog = [ { "seq":10, "op":"write", "table":"outbox", "row":(1,"E1") } ]
+//    <- output : binlog = [ { "seq":10, "op":"write", "table":"outbox", "row":(1,"E1") } ]   BECAUSE a rolled-back write is not committed to the binlog
 // <- output : TLR never sees "E2" · BRK receives only "E1" (0 copies of "E2")`
     },
     {
@@ -80,13 +100,23 @@ registerChapter({
 // DEF: tail_seq10 · CALLED BY: TLR reading the next binlog entry
 // -> read : entry seq 10
 //    step 1 · publish E1 : published : [ ] -> [ "E1" ]
+//    -> input  : published = [] (read = "entry seq 10")
+//    <- output : published = [ "E1" ]   BECAUSE the tailer publishes the event embedded in binlog seq 10
 //    step 2 · CRASH      : position : 9 -> 9    // tailer dies BEFORE saving seq 10, so position stays 9
+//    -> input  : position = 9 (seq_to_save = 10)
+//    <- output : position = 9   BECAUSE the tailer dies before saving seq 10
 // <- outcome : BRK has [ "E1" ] · saved position still 9
 // DEF: tail_restart · CALLED BY: TLR after restart, resuming from saved position 9
 // -> read : entry seq 10 again    // position 9 means seq 10 is re-read
 //    step 1 · re-publish E1 : published : [ "E1" ] -> [ "E1", "E1" ]   BECAUSE seq 10 was published but never marked as saved, so duplicate
+//    -> input  : published = [ "E1" ] (read = "entry seq 10 again")
+//    <- output : published = [ "E1", "E1" ]   BECAUSE seq 10 was published but never marked as saved, so duplicate
 //    step 2 · save position : position : 9 -> 10
+//    -> input  : position = 9
+//    <- output : position = 10   BECAUSE the tailer saves seq 10 as the last-read position
 //    step 3 · CNS dedupes   : processed : { } -> { "E1" : true }       BECAUSE CNS runs INSERT ... ON CONFLICT DO NOTHING on its processed table
+//    -> input  : processed = { } (delivered = [ "E1", "E1" ])
+//    <- output : processed = { "E1" : true }   BECAUSE CNS runs INSERT ... ON CONFLICT DO NOTHING on its processed table
 // <- output : BRK delivered "E1" twice · CNS handled it once (the second copy is skipped)`
     }
   ],
@@ -275,9 +305,17 @@ registerChapter({
 // DEF: tail_and_publish · CALLED BY: TLR reading the log continuously
 // -> log record : (tx 91, "INSERT orders PO-77")
 //    step 1 · TLR reads the next record    position : 0 -> 91   BECAUSE the tailer advances past the last-read offset
+//    -> input  : position = 0 (log record = (tx 91, "INSERT orders PO-77"))
+//    <- output : position = 91   BECAUSE the tailer advances past the last-read offset
 //    step 2 · TLR emits a domain event    event : "none" -> {"type":"OrderCreated","order_id":"PO-77"}   BECAUSE the INSERT maps to a domain event
+//    -> input  : event = "none" (log record = (tx 91, "INSERT orders PO-77"))
+//    <- output : event = {"type":"OrderCreated","order_id":"PO-77"}   BECAUSE the INSERT maps to a domain event
 //    step 3 · TLR publishes the event to BRK    status : "pending" -> "published"   BECAUSE the event is handed to the broker in commit order
+//    -> input  : status = "pending" (event = {"type":"OrderCreated","order_id":"PO-77"})
+//    <- output : status = "published"   BECAUSE the event is handed to the broker in commit order
 //    step 4 · CNS consumes "OrderCreated"    status : "published" -> "delivered"   BECAUSE the subscriber reads the event off BRK
+//    -> input  : status = "published" (brk = [ "OrderCreated" ])
+//    <- output : status = "delivered"   BECAUSE the subscriber reads the event off BRK
 // <- output : BRK holds [ "OrderCreated" ] · CNS consumes it (no app-level write needed to publish)`
   },
   concepts: {

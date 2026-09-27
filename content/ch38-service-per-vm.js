@@ -23,8 +23,14 @@ registerChapter({
 // DEF: bake version 2.3.0 · CALLED BY: BLD on release
 // -> service : "catalog-service" · -> version : "2.3.0"
 //    step 1 · install runtime · stack : {} -> {"jdk":"17","os":"linux"}  BECAUSE the image captures the service's technology stack
+//    -> input  : service = "catalog-service" (version = "2.3.0")
+//    <- output : stack = {"jdk":"17","os":"linux"}   BECAUSE the image captures the service's technology stack
 //    step 2 · copy code · image : null -> "catalog:2.3.0"                // service code is baked into the image
+//    -> input  : stack = {"jdk":"17","os":"linux"}
+//    <- output : image = "catalog:2.3.0"   BECAUSE service code is baked into the image
 //    step 3 · register · ami : 0 -> 1                                    BECAUSE one AMI is now registered for launch
+//    -> input  : image = "catalog:2.3.0"
+//    <- output : ami = 1   BECAUSE one AMI is now registered for launch
 // <- ami : "catalog:2.3.0"  · 1 image, ready to launch as N EC2 instances
 //    alt rebuild after a change : version : "2.3.0" -> "2.3.1"  BECAUSE building a VM image is slow and time consuming`
     },
@@ -45,8 +51,14 @@ registerChapter({
 // DEF: launch 3 instances · CALLED BY: a deploy of catalog-service
 // -> instance_count : 3
 //    step 1 · launch · instances : {} -> {"i-1","i-2","i-3"}  BECAUSE each instance is a separate VM from the same AMI
+//    -> input  : instance_count = 3
+//    <- output : instances = {"i-1","i-2","i-3"}   BECAUSE each instance is a separate VM from the same AMI
 //    step 2 · attach · load_balancer : 0 -> 1                 // the Elastic Load Balancer fronts the instances
+//    -> input  : instances = {"i-1","i-2","i-3"}
+//    <- output : load_balancer = 1   BECAUSE the Elastic Load Balancer fronts the instances
 //    step 3 · serve · endpoints : 0 -> 3                      // 3 VMs now answer for the service
+//    -> input  : load_balancer = 1
+//    <- output : endpoints = 3   BECAUSE 3 VMs now answer for the service
 // <- instances : 3  · Netflix-style: one EC2 instance per service instance
 //    alt scale out : instance_count : 3 -> 5   BECAUSE you increase the number of instances to add throughput`
     },
@@ -67,8 +79,14 @@ registerChapter({
 // DEF: react to load 8.0 · CALLED BY: ASG monitoring CPU
 // -> load : 8.0
 //    step 1 · compare · policy : {} -> {"min":2,"max":6}   BECAUSE the group is bounded between 2 and 6 VMs
+//    -> input  : load = 8.0
+//    <- output : policy = {"min":2,"max":6}   BECAUSE the group is bounded between 2 and 6 VMs
 //    step 2 · trigger · group_size : 2 -> 4                // load exceeds threshold, so the group adds 2 VMs
+//    -> input  : group_size = 2
+//    <- output : group_size = 4   BECAUSE load exceeds threshold, so the group adds 2 VMs
 //    step 3 · stabilize · healthy : 2 -> 4                 // the 2 new VMs come up healthy, total healthy = 4
+//    -> input  : group_size = 4
+//    <- output : healthy = 4   BECAUSE the 2 new VMs come up healthy, total healthy = 4
 // <- group_size : 4  · scaling happened automatically based on load
 //    alt load drops : group_size : 4 -> 2   BECAUSE autoscaling removes VMs when they are unneeded`
     },
@@ -90,8 +108,14 @@ registerChapter({
 // DEF: measure deploy of 2.3.0 · CALLED BY: a release engineer
 // -> service : "catalog-service"
 //    step 1 · use ELB · tools : 0 -> 1       BECAUSE AWS provides a mature load balancer out of the box
+//    -> input  : service = "catalog-service"
+//    <- output : tools = 1   BECAUSE AWS provides a mature load balancer out of the box
 //    step 2 · use ASG · tools : 1 -> 2       // autoscaling groups are another ready-made feature
+//    -> input  : tools = 1
+//    <- output : tools = 2   BECAUSE autoscaling groups are another ready-made feature
 //    step 3 · build · build_time : 0 -> 600  BECAUSE building a VM image is slow and time consuming
+//    -> input  : image = "catalog:2.3.0"
+//    <- output : build_time = 600   BECAUSE building a VM image is slow and time consuming
 // <- tools : 2  · build_time : 600 s  · rich infrastructure, but each image build is slow
 //    alt container build : build_time : 600 -> 6   BECAUSE a container packages ~100x faster than an AMI`
     }
@@ -226,8 +250,14 @@ registerChapter({
 // DEF: scale_vm · CALLED BY: BLD baking, IaaS provisioning, ASG scaling
 // -> image_name : "catalog:2.3.0"
 //    step 1 · BLD bakes the AMI with JDK 17 + OS   // image : "" -> "catalog:2.3.0"   BECAUSE the build pipeline packages the runtime into one artifact
+//    -> input  : image_name = "catalog:2.3.0"
+//    <- output : image = "catalog:2.3.0"   BECAUSE the build pipeline packages the runtime into one artifact
 //    step 2 · IaaS provisions a fourth EC2 instance   // instances : { "i-1":"UP", "i-2":"UP", "i-3":"UP" } -> { "i-1":"UP", "i-2":"UP", "i-3":"UP", "i-4":"STARTING" }   BECAUSE the ASG raises capacity from 3 toward its max 6
+//    -> input  : capacity = 3
+//    <- output : instances = { "i-1":"UP", "i-2":"UP", "i-3":"UP", "i-4":"STARTING" }   BECAUSE the ASG raises capacity from 3 toward its max 6
 //    step 3 · ELB adds the new VM to rotation   // capacity : 3 -> 4   BECAUSE the load balancer registers i-4
+//    -> input  : instances has i-4 "STARTING"
+//    <- output : capacity = 4   BECAUSE the load balancer registers i-4
 // <- outcome : instances = 4 · min 2, max 6  BECAUSE the ASG scales VM instances from the same AMI catalog:2.3.0`
   },
   concepts: {

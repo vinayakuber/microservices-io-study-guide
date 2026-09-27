@@ -24,14 +24,24 @@ registerChapter({
 // DEF: create_order · CALLED BY: U1 placing an order (FTGO OrderService)
 // -> order_id : "PO-2001" · -> event : "OrderCreated"
 //    step 1 · SVC writes the order locally      : orders : {} -> { "PO-2001": { status: "CREATED" } }
+//    -> input  : orders = {}
+//    <- output : orders = { "PO-2001": { status: "CREATED" } }   BECAUSE the order service persists the new order locally
 //    step 2 · SVC publishes the event to BRK    : channel : [] -> [ "OrderCreated(PO-2001)" ]
+//    -> input  : channel = [] (event = "OrderCreated")
+//    <- output : channel = [ "OrderCreated(PO-2001)" ]   BECAUSE the order service publishes the domain event to the channel
 //    step 3 · SVC returns immediately           : reply : "NONE"  BECAUSE a notification sends no reply
+//    -> input  : reply = "none" (no reply is expected)
+//    <- output : reply = "NONE"   BECAUSE a notification sends no reply
 // <- event : "OrderCreated(PO-2001)" sits in the channel, waiting for CON
 //
 // DEF: consume · CALLED BY: CON polling BRK whenever it is ready
 // -> poll : channel = [ "OrderCreated(PO-2001)" ]
 //    step 1 · CON receives the message          : channel : [ "OrderCreated(PO-2001)" ] -> []
+//    -> input  : channel = [ "OrderCreated(PO-2001)" ]
+//    <- output : channel = []   BECAUSE the consumer polls the broker and takes the message off the channel
 //    step 2 · CON starts cooking the order      : kitchen : {} -> { "PO-2001": "COOKING" }
+//    -> input  : kitchen = {}
+//    <- output : kitchen = { "PO-2001": "COOKING" }   BECAUSE the consumer handles the received message by starting the order
 // <- message : "OrderCreated(PO-2001)" consumed · SVC and CON never run at the same instant`
     },
     {
@@ -53,9 +63,17 @@ registerChapter({
 // DEF: request_price · CALLED BY: CLIENT needing a price now
 // -> request : { id: "REQ-77", reply_to: "reply_channel", body: "get price" }
 //    step 1 · CLIENT sends the request to BRK   : request_channel : [] -> [ "REQ-77:get price" ]
+//    -> input  : request_channel = [] (request = { id: "REQ-77", reply_to: "reply_channel", body: "get price" })
+//    <- output : request_channel = [ "REQ-77:get price" ]   BECAUSE the client writes the request message to the request channel
 //    step 2 · SVC receives and processes it     : request_channel : [ "REQ-77:get price" ] -> []
+//    -> input  : request_channel = [ "REQ-77:get price" ]
+//    <- output : request_channel = []   BECAUSE the provider takes the request off the channel and processes it
 //    step 3 · SVC replies on the reply channel  : reply_channel : [] -> [ "REQ-77:42.50" ]
+//    -> input  : reply_channel = [] (reply = "42.50" for id "REQ-77")
+//    <- output : reply_channel = [ "REQ-77:42.50" ]   BECAUSE the provider answers on the reply-to channel
 //    step 4 · CLIENT reads its reply            : reply_channel : [ "REQ-77:42.50" ] -> []
+//    -> input  : reply_channel = [ "REQ-77:42.50" ]
+//    <- output : reply_channel = []   BECAUSE the client takes the reply off the reply channel; id "REQ-77" matches its request
 // <- reply : "42.50" delivered to CLIENT · id "REQ-77" matches the request
 //    alt no reply : CLIENT keeps waiting  BECAUSE both sides must be available for the duration`
     },
@@ -78,9 +96,17 @@ registerChapter({
 // DEF: publish_order_created · CALLED BY: PUB after an order is created
 // -> event : "OrderCreated(PO-2001)"
 //    step 1 · PUB publishes once to the topic   : topic["orders"] : [] -> [ "OrderCreated(PO-2001)" ]
+//    -> input  : topic["orders"] = []
+//    <- output : topic["orders"] = [ "OrderCreated(PO-2001)" ]   BECAUSE the publisher writes one message to the topic
 //    step 2 · BRK fans out to the first reader  : inbox_billing : [] -> [ "OrderCreated(PO-2001)" ]
+//    -> input  : inbox_billing = []
+//    <- output : inbox_billing = [ "OrderCreated(PO-2001)" ]   BECAUSE the broker delivers one copy to each subscriber
 //    step 3 · BRK copies to the second reader   : inbox_kitchen : [] -> [ "OrderCreated(PO-2001)" ]
+//    -> input  : inbox_kitchen = []
+//    <- output : inbox_kitchen = [ "OrderCreated(PO-2001)" ]   BECAUSE the broker delivers one copy to each subscriber
 //    step 4 · the topic drains after fan-out    : topic["orders"] : [ "OrderCreated(PO-2001)" ] -> []
+//    -> input  : topic["orders"] = [ "OrderCreated(PO-2001)" ]
+//    <- output : topic["orders"] = []   BECAUSE fan-out is complete once every subscriber has its copy
 // <- delivery : 2 copies of "OrderCreated(PO-2001)" · zero subscribers would mean 0 copies
 //    alt reader down : BRK holds its copy  BECAUSE the broker buffers per subscriber`
     },
@@ -102,15 +128,27 @@ registerChapter({
 // DEF: publish_while_down · CALLED BY: SVC publishing 5 orders while CON is down
 // -> count : 5
 //    step 1 · CON goes down                     : con_status : "UP" -> "DOWN"
+//    -> input  : con_status = "UP"
+//    <- output : con_status = "DOWN"   BECAUSE the consumer is taken down for maintenance
 //    step 2 · SVC publishes order 1             : queue : [] -> [ 1 ]
+//    -> input  : queue = []
+//    <- output : queue = [ 1 ]   BECAUSE the publisher keeps sending while the consumer is down
 //    step 3 · SVC publishes orders 2 to 5       : queue : [ 1 ] -> [ 1, 2, 3, 4, 5 ]
+//    -> input  : queue = [ 1 ]
+//    <- output : queue = [ 1, 2, 3, 4, 5 ]   BECAUSE the publisher keeps sending orders 2 through 5 while the consumer is down
 //    step 4 · SVC is not blocked                BECAUSE the broker buffers messages until the consumer can process them
+//    -> input  : queue = [ 1, 2, 3, 4, 5 ] (SVC is not waiting on CON)
+//    <- output : blocked = "false"   BECAUSE the broker buffers messages until the consumer can process them
 // <- queue : [ 1, 2, 3, 4, 5 ] held while con_status stays "DOWN"
 //
 // DEF: drain_on_reconnect · CALLED BY: CON reconnecting
 // -> reconnect : "true"
 //    step 1 · CON comes back up                 : con_status : "DOWN" -> "UP"
+//    -> input  : con_status = "DOWN"
+//    <- output : con_status = "UP"   BECAUSE the consumer reconnects after maintenance
 //    step 2 · CON drains the queue              : queue : [ 1, 2, 3, 4, 5 ] -> []
+//    -> input  : queue = [ 1, 2, 3, 4, 5 ]
+//    <- output : queue = []   BECAUSE the reconnected consumer processes every buffered message
 // <- delivery : 5 messages delivered after reconnect · availability bought with the cost of running a broker`
     }
   ],
@@ -265,9 +303,17 @@ registerChapter({
 // DEF: publish_consume · CALLED BY: PUB after creating order "PO-2001"
 // -> order_id : "PO-2001" · -> event : "OrderCreated"
 //    step 1 · PUB builds the message    message : "none" -> "OrderCreated(PO-2001)"
+//    -> input  : order_id = "PO-2001" (event = "OrderCreated")
+//    <- output : message = "OrderCreated(PO-2001)"   BECAUSE the producer builds the message from the order it created
 //    step 2 · PUB publishes to the channel    channel : [] -> [ "OrderCreated(PO-2001)" ]
+//    -> input  : channel = []
+//    <- output : channel = [ "OrderCreated(PO-2001)" ]   BECAUSE the producer writes the message to the channel and returns at once
 //    step 3 · BRK delivers a copy to CON's inbox    inbox : [] -> [ "OrderCreated(PO-2001)" ]
+//    -> input  : inbox = []
+//    <- output : inbox = [ "OrderCreated(PO-2001)" ]   BECAUSE the broker transports the message to the subscriber's mailbox
 //    step 4 · CON consumes and handles it    kitchen : {} -> { "PO-2001": "COOKING" }   BECAUSE the receiver reads the channel and handles the message
+//    -> input  : kitchen = {}
+//    <- output : kitchen = { "PO-2001": "COOKING" }   BECAUSE the receiver reads the channel and handles the message
 // <- outcome : CON handled "OrderCreated(PO-2001)" · PUB returned at once, no reply   BECAUSE sender and receiver never run at the same instant`
   },
   concepts: {

@@ -23,8 +23,14 @@ registerChapter({
 // DEF: place_order · CALLED BY: a client of Order Service
 // -> order_id : "ORD-4007"
 //    step 1 · create order : order.id : "" -> "ORD-4007"  BECAUSE the service records the incoming order
+//    -> input  : order.id = "" (order_id = "ORD-4007")
+//    <- output : order.id = "ORD-4007"   BECAUSE the service records the incoming order
 //    step 2 · start cooking : order.ticket : "" -> "T-88"  BECAUSE Order Service invokes Kitchen Service to create a ticket
+//    -> input  : order.ticket = "" (order.id = "ORD-4007")
+//    <- output : order.ticket = "T-88"   BECAUSE Order Service invokes Kitchen Service to create a ticket
 //    step 3 · record the call : calls : [] -> ["KitchenService.createTicket"]  BECAUSE the outbound call must be tracked for the test
+//    -> input  : calls = [] (order.ticket = "T-88")
+//    <- output : calls = ["KitchenService.createTicket"]   BECAUSE the outbound call must be tracked for the test
 // <- order : {"id":"ORD-4007","state":"PENDING","ticket":"T-88"} · calls.length : 1
 //    alt another order : order.id : "ORD-4007" -> "ORD-4008"  BECAUSE a second scenario starts a fresh order`
     },
@@ -45,8 +51,14 @@ registerChapter({
 // DEF: run_e2e · CALLED BY: TST to verify an order flows through the system
 // -> order_id : "ORD-4007"
 //    step 1 · launch all : launched : [] -> ["OrderService","KitchenService","DeliveryService"]  BECAUSE the test must start every service the flow touches
+//    -> input  : launched = [] (order_id = "ORD-4007")
+//    <- output : launched = ["OrderService","KitchenService","DeliveryService"]   BECAUSE the test must start every service the flow touches
 //    step 2 · configure : checks : 0 -> 1  BECAUSE the test wires each service's data and config before running
+//    -> input  : checks = 0 (launched = ["OrderService","KitchenService","DeliveryService"])
+//    <- output : checks = 1   BECAUSE the test wires each service's data and config before running
 //    step 3 · one flake fails all : launched : ["OrderService","KitchenService","DeliveryService"] -> ["OrderService","KitchenService","DeliveryService","FAILED:DeliveryService"]  BECAUSE one flaky service fails the whole run
+//    -> input  : launched = ["OrderService","KitchenService","DeliveryService"] (checks = 1)
+//    <- output : launched = ["OrderService","KitchenService","DeliveryService","FAILED:DeliveryService"]   BECAUSE one flaky service fails the whole run
 // <- launched.length : 4 · result : "brittle"  BECAUSE the test depends on every service being up
 //    alt isolated test : launched : ["OrderService","KitchenService","DeliveryService","FAILED:DeliveryService"] -> ["OrderService"]  BECAUSE a component test starts only the service under test`
     },
@@ -73,8 +85,14 @@ registerChapter({
 // DEF: test_in_isolation · CALLED BY: the service component test
 // -> order_id : "ORD-4007"
 //    step 1 · stub the dependency : double.createTicket : "" -> "T-88"  BECAUSE the test double returns a fixed ticket instead of a real Kitchen Service
+//    -> input  : double.createTicket = "" (dep = "KitchenService")
+//    <- output : double.createTicket = "T-88"   BECAUSE the test double returns a fixed ticket instead of a real Kitchen Service
 //    step 2 · drive the service : order.id : "" -> "ORD-4007"  BECAUSE the test calls Order Service directly, not over the network
+//    -> input  : order.id = "" (order_id = "ORD-4007")
+//    <- output : order.id = "ORD-4007"   BECAUSE the test calls Order Service directly, not over the network
 //    step 3 · assert : ticket_seen : "" -> "T-88"  BECAUSE the service read the double's reply
+//    -> input  : ticket_seen = "" (double.createTicket = "T-88")
+//    <- output : ticket_seen = "T-88"   BECAUSE the service read the double's reply
 // <- order : {"id":"ORD-4007","state":"PENDING"} · double.createTicket : "T-88" · real_dep not launched
 //    alt double drifts : double.createTicket : "T-88" -> "T-99"  BECAUSE the double now returns a shape the real service no longer returns
 //       ticket_seen : "T-88" -> "T-99"  BECAUSE the test now trusts a stale reply, hiding a production mismatch`
@@ -99,8 +117,14 @@ registerChapter({
 // DEF: run_suite · CALLED BY: the pipeline, then compared against production
 // -> suite : "order-service-component"
 //    step 1 · run in isolation : test_result : "" -> "green"  BECAUSE testing one service is fast, reliable, and cheap
+//    -> input  : test_result = "" (suite = "order-service-component")
+//    <- output : test_result = "green"   BECAUSE testing one service is fast, reliable, and cheap
 //    step 2 · double is stale : drift : false -> true  BECAUSE the double still returns an old Kitchen Service reply shape
+//    -> input  : drift = false (test_result = "green")
+//    <- output : drift = true   BECAUSE the double still returns an old Kitchen Service reply shape
 //    step 3 · deploy : prod_result : "" -> "red"  BECAUSE the real Kitchen Service changed and the test never caught it
+//    -> input  : prod_result = "" (drift = true)
+//    <- output : prod_result = "red"   BECAUSE the real Kitchen Service changed and the test never caught it
 // <- test_result : "green" · prod_result : "red"  BECAUSE tests can pass while the application fails in production
 //    alt doubles stay faithful : drift : true -> false  BECAUSE the doubles are kept in sync with the invoked services' contracts
 //       prod_result : "red" -> "green"  BECAUSE the test now mirrors the real behavior`
@@ -194,9 +218,17 @@ registerChapter({
 // DEF: run_component_test · CALLED BY: TST exercising SVC in isolation
 // -> order_id : "ORD-4007"
 //    step 1 · DBLE is primed with the canned ticket    double.createTicket : "" -> "T-88"
+//    -> input  : double.createTicket = "" (dep = "KitchenService.createTicket")
+//    <- output : double.createTicket = "T-88"   BECAUSE the double is primed with the fixed ticket
 //    step 2 · TST calls SVC in-process    order.id : "" -> "ORD-4007"  BECAUSE the harness drives the service directly, not over the network
+//    -> input  : order.id = "" (order_id = "ORD-4007")
+//    <- output : order.id = "ORD-4007"   BECAUSE the harness drives the service directly, not over the network
 //    step 3 · SVC invokes DBLE and records the call    calls : [] -> ["KitchenService.createTicket"]
+//    -> input  : calls = [] (order.id = "ORD-4007")
+//    <- output : calls = ["KitchenService.createTicket"]   BECAUSE the service records its outbound call to the double
 //    step 4 · SVC reads the double's reply    order.ticket : "" -> "T-88"  BECAUSE the stubbed dependency returns the fixed ticket
+//    -> input  : order.ticket = "" (double.createTicket = "T-88")
+//    <- output : order.ticket = "T-88"   BECAUSE the stubbed dependency returns the fixed ticket
 // <- outcome : order {"id":"ORD-4007","state":"PENDING","ticket":"T-88"} · calls 1 · the real Kitchen Service is never launched`
   },
   concepts: {

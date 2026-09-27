@@ -26,8 +26,14 @@ registerChapter({
 // DEF: read_current_total · CALLED BY: QR asking for the order's current total
 // -> order_id : "O-101"
 //    step 1 · replay order_created    // running : 0.00 -> 120.00  BECAUSE the first event sets the total
+//    -> input  : running = 0.00 (event = {type:"order_created", order_id:"O-101", total:120.00})
+//    <- output : running = 120.00   BECAUSE the first event sets the total
 //    step 2 · replay order_updated    // running : 120.00 -> 95.00  BECAUSE the second event overwrites the total
+//    -> input  : running = 120.00 (event = {type:"order_updated", order_id:"O-101", total:95.00})
+//    <- output : running = 95.00   BECAUSE the second event overwrites the total
 //    step 3 · fold to current state    // current : null -> 95.00
+//    -> input  : current = null (running = 95.00)
+//    <- output : current = 95.00   BECAUSE the folded running total becomes the current state
 // <- current : 95.00  · produced by replaying 2 events, not by reading one row
 //    alt the data lived in a current-state table : one row read returns 95.00 directly -> no replay needed`
     },
@@ -50,8 +56,14 @@ registerChapter({
 // DEF: build_view_schema · CALLED BY: the team shaping the read side
 // -> query : "order history for one customer"
 //    step 1 · choose the store type    // store : "relational" -> "document"  BECAUSE the schema must match the query, and a document or key-value NoSQL store fits
+//    -> input  : store = "relational" (query = "order history for one customer")
+//    <- output : store = "document"   BECAUSE the schema must match the query, and a document or key-value NoSQL store fits
 //    step 2 · denormalize the shape    // doc : {} -> {customer_id:"C-77", orders:[{order_id:"O-101", total:120.00}, {order_id:"O-102", total:80.00}]}
+//    -> input  : doc = {} (query = "order history for one customer")
+//    <- output : doc = {customer_id:"C-77", orders:[{order_id:"O-101", total:120.00}, {order_id:"O-102", total:80.00}]}   BECAUSE the schema is denormalized to answer the query in one read
 //    step 3 · insert the view    // view_db : {} -> {"order_history":{customer_id:"C-77", orders:[{order_id:"O-101", total:120.00}, {order_id:"O-102", total:80.00}]}}
+//    -> input  : view_db = {} (doc = {customer_id:"C-77", orders:[{order_id:"O-101", total:120.00}, {order_id:"O-102", total:80.00}]})
+//    <- output : view_db = {"order_history":{customer_id:"C-77", orders:[{order_id:"O-101", total:120.00}, {order_id:"O-102", total:80.00}]}}   BECAUSE the denormalized document is inserted as the view
 // <- view_db : {"order_history":{customer_id:"C-77", orders:[{order_id:"O-101", total:120.00}, {order_id:"O-102", total:80.00}]}}  · one document read answers the whole query
 //    alt the read side reused a relational schema : the same query would need a multi-table JOIN across service-owned tables`
     },
@@ -76,8 +88,14 @@ registerChapter({
 // DEF: change_order_total · CALLED BY: WR receiving a command
 // -> command : {"order_id":"O-101", "total":95.00}
 //    step 1 · update the write side    // write_db : {"O-101":{total:120.00}} -> {"O-101":{total:95.00}}
+//    -> input  : write_db = {"O-101":{total:120.00}} (command = {"order_id":"O-101", "total":95.00})
+//    <- output : write_db = {"O-101":{total:95.00}}   BECAUSE the command updates the source of truth
 //    step 2 · publish a domain event    // outbox : [] -> [{"type":"order_updated","order_id":"O-101","total":95.00}]
+//    -> input  : outbox = [] (write_db = {"O-101":{total:95.00}})
+//    <- output : outbox = [{"type":"order_updated","order_id":"O-101","total":95.00}]   BECAUSE the change is published as a domain event
 //    step 3 · RD subscribes and updates the view    // view_db : {"O-101":{total:120.00}} -> {"O-101":{total:95.00}}
+//    -> input  : view_db = {"O-101":{total:120.00}} (event = {"type":"order_updated","order_id":"O-101","total":95.00})
+//    <- output : view_db = {"O-101":{total:95.00}}   BECAUSE the read side applies the subscribed event to its replica
 // <- view_db : {"O-101":{total:95.00}}  · the replica caught up to the write side via the event
 //    alt the event is delayed : view_db stays at {"O-101":{total:120.00}} -> the view is eventually consistent, not instant`
     },
@@ -102,8 +120,14 @@ registerChapter({
 // DEF: measure_lag · CALLED BY: RD watching its own staleness
 // -> event : {"type":"order_updated","order_id":"O-101","total":95.00}   // published but not yet consumed by RD
 //    step 1 · event sits in the broker queue    // lag : 0 -> 2  BECAUSE the event waits before RD processes it
+//    -> input  : lag = 0 (event = {"type":"order_updated","order_id":"O-101","total":95.00})
+//    <- output : lag = 2   BECAUSE the event waits before RD processes it
 //    step 2 · RD processes the event    // view_db : {"O-101":{total:120.00}} -> {"O-101":{total:95.00}}
+//    -> input  : view_db = {"O-101":{total:120.00}} (event = {"type":"order_updated","order_id":"O-101","total":95.00})
+//    <- output : view_db = {"O-101":{total:95.00}}   BECAUSE the handler applies the new total to the view row
 //    step 3 · the view catches up    // lag : 2 -> 0  BECAUSE the replica now matches the write side
+//    -> input  : lag = 2 (view_db = {"O-101":{total:95.00}})
+//    <- output : lag = 0   BECAUSE the replica now matches the write side
 // <- view_db : {"O-101":{total:95.00}}  after a 2-second lag
 //    alt a reader queries during the lag : it reads 120.00 from view_db -> the reader sees an older total than the write side holds`
     }
@@ -258,8 +282,14 @@ registerChapter({
 // DEF: update_order · CALLED BY: SVC when the customer changes order O-101
 // -> order_id : "O-101"
 //    step 1 · SVC appends order_updated to the event store   // events : [] -> ["order_created","order_updated"]   BECAUSE the command side writes events, not tables
+//    -> input  : events = [] (command = update_order, order_id = "O-101")
+//    <- output : events = ["order_created","order_updated"]   BECAUSE the command side writes events, not tables
 //    step 2 · ES publishes the event to the broker, OH folds it in   // view["O-101"].total : 120.00 -> 95.00   BECAUSE the projector subtracts the change from the old total
+//    -> input  : view["O-101"].total = 120.00 (event = order_updated {"total":95.00})
+//    <- output : view["O-101"].total = 95.00   BECAUSE the projector subtracts the change from the old total
 //    step 3 · VDB stores the updated view and serves the query   // query : 0 -> 1   BECAUSE the query side reads its own materialized view
+//    -> input  : query = 0 (view["O-101"].total = 95.00)
+//    <- output : query = 1   BECAUSE the query side reads its own materialized view
 // <- outcome : view["O-101"].total = 95.00 · a command wrote once, a projection read once, the write and read models stay separate`
   },
   concepts: {

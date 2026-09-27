@@ -28,9 +28,17 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 6 · microservices
 // DEF: registerUser · CALLED BY: a new user signing up (RestTemplate.postForEntity)
 // -> email : "ada@example.com" · -> password : "s3cret"
 //    step 1 · CLIENT POSTs the request to SVC  : request : null -> { email: "ada@example.com", password: "s3cret" }
+//    -> input  : request = null (email = "ada@example.com", password = "s3cret")
+//    <- output : request = { email: "ada@example.com", password: "s3cret" }   BECAUSE the client builds and POSTs the request to the remote service
 //    step 2 · SVC creates the user and answers : status : "PENDING" -> 200
+//    -> input  : status = "PENDING" (request = { email: "ada@example.com", password: "s3cret" })
+//    <- output : status = 200   BECAUSE the remote service creates the user and returns a success status
 //    step 3 · CLIENT reads the status code     : verdict : "UNSET" -> "OK"
+//    -> input  : status = 200
+//    <- output : verdict = "OK"   BECAUSE the client inspects the HTTP status code of the response
 //    step 4 · CLIENT returns the new id        : result : null -> "user-9"
+//    -> input  : verdict = "OK"
+//    <- output : result = "user-9"   BECAUSE a 200 OK yields the new id, wrapped as Right(id)
 // <- reply : "user-9" (Right) · one request, one prompt reply over HTTP
 ```
 
@@ -56,9 +64,17 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 6 · microservices
 // DEF: registerUser_duplicate · CALLED BY: the same email signing up twice
 // -> email : "ada@example.com" · -> password : "s3cret"
 //    step 1 · CLIENT POSTs the request again    : request : null -> { email: "ada@example.com" }
+//    -> input  : request = null (email = "ada@example.com")
+//    <- output : request = { email: "ada@example.com" }   BECAUSE the same email signs up a second time
 //    step 2 · SVC finds the email already taken : status : "PENDING" -> 409
+//    -> input  : status = "PENDING" (request = { email: "ada@example.com" })
+//    <- output : status = 409   BECAUSE the email is already taken, so the service rejects the call with CONFLICT
 //    step 3 · CLIENT matches the 409            : verdict : "UNSET" -> "CONFLICT"
+//    -> input  : status = 409
+//    <- output : verdict = "CONFLICT"   BECAUSE the proxy inspects the status code and recognizes the CONFLICT
 //    step 4 · CLIENT returns the typed error    : result : null -> "DuplicateRegistrationError"
+//    -> input  : verdict = "CONFLICT"
+//    <- output : result = "DuplicateRegistrationError"   BECAUSE an HttpClientErrorException with CONFLICT becomes Left(DuplicateRegistrationError)
 // <- reply : "DuplicateRegistrationError" (Left) · the 409 becomes a domain error
 //    alt SVC down : no reply at all  BECAUSE client and service must both be available for the whole call
 ```
@@ -84,9 +100,17 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 6 · microservices
 // DEF: registerUser_unavailable · CALLED BY: a sign-up while SVC is unresponsive
 // -> request : { email: "ada@example.com" }
 //    step 1 · CLIENT blocks its thread on the call : thread : "FREE" -> "WAITING"
+//    -> input  : thread = "FREE" (request = { email: "ada@example.com" })
+//    <- output : thread = "WAITING"   BECAUSE the caller thread is held while it waits for the reply
 //    step 2 · SVC is down, so no reply arrives     : elapsed_ms : 0 -> 800
+//    -> input  : elapsed_ms = 0
+//    <- output : elapsed_ms = 800   BECAUSE the service is down, so the call waits out the full timeout window
 //    step 3 · the timer expires and the call fails : verdict : "UNSET" -> "TIMEOUT"
+//    -> input  : verdict = "UNSET" (elapsed_ms = 800 = timeout_ms)
+//    <- output : verdict = "TIMEOUT"   BECAUSE the timeout of 800 ms expires before any reply arrives
 //    step 4 · the thread is released               : thread : "WAITING" -> "FREE"
+//    -> input  : thread = "WAITING"
+//    <- output : thread = "FREE"   BECAUSE the failed call finally returns and frees the caller thread
 // <- reply : "TIMEOUT" after 800 ms · 800 ms of the caller thread spent waiting
 //    alt SVC slow but alive : the reply arrives late  BECAUSE there is no broker to buffer the work
 ```
@@ -113,9 +137,17 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 6 · microservices
 // DEF: resolve_and_call · CALLED BY: CLIENT before its first call
 // -> service_name : "user-registration"
 //    step 1 · CLIENT asks DISC for an instance   : lookup : null -> "user-registration"
+//    -> input  : service_name = "user-registration" (registry = { "user-registration": "10.0.0.7:8080" })
+//    <- output : lookup = "user-registration"   BECAUSE the client needs to discover the location of a service instance
 //    step 2 · DISC returns a network location    : location : null -> "10.0.0.7:8080"
+//    -> input  : registry = { "user-registration": "10.0.0.7:8080" } (lookup = "user-registration")
+//    <- output : location = "10.0.0.7:8080"   BECAUSE the service registry resolves the service name to a network location
 //    step 3 · CLIENT builds the URL              : url : null -> "http://10.0.0.7:8080/register"
+//    -> input  : location = "10.0.0.7:8080"
+//    <- output : url = "http://10.0.0.7:8080/register"   BECAUSE the network location supplies the user_registration_url
 //    step 4 · CLIENT invokes SVC behind a breaker : request : null -> { email: "ada@example.com" }
+//    -> input  : url = "http://10.0.0.7:8080/register" (request = null)
+//    <- output : request = { email: "ada@example.com" }   BECAUSE the client invokes the service behind a circuit breaker to improve reliability
 // <- reply : "user-9" · the URL came from discovery, the call rides behind a circuit breaker
 //    alt breaker open : the call fails fast without touching SVC  BECAUSE a client typically uses a Circuit Breaker
 ```
@@ -163,9 +195,17 @@ _Role: server_
 // DEF: place_registration · CALLED BY: CLIENT after the user submits an email
 // -> email : "bob@example.com" · -> service_name : "user-registration"
 //    step 1 · CLIENT calls the stub : request : {} -> { email: "bob@example.com" }
+//    -> input  : request = {} (email = "bob@example.com")
+//    <- output : request = { email: "bob@example.com" }   BECAUSE the caller builds the request and hands it to the client proxy
 //    step 2 · STUB serializes over HTTP : status : "PENDING" -> "IN_FLIGHT"
+//    -> input  : status = "PENDING" (request = { email: "bob@example.com" })
+//    <- output : status = "IN_FLIGHT"   BECAUSE the client proxy serializes the request onto the HTTP transport
 //    step 3 · SVC runs the logic and stores the row : reply : "none" -> "user-14"
+//    -> input  : request = { email: "bob@example.com" } (reply = "none")
+//    <- output : reply = "user-14"   BECAUSE the server skeleton runs the business logic and returns the new id
 //    step 4 · STUB deserializes and returns the reply : status : "IN_FLIGHT" -> "DONE"
+//    -> input  : reply = "user-14" (status = "IN_FLIGHT")
+//    <- output : status = "DONE"   BECAUSE the client proxy deserializes the reply and hands it back to the caller
 // <- reply : "user-14" · the caller reads its answer on the same synchronous connection
 //    alt service down : the call hangs or fails fast  BECAUSE both ends must be alive for the whole interaction
 ```

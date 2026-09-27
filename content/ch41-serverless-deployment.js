@@ -23,8 +23,14 @@ registerChapter({
 // DEF: deploy handler with memory 128 · CALLED BY: DEV uploading a ZIP
 // -> code : "restaurant.zip" · -> handler : "index.handler" · -> memory : 128
 //    step 1 · upload · function : null -> "restaurant"        BECAUSE the infrastructure takes your code and runs it
+//    -> input  : code = "restaurant.zip"
+//    <- output : function = "restaurant"   BECAUSE the infrastructure takes your code and runs it
 //    step 2 · describe · limits : {} -> {"memory":128}        // you specify resource limits, not servers
+//    -> input  : memory = 128
+//    <- output : limits = {"memory":128}   BECAUSE you specify resource limits, not servers
 //    step 3 · register · handler : null -> "index.handler"    // the name of the function that handles events
+//    -> input  : handler = null
+//    <- output : handler = "index.handler"   BECAUSE the name of the function that handles events
 // <- function : "restaurant"  · no OS, VM, or container is managed by anyone on your team
 //    alt new version : code : "restaurant.zip" -> "restaurant-v2.zip"   BECAUSE a redeploy uploads a fresh ZIP`
     },
@@ -45,8 +51,14 @@ registerChapter({
 // DEF: react to S3 object 1 · CALLED BY: LAMBDA when an object is created
 // -> event : "object-created" · -> key : "photo-7.jpg"
 //    step 1 · find idle instance · instances : {} -> {"i-1"}   BECAUSE Lambda finds an idle instance, launching one if none exist
+//    -> input  : event = "object-created" (key = "photo-7.jpg")
+//    <- output : instances = {"i-1"}   BECAUSE Lambda finds an idle instance, launching one if none exist
 //    step 2 · invoke · handler_runs : 0 -> 1                   // the handler function receives the event
+//    -> input  : instances = {"i-1"}
+//    <- output : handler_runs = 1   BECAUSE the handler function receives the event
 //    step 3 · isolate · containers : 0 -> 1                    // under the covers a container isolates this instance
+//    -> input  : instances = {"i-1"}
+//    <- output : containers = 1   BECAUSE under the covers a container isolates this instance
 // <- handler_runs : 1  · the function handled event "object-created" for "photo-7.jpg"
 //    alt no idle instance : instances : {} -> {"i-1"}  BECAUSE Lambda launches a fresh instance when none are available, which adds startup latency`
     },
@@ -67,8 +79,14 @@ registerChapter({
 // DEF: route GET /restaurants/42 · CALLED BY: CLIENT
 // -> method : "GET" · -> path : "/restaurants/42"
 //    step 1 · transform · http : {} -> {"method":"GET","path":"/restaurants/42"}  BECAUSE the gateway turns the HTTP request into an event object
+//    -> input  : method = "GET" (path = "/restaurants/42")
+//    <- output : http = {"method":"GET","path":"/restaurants/42"}   BECAUSE the gateway turns the HTTP request into an event object
 //    step 2 · invoke · http : {"method":"GET","path":"/restaurants/42"} -> "handled"  // the event is passed to the lambda
+//    -> input  : http = {"method":"GET","path":"/restaurants/42"}
+//    <- output : http = "handled"   BECAUSE the event is passed to the lambda
 //    step 3 · respond · response : null -> {"status":200}                            // the gateway builds an HTTP response from the result
+//    -> input  : http = "handled"
+//    <- output : response = {"status":200}   BECAUSE the gateway builds an HTTP response from the result
 // <- response : {"status":200}  · one HTTP call became one event and one reply
 //    alt error path : response : null -> {"status":500}   BECAUSE the function returned an error result`
     },
@@ -90,8 +108,14 @@ registerChapter({
 // DEF: bill invocation of 300 ms · CALLED BY: LAMBDA after each handler run
 // -> duration_ms : 300 · -> memory : 128
 //    step 1 · bucket · increments : 0 -> 3          // 300 ms / 100 ms = 3 increments  BECAUSE duration is measured in 100 ms increments
+//    -> input  : duration_ms = 300
+//    <- output : increments = 3   BECAUSE duration is measured in 100 ms increments
 //    step 2 · price · bill : 0 -> 3                 // the cost is a function of duration and the memory consumed
+//    -> input  : increments = 3 (memory = 128)
+//    <- output : bill = 3   BECAUSE the cost is a function of duration and the memory consumed
 //    step 3 · react · latency : 0 -> 350            // provisioning plus initialization can add latency on a spike
+//    -> input  : bill = 3
+//    <- output : latency = 350   BECAUSE provisioning plus initialization can add latency on a spike
 // <- bill : 3 units  · latency : 350 ms  · pay per request, but you cannot pre-provision capacity
 //    alt steady load : latency : 350 -> 10   BECAUSE a warm idle instance is found, so no startup cost`
     }
@@ -239,9 +263,17 @@ registerChapter({
 // DEF: route_one_request · CALLED BY: CLIENT calling GET /restaurants/42
 // -> method : "GET" · -> path : "/restaurants/42"
 //    step 1 · GW transforms the HTTP request into an event    request : {} -> {"method":"GET","path":"/restaurants/42"}   BECAUSE the gateway turns HTTP into an event object
+//    -> input  : method = "GET" (path = "/restaurants/42")
+//    <- output : request = {"method":"GET","path":"/restaurants/42"}   BECAUSE the gateway turns HTTP into an event object
 //    step 2 · RT loads the ZIP and cold-starts an instance    instances : {} -> {"i-1"}   // the runtime launches one when none are idle
+//    -> input  : zip = "restaurant.zip"
+//    <- output : instances = {"i-1"}   BECAUSE the runtime launches one when none are idle
 //    step 3 · RT invokes the handler with the event    runs : 0 -> 1   // handler "index.handler" runs the event
+//    -> input  : instances = {"i-1"} (handler = "index.handler")
+//    <- output : runs = 1   BECAUSE handler "index.handler" runs the event
 //    step 4 · GW creates the response from the result    response : "" -> "200"   // the gateway returns an HTTP response
+//    -> input  : runs = 1
+//    <- output : response = "200"   BECAUSE the gateway returns an HTTP response
 // <- response : "200" · one HTTP call became one event, one run, and one reply   BECAUSE the gateway and runtime hide every server`
   },
   concepts: {

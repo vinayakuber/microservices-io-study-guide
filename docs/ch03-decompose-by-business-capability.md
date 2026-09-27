@@ -28,8 +28,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 3 · microservices
 // DEF: change · CALLED BY: DEV changing the tax rule
 // -> rule : "tax_rule"
 //    step 1 · locate the owning service : owner : "unknown" -> "SVC_O"   BECAUSE the rule is packaged with the code that changes with it (CCP)
+//    -> input  : owner = "unknown"
+//    <- output : owner = "SVC_O"   BECAUSE the rule is packaged with the code that changes with it (CCP)
 //    step 2 · edit only that service : change_impact["SVC_O"] : 0 -> 1
+//    -> input  : change_impact["SVC_O"] = 0
+//    <- output : change_impact["SVC_O"] = 1   BECAUSE only the owning service is edited
 //    step 3 · coordinate one team : teams_to_coordinate : 0 -> 1
+//    -> input  : teams_to_coordinate = 0
+//    <- output : teams_to_coordinate = 1   BECAUSE a single-service change needs one team
 // <- services_touched : 1 · teams_to_coordinate : 1
 //    alt rule scattered across 3 services : services_touched : 1 -> 3 (three teams must coordinate)
 ```
@@ -56,9 +62,20 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 3 · microservices
 // DEF: decompose · CALLED BY: ARC mapping the online store's capabilities to services
 // -> capability_set : ["product_catalog","inventory","order","delivery"]
 //    step 1 · one service per capability : services : [] -> ["catalog","inventory","order","delivery"]
+//    -> input  : services = [] (0 services)
+//    <- output : services = ["catalog","inventory","order","delivery"]   BECAUSE each capability becomes one service
 //    step 2 · attach the business object each capability manages : owners : {} -> {"catalog":"Product","inventory":"Stock","order":"Order","delivery":"Shipment"}
+//    -> input  : owners = {} (empty)
+//    <- output : owners = {"catalog":"Product","inventory":"Stock","order":"Order","delivery":"Shipment"}   BECAUSE each capability maps to its business object
 //    step 3 · place them under a top-level capability category : category : "none" -> "Product/Service delivery"   BECAUSE capabilities form a multi-level hierarchy
+//    -> input  : category = "none"
+//    <- output : category = "Product/Service delivery"   BECAUSE capabilities form a multi-level hierarchy
 //    step 4 · a client query is served by the owning service : query "GET /products/P-1" -> served by "catalog"   BECAUSE owners maps Product -> catalog
+//    -> input  : query = "GET /products/P-1", owners = {"catalog":"Product","inventory":"Stock","order":"Order","delivery":"Shipment"}
+//    decode 4a · parse the path to the product key -> key : "none" -> "P-1"
+//    decode 4b · resolve the key to its business object -> object : "none" -> "Product"
+//    decode 4c · look up the owning service -> owner : "unknown" -> "catalog"   BECAUSE owners maps Product -> catalog
+//    <- output : served by "catalog"   BECAUSE owners maps Product -> catalog
 // <- service_count : 4 · each service corresponds to one business capability · queries route to the owning service (read path)
 //    alt merge delivery into order : services : 4 -> 3  (a capability group can map to one service)
 ```
@@ -86,8 +103,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 3 · microservices
 // DEF: size_check · CALLED BY: ORG validating a proposed service boundary
 // -> members : 2
 //    step 1 · grow the team into the 6-10 band : team.members : 2 -> 7   BECAUSE a service must be developable by a two-pizza team of 6-10 people
+//    -> input  : team.members = 2
+//    <- output : team.members = 7   BECAUSE a service must be developable by a two-pizza team of 6-10 people
 //    step 2 · encapsulate the implementation : service_api.exposed : 0 -> 1   BECAUSE loose coupling needs an API the client calls, not internals
+//    -> input  : service_api.exposed = 0
+//    <- output : service_api.exposed = 1   BECAUSE loose coupling needs an API the client calls, not internals
 //    step 3 · confirm the service is testable at its size : testable : "unknown" -> "yes"
+//    -> input  : testable = "unknown"
+//    <- output : testable = "yes"   BECAUSE the 7-member team can test the small service
 // <- verdict : "fits" · 7 members in [6,10] · implementation hidden behind an API
 //    alt team stays at 2 : verdict : "fits" -> "split the service"  (two people cannot own a too-large service)
 ```
@@ -117,8 +140,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 3 · microservices
 // DEF: identify · CALLED BY: ARC deriving capabilities from two starting points
 // -> group : "Warehouse"
 //    step 1 · map an org group to a capability : capabilities : [] -> ["inventory management"]
+//    -> input  : capabilities = [] (0 capabilities)
+//    <- output : capabilities = ["inventory management"]   BECAUSE the Warehouse group corresponds to a capability
 //    step 2 · cross-check the domain model : domain_objects["Order"].capability : "none" -> "order management"   BECAUSE capabilities often correspond to domain objects
+//    -> input  : domain_objects["Order"].capability = "none"
+//    <- output : domain_objects["Order"].capability = "order management"   BECAUSE capabilities often correspond to domain objects
 //    step 3 · record the area of expertise : expertise : "none" -> "warehouse operations"   BECAUSE expertise marks a distinct capability area
+//    -> input  : expertise = "none"
+//    <- output : expertise = "warehouse operations"   BECAUSE expertise marks a distinct capability area
 // <- capabilities : ["inventory management","order management"] · found via org structure + domain model
 //    alt a capability is missed : capabilities : 2 -> 3 on a later pass (identification is iterative)
 ```
@@ -165,9 +194,19 @@ _Role: team (owns the service)_
 // DEF: serve_product · CALLED BY: a client query "GET /products/P-1" routed to the owning capability
 // -> product_id : "P-1"
 //    step 1 · CAP routes the query to the owning service    route : "unknown" -> "catalog"
+//    -> input  : route = "unknown"
+//    <- output : route = "catalog"   BECAUSE the product capability owns the catalog service
 //    step 2 · SVC creates the row in its own DB    products : {} -> { "P-1": {name:"Widget"} }
+//    -> input  : products = {} (empty)
+//    <- output : products = { "P-1": {name:"Widget"} }   BECAUSE the catalog service creates the product row in its own DB
 //    step 3 · SVC reads it back to answer    GET /products/P-1 -> { id:"P-1", name:"Widget" }
+//    -> input  : GET /products/P-1 (read key "P-1")
+//    decode 3a · SVC sends the GET for key P-1 -> request : "none" -> "GET /products/P-1"
+//    decode 3b · the catalog DB looks up the row by id -> row : {} -> { id:"P-1", name:"Widget" }
+//    <- output : { id:"P-1", name:"Widget" }   BECAUSE the catalog service's own DB returns the row it just created
 //    step 4 · TEAM ships the change alone    deploy : "lockstep" -> "single-service"   BECAUSE one team owns one service
+//    -> input  : deploy = "lockstep"
+//    <- output : deploy = "single-service"   BECAUSE one team owns one service
 // <- outcome : client sees "P-1" name "Widget" · one capability, one service, one team
 ```
 
