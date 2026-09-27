@@ -66,6 +66,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.15 (p.114) · micro
 //    tickets : {}                                // owned by Kitchen Service
 // DEF: create-order saga orchestrator · created by ORD when CLIENT POSTs /orders
 // -> order_id : "PO-2001" · -> customer_id : "CUST-7" · -> total : 100.00
+// BUILD PHASE · run once per saga · cost O(n)
 //    step 1 · LT1 on ORD : create the order   // orders : {} -> {"PO-2001":"PENDING"}
 //    -> input  : orders = {}
 //    <- output : orders = {"PO-2001":"PENDING"}   BECAUSE LT1 on ORD creates the order in the PENDING state
@@ -81,6 +82,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.15 (p.114) · micro
 //    step 5 · LT3 on KIT : the ticket is rejected BECAUSE the item is not available   // tickets : {} -> {} (nothing created)
 //    -> input  : tickets = {} (order_id = "PO-2001")
 //    <- output : tickets = {} (nothing created)   BECAUSE the item is not available
+// QUERY PHASE · per failure · cost O(m)
 //    step 6 · KIT replies "ticket_rejected" -> the orchestrator runs the COMPENSATING transactions
 //    -> input  : reply = "none" (ticket_rejected = true)
 //    <- output : reply = "ticket_rejected"   BECAUSE Kitchen Service reports the rejection
@@ -90,6 +92,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.15 (p.114) · micro
 //    step 8 · COMPENSATE LT1 : reject the order   // orders : {"PO-2001":"PENDING"} -> {"PO-2001":"REJECTED"}
 //    -> input  : orders = {"PO-2001":"PENDING"}
 //    <- output : orders = {"PO-2001":"REJECTED"}   BECAUSE the orchestrator rejects the order to compensate
+// COMPLEXITY:
+//    time(build) = O(n) per saga = n forward local transactions (1 order + 1 reserve + 1 ticket) · time(query) = O(m) per failure = m compensations in reverse
+//    space(extra) = O(1) = the saga id + the reserved-set entry
+// TRACE (one run, order "PO-2001", ticket rejected):
+//    phase  | orders                     | customer_credit          | reserved   | tickets
+//    build  | {"PO-2001":"PENDING"}      | {"CUST-7":400.00}        | {"SAGA-1"} | {}
+//    query  | {"PO-2001":"REJECTED"}     | {"CUST-7":500.00}        | {"SAGA-1"} | {}
+// CORRECTNESS (compensation invariant): every forward local transaction has a compensating transaction that undoes it
+//    in reverse order (release credit, then reject the order), so on any failure the saga returns each participant to its pre-saga state.
+// VARIANTS (when to pick which):
+//    orchestration                -> one orchestrator owns the sequence, O(n) forward + O(m) compensation, O(1) extra   (use when you want explicit failure paths)   <- THIS ONE
+//    choreography                 -> events trigger the next step, no coordinator, O(n) forward                             (use when the sequence is simple and stable)
+//    idempotent saga steps        -> each step guarded by the saga id in a seen-set, O(1) per retry                          (use when commands may be retried)
 // <- outcome : "OrderRejected" · order REJECTED, credit fully released, no ticket created
 //    alt success : KIT replies "ticket_created" -> orders : {"PO-2001":"PENDING"} -> {"PO-2001":"APPROVED"} (no compensation)
 //       -> a retried ReserveCredit(saga="SAGA-1") is skipped BECAUSE "SAGA-1" is already in reserved (ON CONFLICT / already-seen guard)
@@ -120,12 +135,14 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.15 (p.114) · micro
 //    credit_events : []
 // DEF: choreographed handler chain · one event carries the saga forward, no orchestrator
 // -> POST /orders : total = 100.00
+// BUILD PHASE · run once per local transaction · cost O(1)
 //    step 1 · LT1 on ORD : create the order   // orders : {} -> {"PO-2001":"PENDING"}
 //    -> input  : orders = {}
 //    <- output : orders = {"PO-2001":"PENDING"}   BECAUSE LT1 on ORD creates the order in the PENDING state
 //    step 2 · ORD publishes "OrderCreated"   // the event triggers the next local transaction in CS
 //    -> input  : event = "none"
 //    <- output : event = "OrderCreated"   BECAUSE ORD publishes the event that triggers the next local transaction in CS
+// QUERY PHASE · per event handler · cost O(1)
 //    step 3 · CS handler receives "OrderCreated" and reserves credit   // customer_credit : {"CUST-7":500.00} -> {"CUST-7":400.00}  BECAUSE 100.00 is reserved
 //    -> input  : customer_credit = {"CUST-7":500.00} (event = "OrderCreated")
 //    <- output : customer_credit = {"CUST-7":400.00}   BECAUSE 100.00 is reserved
@@ -135,6 +152,19 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.15 (p.114) · micro
 //    step 5 · ORD handler receives "CreditReserved" and approves   // orders : {"PO-2001":"PENDING"} -> {"PO-2001":"APPROVED"}
 //    -> input  : orders = {"PO-2001":"PENDING"} (event = "CreditReserved")
 //    <- output : orders = {"PO-2001":"APPROVED"}   BECAUSE ORD approves the order on the CreditReserved event
+// COMPLEXITY:
+//    time(build) = O(1) per local transaction = 1 write + 1 publish · time(query) = O(1) per event handler = 1 receive + 1 write
+//    space(extra) = O(1) = the single in-flight event
+// TRACE (one run, order "PO-2001"):
+//    phase  | orders                  | customer_credit          | credit_events
+//    build  | {"PO-2001":"PENDING"}   | {"CUST-7":500.00}        | []
+//    query  | {"PO-2001":"APPROVED"}  | {"CUST-7":400.00}        | ["CreditReserved"]
+// CORRECTNESS (event-chain invariant): each local transaction publishes exactly one event that names the next step, so
+//    "OrderCreated" triggers the reserve and "CreditReserved" triggers the approve — the chain advances with no central coordinator.
+// VARIANTS (when to pick which):
+//    choreography              -> events trigger the next local transaction, O(1) per event, O(1) space   (use when the sequence is simple and stable)   <- THIS ONE
+//    orchestration             -> one orchestrator sends commands and handles failures, O(n) forward + O(m) compensation   (use when failure paths get complex)
+//    event with saga id        -> tag every event with the saga id, O(1) per event                              (use when many sagas interleave)
 // <- outcome : order "PO-2001" APPROVED · no central coordinator — each event is the trigger for the next step
 ```
 
@@ -228,9 +258,11 @@ _Role: broker_
 //    state     : "NEW"
 // DEF: run_saga · CALLED BY: ORCH receiving "OrderCreated" for PO-77
 // -> command : "reserve credit 100.00 for CUST-7"
+// BUILD PHASE · run once per saga · cost O(1)
 //    step 1 · ORCH orders CS to reserve credit    customers : [("CUST-7", credit 500.00)] -> [("CUST-7", credit 400.00)]   BECAUSE CS debits 100.00 for the reservation
 //    -> input  : customers = [("CUST-7", credit 500.00)] (command = "reserve credit 100.00 for CUST-7")
 //    <- output : customers = [("CUST-7", credit 400.00)]   BECAUSE CS debits 100.00 for the reservation
+// QUERY PHASE · per participant step · cost O(1)
 //    step 2 · CS publishes CreditReserved    events : [] -> [ "OrderCreated", "CreditReserved" ]   BECAUSE the participant publishes its outcome back to the orchestrator
 //    -> input  : events = []
 //    <- output : events = [ "OrderCreated", "CreditReserved" ]   BECAUSE the participant publishes its outcome back to the orchestrator
@@ -240,6 +272,19 @@ _Role: broker_
 //    step 4 · saga completes    state : "NEW" -> "COMPLETED"   BECAUSE every step succeeded with no compensation needed
 //    -> input  : state = "NEW"
 //    <- output : state = "COMPLETED"   BECAUSE every step succeeded with no compensation needed
+// COMPLEXITY:
+//    time(build) = O(1) per saga = 1 state reset to "NEW" · time(query) = O(1) per participant step = 1 command + 1 outcome event
+//    space(extra) = O(1) = the saga state + the last event
+// TRACE (one run, saga SAGA-1):
+//    phase  | customers                    | events                                             | state
+//    build  | [("CUST-7", credit 500.00)]  | []                                                 | "NEW"
+//    query  | [("CUST-7", credit 400.00)]  | ["OrderCreated","CreditReserved","ticket_created"] | "COMPLETED"
+// CORRECTNESS (saga-state invariant): the orchestrator advances state from "NEW" to "COMPLETED" only after each participant
+//    publishes its outcome, and any failed step triggers compensation instead — so the saga never completes with an un-compensated failure.
+// VARIANTS (when to pick which):
+//    orchestrated saga       -> one orchestrator orders steps and compensates, O(n) forward + O(m) compensation, O(1) state   (use for explicit failure paths)   <- THIS ONE
+//    choreographed saga      -> events alone advance the saga, no orchestrator, O(n) forward                                  (use when the flow is simple and stable)
+//    saga with outbox        -> each step writes its event via a transactional outbox, O(1) per step                            (use when a step must not lose its event)
 // <- outcome : state "COMPLETED" for saga SAGA-1 · credit debited 100.00 from CUST-7
 ```
 

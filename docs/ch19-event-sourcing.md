@@ -24,12 +24,14 @@ _Also known as: Chris Richardson · Microservice Patterns · microservices.io /p
 //    state : { orderState:null, customerId:null }
 // DEF: create order · CALLED BY: SVC processing a CreateOrderCommand
 // -> customerId : "C-100" · -> orderTotal : 125.00
+// BUILD PHASE · run once per command at write time · cost O(1)
 //    step 1 · build the event : E1 = OrderCreatedEvent("C-100", 125.00)   // the command becomes an event
 //    -> input  : event = "none" (customerId = "C-100", orderTotal = 125.00)
 //    <- output : event = E1 = OrderCreatedEvent("C-100", 125.00)   BECAUSE the command becomes an event
 //    step 2 · append to the store : events : [] -> [E1:OrderCreated("C-100",125.00)]   BECAUSE saving an event is a single operation, inherently atomic
 //    -> input  : events = [] (event = E1:OrderCreated("C-100",125.00))
 //    <- output : events = [E1:OrderCreated("C-100",125.00)]   BECAUSE saving an event is a single operation, inherently atomic
+// QUERY PHASE · per event apply · cost O(1)
 //    step 3 · apply to memory : state.orderState : null -> "CREATED" · state.customerId : null -> "C-100"
 //    -> input  : state = { orderState:null, customerId:null } (event = E1:OrderCreated("C-100",125.00))
 //    <- output : state = { orderState:"CREATED", customerId:"C-100" }   BECAUSE applying E1 sets the created state and copies the customer id
@@ -46,6 +48,11 @@ _Also known as: Chris Richardson · Microservice Patterns · microservices.io /p
 //    step 3 · apply : state.orderState : "CREATED" -> "APPROVED"
 //    -> input  : state.orderState = "CREATED" (event = E2:OrderApproved("C-100"))
 //    <- output : state.orderState = "APPROVED"   BECAUSE applying E2 sets the state to APPROVED
+// COMPLEXITY · time(build) = O(1) per append · time(query) = O(1) per apply · space(extra) = O(1) per event appended
+// TRACE · create: command (customerId = "C-100", orderTotal = 125.00) -> E1 = OrderCreatedEvent -> events = [E1] -> state.orderState = "CREATED"
+//         approve: command approve -> E2 = OrderApprovedEvent -> events = [E1, E2] -> state.orderState = "APPROVED"
+// CORRECTNESS · invariant: in-memory state always equals fold(events); after k appends, state = apply(Ek, ... apply(E1, empty)). Here state.orderState = "APPROVED" = fold([E1, E2]), so the appended history and the applied state never diverge.
+// VARIANTS · (1) in-place current-state row — time O(1) read, space O(1); pick when no history or temporal queries are needed; trade = loses the audit log. (2) append + transactional outbox — time(build) = O(1) with O(1) per relay poll; pick when the store cannot deliver to subscribers; trade = extra relay latency. (3) snapshot + tail replay — replay cost drops to O(tail); pick when histories grow long; trade = extra snapshot writes.
 // <- event : E2:OrderApproved("C-100") · delivered to every subscriber
 ```
 
@@ -67,15 +74,21 @@ _Also known as: Chris Richardson · Microservice Patterns · microservices.io /p
 //    state : { orderState:null, customerId:null }      // empty before replay
 // DEF: replay · CALLED BY: SVC loading the Order — reads the event list and applies each event in sequence
 // -> entityId : "PO-100"
+// BUILD PHASE · run once per load · cost O(n)
 //    step 1 · apply E1 sets state : state.orderState : null -> "CREATED"
 //    -> input  : state.orderState = null (event = E1:OrderCreated("C-100",125.00))
 //    <- output : state.orderState = "CREATED"   BECAUSE apply(OrderCreatedEvent) sets the state to CREATED
 //    step 2 · apply E1 copies id : state.customerId : null -> "C-100"   BECAUSE apply(OrderCreatedEvent) sets state and copies the customer id
 //    -> input  : state.customerId = null (event = E1:OrderCreated("C-100",125.00))
 //    <- output : state.customerId = "C-100"   BECAUSE apply(OrderCreatedEvent) sets state and copies the customer id
+// QUERY PHASE · per event fold · cost O(1)
 //    step 3 · apply E2 : state.orderState : "CREATED" -> "APPROVED"   BECAUSE apply(OrderApprovedEvent) sets state to APPROVED
 //    -> input  : state.orderState = "CREATED" (event = E2:OrderApproved("C-100"))
 //    <- output : state.orderState = "APPROVED"   BECAUSE apply(OrderApprovedEvent) sets state to APPROVED
+// COMPLEXITY · time(build) = O(n) to read n = 2 events · time(query) = O(1) per event fold, O(n) total · space(extra) = O(1)
+// TRACE · entityId "PO-100" -> apply E1: orderState null -> "CREATED", customerId null -> "C-100" -> apply E2: orderState "CREATED" -> "APPROVED" -> state = { orderState:"APPROVED", customerId:"C-100" }
+// CORRECTNESS · determinism: replaying the n events in write order always lands on the same final state, and the walk terminates after exactly n = 2 folds. After E1 then E2, state.orderState = "APPROVED"; the wrong order (E2 then E1) would leave "CREATED".
+// VARIANTS · (1) full replay every load — time O(n); pick when the event list is short; trade = slow for long histories. (2) snapshot + tail replay — time O(tail); pick when histories grow; trade = snapshot write cost. (3) project into a read model once (CQRS) — time O(1) per read; pick for frequent reads; trade = eventual consistency.
 // <- state : { orderState:"APPROVED", customerId:"C-100" } · replayed from 2 events
 //    alt wrong order : replaying E2 before E1 would leave orderState "CREATED", so event order must be preserved
 ```
@@ -98,15 +111,21 @@ _Also known as: Chris Richardson · Microservice Patterns · microservices.io /p
 //    events : [E1:Created, E2:Credit+50.00, E3:Credit+50.00, E4:Debit-25.00]
 // DEF: load · CALLED BY: SVC reading the Customer — finds the most recent snapshot, then only the events since it
 // -> entityId : "C-100"
+// BUILD PHASE · run once per load · cost O(1)
 //    step 1 · start from the snapshot : state.balance : null -> 100.00   BECAUSE the snapshot already folded E1..E3
 //    -> input  : state.balance = null (snapshot = { balance:100.00, seq:3 })
 //    <- output : state.balance = 100.00   BECAUSE the snapshot already folded E1..E3
+// QUERY PHASE · per tail event · cost O(1)
 //    step 2 · replay only E4 : state.balance : 100.00 -> 75.00   BECAUSE Debit-25.00 subtracts from the snapshot balance
 //    -> input  : state.balance = 100.00 (event = E4:Debit-25.00)
 //    <- output : state.balance = 75.00   BECAUSE Debit-25.00 subtracts from the snapshot balance
 //    step 3 · count the replay : replayed : 4 -> 1   BECAUSE only the events after seq 3 need folding
 //    -> input  : replayed = 4 (snapshot seq = 3)
 //    <- output : replayed = 1   BECAUSE only the events after seq 3 need folding
+// COMPLEXITY · time(build) = O(1) to load one snapshot · time(query) = O(tail) = O(1) to fold the 1 event after seq 3 · space(extra) = O(1) per snapshot
+// TRACE · entityId "C-100" -> snapshot = { balance:100.00, seq:3 } -> replay E4: balance 100.00 -> 75.00 -> replayed = 1 -> state = { balance:75.00 }
+// CORRECTNESS · invariant: state = apply(events after seq 3, snapshot); folding only the tail reproduces a full replay because E1..E3 are already inside the snapshot. Here snapshot seq = 3 and only E4 (seq 4) is folded, so replayed = 4 - 3 = 1.
+// VARIANTS · (1) no snapshot — full replay O(n) per load; pick for short histories; trade = simpler but slow for long ones. (2) snapshot after every event — O(1) tail but O(n) snapshot writes; pick when reads dominate; trade = write amplification. (3) snapshot every k events — tail <= k; pick for balanced load; trade = tunable staleness.
 // <- state : { balance:75.00 } · rebuilt from 1 event instead of 4
 ```
 
@@ -128,15 +147,21 @@ _Also known as: Chris Richardson · Microservice Patterns · microservices.io /p
 //    balance : 200.00
 // DEF: reserveCredit · CALLED BY: ES delivering an OrderCreatedEvent to the subscribed CustomerService
 // -> event : OrderCreatedEvent("C-100", 125.00) · -> orderId : "PO-100"
+// BUILD PHASE · run once at subscribe time · cost O(1)
 //    step 1 · read the payload : customerId : null -> "C-100" · orderTotal : null -> 125.00   BECAUSE the handler unpacks the event it received
 //    -> input  : event = OrderCreatedEvent("C-100", 125.00) (customerId = null, orderTotal = null)
 //    <- output : customerId = "C-100" · orderTotal = 125.00   BECAUSE the handler unpacks the event it received
+// QUERY PHASE · per delivered event · cost O(1)
 //    step 2 · reserve credit : balance : 200.00 -> 75.00   BECAUSE reserveCredit subtracts the order total 125.00 from the 200.00 available
 //    -> input  : balance = 200.00 (orderTotal = 125.00)
 //    <- output : balance = 75.00   BECAUSE reserveCredit subtracts the order total 125.00 from the 200.00 available
 //    step 3 · record the reservation : reserved : {} -> { "PO-100":125.00 }
 //    -> input  : reserved = {} (orderId = "PO-100", orderTotal = 125.00)
 //    <- output : reserved = { "PO-100":125.00 }   BECAUSE the handler records the credit reserved for the order
+// COMPLEXITY · time(build) = O(1) to register one handler · time(query) = O(1) per delivered event · space(extra) = O(1) per reservation entry
+// TRACE · event OrderCreatedEvent("C-100",125.00) -> unpack: customerId = "C-100", orderTotal = 125.00 -> balance 200.00 -> 75.00 -> reserved = { "PO-100":125.00 }
+// CORRECTNESS · invariant: the subscriber's balance drops by exactly the delivered orderTotal each time, so the reserved map always reconciles — after one delivery balance = 200.00 - 125.00 = 75.00 and reserved["PO-100"] = 125.00.
+// VARIANTS · (1) synchronous request/reply call — O(1) but couples caller to callee; pick when an immediate answer is needed; trade = temporal coupling. (2) broker pub/sub fan-out — O(n) per publish to n subscribers; pick when many subscribers; trade = broker dependency. (3) record each processed event id and skip ones already stored — O(1) membership lookup; pick when deliveries can repeat; trade = extra key store.
 // <- state : { balance:75.00, reserved:{"PO-100":125.00} } · the Customer's own state updated from the Order's event
 ```
 
@@ -189,6 +214,7 @@ _Role: query side_
 //    view   : { orderState:"CREATED", customerId:"C-100" }
 // DEF: approve_order · CALLED BY: CMD processing command "approve_order"
 // -> command : "approve_order"
+// BUILD PHASE · run once per command · cost O(1)
 //    step 1 · CMD appends E2    events : [ E1:OrderCreated("C-100",125.00) ] -> [ E1:OrderCreated("C-100",125.00), E2:OrderApproved("C-100") ]  BECAUSE one append is one atomic write
 //    -> input  : events = [ E1:OrderCreated("C-100",125.00) ] (command = "approve_order")
 //    <- output : events = [ E1:OrderCreated("C-100",125.00), E2:OrderApproved("C-100") ]   BECAUSE one append is one atomic write
@@ -198,9 +224,14 @@ _Role: query side_
 //    step 3 · PH folds E2 into the view    view : { orderState:"CREATED", customerId:"C-100" } -> { orderState:"APPROVED", customerId:"C-100" }
 //    -> input  : view = { orderState:"CREATED", customerId:"C-100" } (event = E2:OrderApproved("C-100"))
 //    <- output : view = { orderState:"APPROVED", customerId:"C-100" }   BECAUSE apply(E2) sets the view state to APPROVED
+// QUERY PHASE · per query · cost O(1)
 //    step 4 · QR reads the current state    read : "none" -> { orderState:"APPROVED", customerId:"C-100" }  (query, no replay)
 //    -> input  : read = "none" (view = { orderState:"APPROVED", customerId:"C-100" })
 //    <- output : read = { orderState:"APPROVED", customerId:"C-100" }   BECAUSE the query side reads the view directly, no replay
+// COMPLEXITY · time(build) = O(1) per append · time(query) = O(1) per read · space(extra) = O(1) per event plus O(1) per view field
+// TRACE · command "approve_order" -> append E2: events = [E1] -> [E1, E2] -> deliver E2 to PH -> fold: view.orderState "CREATED" -> "APPROVED" -> read = { orderState:"APPROVED", customerId:"C-100" }
+// CORRECTNESS · invariant: the view always equals fold(events), so every query returns the same value a full replay would, without replaying at query time. After E1 and E2 are folded, view.orderState = "APPROVED".
+// VARIANTS · (1) replay on every read — time O(n) per read; pick when reads are rare; trade = slow reads. (2) snapshot-backed projector — replay only the tail after a snapshot; pick for long histories; trade = snapshot writes. (3) store fan-out to many consumers — O(n) publish per event; pick when many subscribers; trade = broker dependency.
 // <- outcome : QR returns orderState "APPROVED"  BECAUSE CMD wrote E2 to the event store, ES delivered it, PH folded it into the view, and QR read the view back
 ```
 

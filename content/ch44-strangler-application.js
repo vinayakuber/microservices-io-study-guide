@@ -50,15 +50,21 @@ registerChapter({
 //    route_table : { "/catalog": "NEW", "/orders": "MONO" }
 // DEF: route · CALLED BY: RTR on each incoming request
 // -> request : { "path": "/catalog" }
+// BUILD PHASE · run once at startup · cost O(1)
 //    step 1 · look up "/catalog" in route_table   // matched : "" -> "NEW"   BECAUSE /catalog was already migrated
 //    -> input  : path = "/catalog" · route_table = { "/catalog": "NEW", "/orders": "MONO" } · matched = ""
 //    <- output : matched = "NEW"   BECAUSE /catalog was already migrated
+// QUERY PHASE · per request · cost O(1)
 //    step 2 · forward the request to the matched backend   // target : "" -> "NEW"
 //    -> input  : matched = "NEW" · target = ""
 //    <- output : target = "NEW"   BECAUSE the request is forwarded to the matched backend
 //    step 3 · NEW serves the catalog from its own service
 //    -> input  : target = "NEW"
 //    <- output : response = "catalog items"   BECAUSE NEW serves the catalog from its own service
+// COMPLEXITY · time(build) = O(1) per route entry · time(query) = O(1) per request lookup · space(extra) = O(1) per route entry
+// TRACE · request path "/catalog" -> lookup: matched = "NEW" (route_table["/catalog"]) -> forward: target = "NEW" -> serve: response = "catalog items"
+// CORRECTNESS · invariant: every path maps to exactly one backend in route_table, so each request is forwarded deterministically to NEW or MONO and none is dropped — the walk ends after one lookup + one forward.
+// VARIANTS · (1) prefix / longest-match routing — O(1) with a trie; pick when paths nest; trade = more complex table. (2) regex-based routing — O(1) per pattern with a compiled matcher; pick for expressive rules; trade = slower than exact hash. (3) weighted canary cutover — O(1) per request with a split; pick to de-risk a cutover; trade = both systems serve the same path for a while.
 // <- response : "catalog items" from NEW — MONO never receives this request
 //    alt path "/orders" : matched : "NEW" -> "MONO" · target : "" -> "MONO" — MONO still serves it, unchanged (fall back)
 `
@@ -227,9 +233,11 @@ registerChapter({
 //    migrated : {}
 // DEF: route_request · CALLED BY: RTR on each incoming request
 // -> request : { "path":"/catalog" }
+// BUILD PHASE · run once at startup · cost O(1)
 //    step 1 · the router reads the path from the request    path : "" -> "/catalog"   BECAUSE the façade fronts both systems
 //    -> input  : request = { "path":"/catalog" } · path = ""
 //    <- output : path = "/catalog"   BECAUSE the façade fronts both systems
+// QUERY PHASE · per request · cost O(1)
 //    step 2 · the router looks up "/catalog" in the route table    matched : "" -> "NEW"   // the path was already migrated
 //    -> input  : path = "/catalog" · route_table = { "/catalog":"NEW", "/orders":"MONO" } · matched = ""
 //    <- output : matched = "NEW"   BECAUSE the path was already migrated
@@ -239,6 +247,10 @@ registerChapter({
 //    step 4 · the strangler records a migrated feature    migrated : {} -> { "catalog": true }   BECAUSE the strangler replaces the monolith one feature at a time
 //    -> input  : migrated = {}
 //    <- output : migrated = { "catalog": true }   BECAUSE the strangler replaces the monolith one feature at a time
+// COMPLEXITY · time(build) = O(1) per route entry · time(query) = O(1) per request lookup · space(extra) = O(1) per route entry
+// TRACE · request path "/catalog" -> read: path = "/catalog" -> lookup: matched = "NEW" (route_table["/catalog"]) -> forward: target = "NEW" -> record: migrated = { "catalog": true }
+// CORRECTNESS · invariant: every path maps to exactly one backend in route_table, so the router forwards deterministically to NEW or MONO and the migrated set only grows — the walk ends after one read + one lookup + one forward + one record.
+// VARIANTS · (1) prefix / longest-match routing — O(1) with a trie; pick when paths nest; trade = more complex table. (2) regex-based routing — O(1) per pattern with a compiled matcher; pick for expressive rules; trade = slower than exact hash. (3) weighted canary cutover — O(1) per request with a split; pick to de-risk a cutover; trade = both systems serve the same path for a while.
 // <- response : "catalog items" from NEW · MONO never receives this request   BECAUSE the route table sends migrated paths to the new services
 //    alt path "/orders" : matched : "NEW" -> "MONO" · target : "" -> "MONO" — the monolith still serves it, unchanged (fall back)`
   },

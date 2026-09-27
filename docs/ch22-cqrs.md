@@ -27,15 +27,21 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 22 · microservice
 //    current : null
 // DEF: read_current_total · CALLED BY: QR asking for the order's current total
 // -> order_id : "O-101"
+// BUILD PHASE · run once per read · cost O(n)
 //    step 1 · replay order_created    // running : 0.00 -> 120.00  BECAUSE the first event sets the total
 //    -> input  : running = 0.00 (event = {type:"order_created", order_id:"O-101", total:120.00})
 //    <- output : running = 120.00   BECAUSE the first event sets the total
 //    step 2 · replay order_updated    // running : 120.00 -> 95.00  BECAUSE the second event overwrites the total
 //    -> input  : running = 120.00 (event = {type:"order_updated", order_id:"O-101", total:95.00})
 //    <- output : running = 95.00   BECAUSE the second event overwrites the total
+// QUERY PHASE · per event fold · cost O(1)
 //    step 3 · fold to current state    // current : null -> 95.00
 //    -> input  : current = null (running = 95.00)
 //    <- output : current = 95.00   BECAUSE the folded running total becomes the current state
+// COMPLEXITY · time(build) = O(n) to read n = 2 events · time(query) = O(1) per fold, O(n) total · space(extra) = O(1)
+// TRACE · order_id "O-101" -> replay order_created: running 0.00 -> 120.00 -> replay order_updated: running 120.00 -> 95.00 -> fold: current = 95.00
+// CORRECTNESS · invariant: current always equals fold(event_log); the walk folds each event once in order, so it terminates after exactly n = 2 events and lands on current = 95.00 (the last event's total wins).
+// VARIANTS · (1) current-state table — one row read O(1); pick when no event log is kept; trade = loses history. (2) CQRS view database — O(1) read of a precomputed view; pick for hot reads; trade = eventual consistency. (3) snapshot + tail replay — O(tail); pick for long logs; trade = snapshot writes.
 // <- current : 95.00  · produced by replaying 2 events, not by reading one row
 //    alt the data lived in a current-state table : one row read returns 95.00 directly -> no replay needed
 ```
@@ -60,15 +66,21 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 22 · microservice
 //    doc     : {}
 // DEF: build_view_schema · CALLED BY: the team shaping the read side
 // -> query : "order history for one customer"
+// BUILD PHASE · run once per view · cost O(1)
 //    step 1 · choose the store type    // store : "relational" -> "document"  BECAUSE the schema must match the query, and a document or key-value NoSQL store fits
 //    -> input  : store = "relational" (query = "order history for one customer")
 //    <- output : store = "document"   BECAUSE the schema must match the query, and a document or key-value NoSQL store fits
 //    step 2 · denormalize the shape    // doc : {} -> {customer_id:"C-77", orders:[{order_id:"O-101", total:120.00}, {order_id:"O-102", total:80.00}]}
 //    -> input  : doc = {} (query = "order history for one customer")
 //    <- output : doc = {customer_id:"C-77", orders:[{order_id:"O-101", total:120.00}, {order_id:"O-102", total:80.00}]}   BECAUSE the schema is denormalized to answer the query in one read
+// QUERY PHASE · per read · cost O(1)
 //    step 3 · insert the view    // view_db : {} -> {"order_history":{customer_id:"C-77", orders:[{order_id:"O-101", total:120.00}, {order_id:"O-102", total:80.00}]}}
 //    -> input  : view_db = {} (doc = {customer_id:"C-77", orders:[{order_id:"O-101", total:120.00}, {order_id:"O-102", total:80.00}]})
 //    <- output : view_db = {"order_history":{customer_id:"C-77", orders:[{order_id:"O-101", total:120.00}, {order_id:"O-102", total:80.00}]}}   BECAUSE the denormalized document is inserted as the view
+// COMPLEXITY · time(build) = O(1) to choose + denormalize + insert one view · time(query) = O(1) per read (one document lookup) · space(extra) = O(1) per view document
+// TRACE · query "order history for one customer" -> store "relational" -> "document" -> denormalize: doc = {customer_id:"C-77", orders:[{order_id:"O-101", total:120.00}, {order_id:"O-102", total:80.00}]} -> insert: view_db = {"order_history": doc}
+// CORRECTNESS · invariant: the document nests every column the query needs under one key, so one read returns the whole answer — the walk ends after one choose + one denormalize + one insert, and the query never joins tables.
+// VARIANTS · (1) reuse the relational write schema — one multi-table JOIN per read; pick when writes and reads share a shape; trade = slow reads. (2) key-value store — O(1) get by key; pick for point lookups; trade = no rich query. (3) search index — O(log n) or inverted index for free-text; pick for text search; trade = extra index upkeep.
 // <- view_db : {"order_history":{customer_id:"C-77", orders:[{order_id:"O-101", total:120.00}, {order_id:"O-102", total:80.00}]}}  · one document read answers the whole query
 //    alt the read side reused a relational schema : the same query would need a multi-table JOIN across service-owned tables
 ```
@@ -95,15 +107,21 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 22 · microservice
 //    outbox   : []                                 // WR's outbox of events to publish
 // DEF: change_order_total · CALLED BY: WR receiving a command
 // -> command : {"order_id":"O-101", "total":95.00}
+// BUILD PHASE · run once per command · cost O(1)
 //    step 1 · update the write side    // write_db : {"O-101":{total:120.00}} -> {"O-101":{total:95.00}}
 //    -> input  : write_db = {"O-101":{total:120.00}} (command = {"order_id":"O-101", "total":95.00})
 //    <- output : write_db = {"O-101":{total:95.00}}   BECAUSE the command updates the source of truth
 //    step 2 · publish a domain event    // outbox : [] -> [{"type":"order_updated","order_id":"O-101","total":95.00}]
 //    -> input  : outbox = [] (write_db = {"O-101":{total:95.00}})
 //    <- output : outbox = [{"type":"order_updated","order_id":"O-101","total":95.00}]   BECAUSE the change is published as a domain event
+// QUERY PHASE · per event · cost O(1)
 //    step 3 · RD subscribes and updates the view    // view_db : {"O-101":{total:120.00}} -> {"O-101":{total:95.00}}
 //    -> input  : view_db = {"O-101":{total:120.00}} (event = {"type":"order_updated","order_id":"O-101","total":95.00})
 //    <- output : view_db = {"O-101":{total:95.00}}   BECAUSE the read side applies the subscribed event to its replica
+// COMPLEXITY · time(build) = O(1) to update the write side · time(query) = O(1) per delivered event to update the view · space(extra) = O(1) per event published
+// TRACE · command {"order_id":"O-101", "total":95.00} -> write_db = {"O-101":{total:95.00}} -> outbox = [{"type":"order_updated","order_id":"O-101","total":95.00}] -> RD applies: view_db = {"O-101":{total:95.00}}
+// CORRECTNESS · invariant: after the event is applied, view_db equals write_db for the changed key — here both hold total 95.00, so the walk ends after one write, one publish, and one subscribe-update and the replica is caught up.
+// VARIANTS · (1) direct write to the view — O(1) but clients mutate the replica; pick never; trade = loses the read-only guarantee. (2) transactional outbox + relay — O(1) write + O(1) per poll; pick when the store cannot publish events; trade = relay latency. (3) polling the write side for changes — O(n) per scan; pick when events are unavailable; trade = lag and load.
 // <- view_db : {"O-101":{total:95.00}}  · the replica caught up to the write side via the event
 //    alt the event is delayed : view_db stays at {"O-101":{total:120.00}} -> the view is eventually consistent, not instant
 ```
@@ -183,15 +201,21 @@ _Role: projections + query side_
 //    view : { "O-101": { "total": 120.00 } }   // the read model before the update
 // DEF: update_order · CALLED BY: SVC when the customer changes order O-101
 // -> order_id : "O-101"
+// BUILD PHASE · run once per command · cost O(1)
 //    step 1 · SVC appends order_updated to the event store   // events : [] -> ["order_created","order_updated"]   BECAUSE the command side writes events, not tables
 //    -> input  : events = [] (command = update_order, order_id = "O-101")
 //    <- output : events = ["order_created","order_updated"]   BECAUSE the command side writes events, not tables
 //    step 2 · ES publishes the event to the broker, OH folds it in   // view["O-101"].total : 120.00 -> 95.00   BECAUSE the projector subtracts the change from the old total
 //    -> input  : view["O-101"].total = 120.00 (event = order_updated {"total":95.00})
 //    <- output : view["O-101"].total = 95.00   BECAUSE the projector subtracts the change from the old total
+// QUERY PHASE · per query · cost O(1)
 //    step 3 · VDB stores the updated view and serves the query   // query : 0 -> 1   BECAUSE the query side reads its own materialized view
 //    -> input  : query = 0 (view["O-101"].total = 95.00)
 //    <- output : query = 1   BECAUSE the query side reads its own materialized view
+// COMPLEXITY · time(build) = O(1) per append · time(query) = O(1) per read · space(extra) = O(1) per event plus O(1) per view field
+// TRACE · order_id "O-101" -> SVC appends order_updated: events = [] -> ["order_created","order_updated"] -> ES publishes, OH folds: view["O-101"].total = 120.00 -> 95.00 -> VDB serves: query = 0 -> 1
+// CORRECTNESS · invariant: the view always equals fold(events), so a query returns the projection of the write model without replaying at query time. After the fold, view["O-101"].total = 95.00 matches the appended order_updated.
+// VARIANTS · (1) single shared model — one database for writes and reads; pick for simplicity; trade = writes and reads cannot scale or shape independently. (2) API composition join — O(k) provider calls; pick for ad-hoc reads; trade = in-memory join cost. (3) multiple denormalized views — one view per query shape; pick when queries differ; trade = more replicas to keep consistent.
 // <- outcome : view["O-101"].total = 95.00 · a command wrote once, a projection read once, the write and read models stay separate
 ```
 

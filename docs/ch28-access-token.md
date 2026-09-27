@@ -26,6 +26,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 28 · microservice
 //    token : ""                           // the access token GW will hand back
 // DEF: authenticate · CALLED BY: CL posting credentials to the login route
 // -> credentials : {"user":"alice","password":"hunter2"}
+// BUILD PHASE · run once per login · cost O(1)
 //    step 1 · GW verifies the credentials    // gw_auth : {} -> {"alice":"verified"}
 //    -> input  : gw_auth = {} (credentials = {"user":"alice","password":"hunter2"})
 //    <- output : gw_auth = {"alice":"verified"}   BECAUSE GW confirms who the requestor is
@@ -35,6 +36,23 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 28 · microservice
 //    step 3 · GW signs the claim into a JSON Web Token    // token : "" -> "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"  BECAUSE the signature lets any service verify the identity without re-authenticating
 //    -> input  : token = "" (payload = {"sub":"alice"})
 //    <- output : token = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"   BECAUSE the signature lets any service verify the identity without re-authenticating
+// QUERY PHASE · per request, at each service · cost O(1)
+//    the minted token is read and verified by every service on each later request, with no re-mint
+// COMPLEXITY:
+//    time(build) = O(1) = 1 signature computation per login   · time(query) = O(1) = 1 signature verify + 1 claim read + 1 role lookup per request
+//    space(extra) = O(1) = the identity claim {"sub":"alice"} carried inside the token
+// TRACE (one login, user = "alice"):
+//    step   | gw_auth              | payload         | token
+//    verify | {"alice":"verified"} | ""              | ""
+//    claim  | {"alice":"verified"} | {"sub":"alice"} | ""
+//    sign   | {"alice":"verified"} | {"sub":"alice"} | "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"
+// CORRECTNESS (issuance invariant): a token is issued only after gw_auth records the requestor as "verified",
+//    and the payload sub claim equals that verified identity, so every issued token names exactly one requestor.
+// VARIANTS (when to pick which):
+//    HMAC-signed JWT (HS256) -> one shared secret, O(1) sign, O(1) verify          (use when all verifiers trust one issuer)   <- THIS ONE
+//    RSA-signed JWT (RS256)  -> public/private key pair, O(1) verify, key rotation  (use when verifiers must not hold the signing key)
+//    opaque token in a store -> no signature, O(1) lookup at the auth server         (use when you need immediate revocation)
+//    PASETO token            -> signed token with safer defaults, O(1) verify        (use when you want fewer JWT foot-guns)
 // <- token : "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig" returned to CL for every later request
 //    alt unknown user : gw_auth : {} -> {"alice":"unknown"} · token : "" -> ""  BECAUSE there is no verified identity to sign, so no token is issued
 ```
@@ -60,6 +78,9 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 28 · microservice
 //    verdict : "pending"                     // the authorization decision, not yet made
 // DEF: handle_order · CALLED BY: GW forwarding a request that carries the token
 // -> token : "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig" · -> operation : "place_order"
+// BUILD PHASE · run once at startup · cost O(1)
+//    configure allowed_roles once -> allowed_roles = {"alice":"customer"}
+// QUERY PHASE · per request · cost O(1)
 //    step 1 · SVC verifies the token signature    // verdict : "pending" -> "authentic"
 //    -> input  : verdict = "pending" (token = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig")
 //    <- output : verdict = "authentic"   BECAUSE SVC confirms the token was signed by the issuer
@@ -69,6 +90,21 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 28 · microservice
 //    step 3 · SVC checks the role against the operation    // verdict : "authentic" -> "authorized"  BECAUSE allowed_roles maps "alice" to "customer", which may place an order
 //    -> input  : verdict = "authentic" (requestor = "alice", operation = "place_order")
 //    <- output : verdict = "authorized"   BECAUSE allowed_roles maps "alice" to "customer", which may place an order
+// COMPLEXITY:
+//    time(build) = O(1) = 1 role-map allocation   · time(query) = O(1) = 1 signature verify + 1 claim read + 1 role lookup per request
+//    space(extra) = O(1) = the allowed_roles map (one entry per requestor)
+// TRACE (one request, sub = "alice", operation = "place_order"):
+//    step         | verdict      | requestor | role check
+//    verify sig   | "authentic"  |    ""     |   -
+//    read claim   | "authentic"  | "alice"   |   -
+//    check role   | "authorized" | "alice"   | "customer" permits "place_order"
+// CORRECTNESS (verification invariant): the verdict reaches "authorized" only if the signature verifies,
+//    the sub claim names a known requestor, and that requestor's role permits the operation; a bad signature
+//    short-circuits to "rejected" before any role lookup, so an unauthentic token can never authorize an operation.
+// VARIANTS (when to pick which):
+//    JWT local verify           -> O(1) verify with no round-trip, but a stolen token lives until expiry (use when services are many and revocation is rare)   <- THIS ONE
+//    opaque token introspection -> O(1) verify but one round-trip to the auth server, revocable now          (use when immediate revocation is required)
+//    shared revocation cache    -> O(1) verify plus a local deny-list, revocable, needs the cache kept warm    (use when you want speed AND revocation)
 // <- verdict : "authorized" — SVC proceeds with "place_order"
 //    alt invalid signature : verdict : "pending" -> "rejected" — SVC refuses the request
 ```
@@ -93,6 +129,9 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 28 · microservice
 //    pay_verdict : "pending"           // PAY's authorization decision
 // DEF: invoke_payment · CALLED BY: SVC needing to charge the customer's card
 // -> token : "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"
+// BUILD PHASE · run once at startup · cost O(1)
+//    configure allowed_roles once -> allowed_roles = {"alice":"customer"}
+// QUERY PHASE · per forwarded call · cost O(1)
 //    step 1 · SVC stores the token it received    // incoming : "" -> "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"
 //    -> input  : incoming = "" (token = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig")
 //    <- output : incoming = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"   BECAUSE SVC records the token it received
@@ -102,6 +141,21 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 28 · microservice
 //    step 3 · PAY verifies the token and authorizes the charge    // pay_verdict : "pending" -> "authorized"  BECAUSE the token still identifies "alice", whose role permits the charge
 //    -> input  : pay_verdict = "pending" (forwarded = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig")
 //    <- output : pay_verdict = "authorized"   BECAUSE the token still identifies "alice", whose role permits the charge
+// COMPLEXITY:
+//    time(build) = O(1)   · time(query) = O(1) = 1 token copy + 1 signature verify + 1 role lookup per forwarded call
+//    space(extra) = O(1) = the forwarded token (one copy per hop)
+// TRACE (one forwarded call, sub = "alice"):
+//    step         | incoming                    | forwarded                   | pay_verdict
+//    store        | "eyJhbGci...sig"            | ""                          | "pending"
+//    attach       | "eyJhbGci...sig"            | "eyJhbGci...sig"            | "pending"
+//    verify+authz | "eyJhbGci...sig"            | "eyJhbGci...sig"            | "authorized"
+// CORRECTNESS (propagation invariant): forwarded always equals incoming, so the requestor identity is copied,
+//    never altered, across the hop; PAY's verdict comes from the SAME token SVC received, so the chain cannot
+//    silently drop or swap identities mid-flight.
+// VARIANTS (when to pick which):
+//    forward the same token   -> O(1) per hop, identity intact, no re-auth       (use when the requestor identity must survive the whole chain)   <- THIS ONE
+//    re-mint a scoped token   -> O(1) sign per hop, narrows each hop's authority  (use when each hop needs fewer permissions)
+//    drop the token inside    -> no downstream identity, O(0) per hop             (use only for trusted internal calls that need no identity)
 // <- pay_verdict : "authorized" — the charge is processed for "alice"
 ```
 
@@ -147,18 +201,35 @@ _Role: service_
 //    verdict : "pending"
 // DEF: authenticate_and_route · CALLED BY: CL posting credentials on the login route
 // -> credentials : {"user":"alice","password":"hunter2"}
+// BUILD PHASE · run once per login · cost O(1)
 //    step 1 · IDP authenticates alice    auth : {} -> {"alice":"verified"}
 //    -> input  : auth = {} (credentials = {"user":"alice","password":"hunter2"})
 //    <- output : auth = {"alice":"verified"}   BECAUSE IDP confirms alice's credentials
 //    step 2 · IDP mints the JWT    token : "" -> "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"  BECAUSE the signature lets any service verify the identity without re-authenticating
 //    -> input  : token = "" (auth = {"alice":"verified"})
 //    <- output : token = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"   BECAUSE the signature lets any service verify the identity without re-authenticating
+// QUERY PHASE · per request · cost O(1)
 //    step 3 · GW validates the signature and routes the token to SVC    token : "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig" -> "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"
 //    -> input  : token = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig" (verdict = "pending")
 //    <- output : token = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig"   BECAUSE GW validates and forwards the token unchanged
 //    step 4 · SVC reads the claim and checks the role    verdict : "pending" -> "authorized"  BECAUSE {"sub":"alice"} maps to role "customer" which may place the order
 //    -> input  : verdict = "pending" (token claim = {"sub":"alice"}, operation = "place_order")
 //    <- output : verdict = "authorized"   BECAUSE {"sub":"alice"} maps to role "customer" which may place the order
+// COMPLEXITY:
+//    time(build) = O(1) = 1 signature computation per login   · time(query) = O(1) = 1 signature verify + 1 claim read + 1 role lookup per request
+//    space(extra) = O(1) = the signed claim carried inside the token
+// TRACE (one login then one request, sub = "alice"):
+//    step      | auth               | token                                     | verdict
+//    mint      | {"alice":"verified"} | "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig" | "pending"
+//    route     | {"alice":"verified"} | "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig" | "pending"
+//    verify    | {"alice":"verified"} | "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.sig" | "authorized"
+// CORRECTNESS (end-to-end invariant): the identity leaves IDP as a signed claim, crosses GW unchanged, and is
+//    verified again at SVC, so verdict "authorized" is reached only when the same {"sub":"alice"} claim survives
+//    the whole chain — no hop re-authenticates and none can alter the identity.
+// VARIANTS (when to pick which):
+//    gateway mints, services verify (JWT) -> O(1) verify, no re-auth, no gateway round-trip       (use when services are many)   <- THIS ONE
+//    gateway introspects per request      -> O(1) verify at one auth server, revocable, adds a hop (use when revocation matters)
+//    mTLS client certificates             -> identity in the handshake, O(1) verify, no token header (use for service-to-service identity)
 // <- outcome : verdict "authorized" · no gateway round-trip  BECAUSE each service validates the token locally
 ```
 
