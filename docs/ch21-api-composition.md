@@ -26,21 +26,20 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 21 · microservice
 //    result  : {}
 // DEF: get_order_with_name · CALLED BY: CLI assembling an order page
 // -> order_id : "O-101"
-// BUILD PHASE · run once per query · cost O(k)
+// BUILD PHASE · run once per query
 //    step 1 · ORD.fetch(order_id)    // order_row : null -> {cust_id:"C-77", total:120.00}  BECAUSE the order row lives in ORD's own database
 //    -> input  : order_row = null (order_id = "O-101")
 //    <- output : order_row = {cust_id:"C-77", total:120.00}   BECAUSE the order row lives in ORD's own database
 //    step 2 · CUST.fetch("C-77")     // cust_row  : null -> {name:"Ada"}                      BECAUSE the customer row lives in CUST's own database
 //    -> input  : cust_row = null (customer_id = "C-77")
 //    <- output : cust_row = {name:"Ada"}   BECAUSE the customer row lives in CUST's own database
-// QUERY PHASE · per join · cost O(1)
+// QUERY PHASE · per join
 //    step 3 · join the two rows in memory    // result : {} -> {"O-101":{name:"Ada", total:120.00}}
 //    -> input  : result = {} (order_row = {cust_id:"C-77", total:120.00}, cust_row = {name:"Ada"})
 //    <- output : result = {"O-101":{name:"Ada", total:120.00}}   BECAUSE the composer merges the two fragments on the order id
-// COMPLEXITY · time(build) = O(k) to fetch k = 2 fragments · time(query) = O(1) per join · space(extra) = O(1) for the one joined row
 // TRACE · order_id "O-101" -> ORD.fetch: order_row = {cust_id:"C-77", total:120.00} -> CUST.fetch("C-77"): cust_row = {name:"Ada"} -> join: result = {"O-101":{name:"Ada", total:120.00}}
 // CORRECTNESS · invariant: the joined row carries every column the query asked for — here result has name (from CUST) and total (from ORD), so the walk ends after exactly k = 2 fetches plus one join.
-// VARIANTS · (1) single shared database — one SQL JOIN, O(1) statement; pick before Database per Service; trade = violates service data ownership. (2) CQRS materialized view — O(1) read of a precomputed row; pick for large or hot joins; trade = eventual consistency. (3) parallel fan-out — O(1) wall-clock with concurrent fetches; pick when services are independent; trade = extra complexity.
+// VARIANTS · (1) single shared database — one SQL JOIN, one statement; pick before Database per Service; trade = violates service data ownership. (2) CQRS materialized view — one read of a precomputed row; pick for large or hot joins; trade = eventual consistency. (3) parallel fan-out — concurrent fetches in one round-trip; pick when services are independent; trade = extra complexity.
 // <- result : {"O-101":{name:"Ada", total:120.00}}
 //    alt pre-microservice monolith : one database held both tables -> one SQL JOIN returned this same row in a single statement
 ```
@@ -63,21 +62,20 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 21 · microservice
 //    calls  : 0                           // round-trips made so far
 // DEF: compose_order_details · CALLED BY: CMP answering one order query
 // -> query : {"order_id":"O-101"}         // the one logical query to answer
-// BUILD PHASE · run once per query · cost O(k)
+// BUILD PHASE · run once per query
 //    step 1 · ORD.fetch("O-101")    // joined : {} -> {cust_id:"C-77", total:120.00}     · calls : 0 -> 1
 //    -> input  : joined = {} (order_id = "O-101", calls = 0)
 //    <- output : joined = {cust_id:"C-77", total:120.00} · calls = 1   BECAUSE ORD returns the order fragment and one round-trip is made
-// QUERY PHASE · per provider fetch · cost O(1)
+// QUERY PHASE · per provider fetch
 //    step 2 · CUST.fetch("C-77")    // joined : {cust_id:"C-77", total:120.00} -> {cust_id:"C-77", total:120.00, name:"Ada"}    · calls : 1 -> 2
 //    -> input  : joined = {cust_id:"C-77", total:120.00} (customer_id = "C-77", calls = 1)
 //    <- output : joined = {cust_id:"C-77", total:120.00, name:"Ada"} · calls = 2   BECAUSE CUST adds the customer name and one more round-trip is made
 //    step 3 · INV.fetch("O-101")    // joined : {cust_id:"C-77", total:120.00, name:"Ada"} -> {cust_id:"C-77", total:120.00, name:"Ada", stock:3}    · calls : 2 -> 3
 //    -> input  : joined = {cust_id:"C-77", total:120.00, name:"Ada"} (order_id = "O-101", calls = 2)
 //    <- output : joined = {cust_id:"C-77", total:120.00, name:"Ada", stock:3} · calls = 3   BECAUSE INV adds the stock level and one more round-trip is made
-// COMPLEXITY · time(build) = O(k) to fan out to k = 3 providers · time(query) = O(1) per provider fetch · space(extra) = O(1) per fragment merged into joined
 // TRACE · query {"order_id":"O-101"} -> ORD.fetch: joined = {cust_id:"C-77", total:120.00}, calls = 1 -> CUST.fetch: joined adds name "Ada", calls = 2 -> INV.fetch: joined adds stock 3, calls = 3 -> output = {cust_id:"C-77", total:120.00, name:"Ada", stock:3}
 // CORRECTNESS · invariant: each fetch adds exactly one field group to joined, and calls counts the round-trips, so after k = 3 fetches joined holds all three fragments and calls = 3. The join terminates when every provider has been called once.
-// VARIANTS · (1) sequential fan-out — O(k) round-trips; pick for few providers; trade = latency grows with k. (2) parallel fan-out — O(1) wall-clock; pick when providers are independent; trade = error handling complexity. (3) partial response on failure — return what succeeded; pick for availability; trade = incomplete result (missing the down provider's field).
+// VARIANTS · (1) sequential fan-out — k round-trips, one per provider; pick for few providers; trade = latency grows with k. (2) parallel fan-out — all k fetches in one round-trip; pick when providers are independent; trade = error handling complexity. (3) partial response on failure — return what succeeded; pick for availability; trade = incomplete result (missing the down provider's field).
 // <- output : {cust_id:"C-77", total:120.00, name:"Ada", stock:3}
 //    alt INV is down : step 3 raises -> calls stays at 2 -> the joined result is missing the stock field
 ```
@@ -103,21 +101,20 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 21 · microservice
 //    matched   : null
 // DEF: join_fragments · CALLED BY: CMP merging two partial results
 // -> key : "O-101"                                    // the shared id the join matches on
-// BUILD PHASE · run once per row · cost O(1)
+// BUILD PHASE · run once per row
 //    step 1 · match ord_rows[0]    // matched : null -> {"O-101":{total:120.00}}
 //    -> input  : matched = null (key = "O-101", ord_rows = [{"O-101":{total:120.00}}, {"O-102":{total:80.00}}])
 //    <- output : matched = {"O-101":{total:120.00}}   BECAUSE ord_rows[0] carries the key "O-101"
-// QUERY PHASE · per key lookup · cost O(1)
+// QUERY PHASE · per key lookup
 //    step 2 · attach name by id    // matched : {"O-101":{total:120.00}} -> {"O-101":{total:120.00, name:"Ada"}}
 //    -> input  : matched = {"O-101":{total:120.00}} (cust_rows = [{"C-77":{name:"Ada"}}])
 //    <- output : matched = {"O-101":{total:120.00, name:"Ada"}}   BECAUSE the composer attaches the customer name on the shared id
 //    step 3 · append to joined    // joined : [] -> [{"O-101":{total:120.00, name:"Ada"}}]
 //    -> input  : joined = [] (matched = {"O-101":{total:120.00, name:"Ada"}})
 //    <- output : joined = [{"O-101":{total:120.00, name:"Ada"}}]   BECAUSE the merged row is appended to the result
-// COMPLEXITY · time(build) = O(1) to match one row · time(query) = O(1) per key lookup · space(extra) = O(1) per joined row
 // TRACE · key "O-101" -> match ord_rows[0]: matched = {"O-101":{total:120.00}} -> attach name by id: matched = {"O-101":{total:120.00, name:"Ada"}} -> append: joined = [{"O-101":{total:120.00, name:"Ada"}}]
 // CORRECTNESS · invariant: a row is joined by matching its shared key across fragments — matched grows only fields that belong to the same key, and the walk ends after one match + one attach + one append. The key "O-102" with no customer row attaches name = null instead of inventing one.
-// VARIANTS · (1) nested-loop join — O(n·m) over n order rows and m customer rows; pick for small sets; trade = quadratic cost. (2) hash join — build a hash on the key, O(n + m); pick when sets are large; trade = extra hash table memory. (3) sort-merge join — O(n log n + m log m); pick when rows are already sorted; trade = sort overhead.
+// VARIANTS · (1) nested-loop join — compare every one of n order rows against every one of m customer rows, n·m comparisons; pick for small sets; trade = the n·m comparisons are the cost. (2) hash join — build a hash on the key, one pass over n order rows plus one pass over m customer rows; pick when sets are large; trade = extra hash table memory. (3) sort-merge join — sort n order rows and m customer rows then merge in one pass; pick when rows are already sorted; trade = sort overhead.
 // <- joined : [{"O-101":{total:120.00, name:"Ada"}}]
 //    alt the key "O-102" has no matching cust row : matched : {"O-102":{total:80.00}} -> {"O-102":{total:80.00, name:null}}  BECAUSE the composer cannot invent a name it was never given
 ```
@@ -142,21 +139,20 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 21 · microservice
 //    joined    : []                         // the assembled result
 // DEF: join_large_dataset · CALLED BY: CMP answering a full-history query
 // -> scope : "last 30 days"                 // the query asks for the whole set, not one row
-// BUILD PHASE · run once per query · cost O(n + m)
+// BUILD PHASE · run once per query
 //    step 1 · ORD.fetch_all(scope)    // ord_rows  : [] -> [900000 rows]  BECAUSE the query selects the full history rather than one id
 //    -> input  : ord_rows = [] (scope = "last 30 days")
 //    <- output : ord_rows = [900000 rows]   BECAUSE the query selects the full history rather than one id
 //    step 2 · CUST.fetch_all()        // cust_rows : [] -> [120000 rows]  BECAUSE every referenced customer must also be pulled
 //    -> input  : cust_rows = [] (ord_rows = [900000 rows])
 //    <- output : cust_rows = [120000 rows]   BECAUSE every referenced customer must also be pulled
-// QUERY PHASE · per joined row · cost O(1)
+// QUERY PHASE · per joined row
 //    step 3 · join in CMP memory      // joined    : [] -> [900000 rows]  BECAUSE all 900000 order rows are combined in the composer's RAM
 //    -> input  : joined = [] (ord_rows = [900000 rows], cust_rows = [120000 rows])
 //    <- output : joined = [900000 rows]   BECAUSE all 900000 order rows are combined in the composer's RAM
-// COMPLEXITY · time(build) = O(n + m) to fetch n = 900000 order rows and m = 120000 customer rows · time(query) = O(n) to join n rows in memory · space(extra) = O(n) for the materialized result
 // TRACE · scope "last 30 days" -> ORD.fetch_all: ord_rows = [900000 rows] -> CUST.fetch_all: cust_rows = [120000 rows] -> join: joined = [900000 rows] — all 900000 order rows held in composer RAM at once
 // CORRECTNESS · invariant: the composer holds the full joined set in memory, so its peak memory is the size of the largest fragment — here 900000 rows — which is exactly when the pattern becomes inefficient and the walk should be replaced by a precomputed view.
-// VARIANTS · (1) CQRS materialized view — O(1) read of a precomputed result; pick for large or hot joins; trade = eventual consistency. (2) pushdown / server-side filter — fetch only matching rows, O(kept); pick when the query selects few rows; trade = needs a queryable store. (3) paginate the join — join one page at a time, O(page); pick for rendering; trade = repeated round-trips.
+// VARIANTS · (1) CQRS materialized view — one read of a precomputed result; pick for large or hot joins; trade = eventual consistency. (2) pushdown / server-side filter — fetch only the matching rows, one fetch per kept row; pick when the query selects few rows; trade = needs a queryable store. (3) paginate the join — join one page at a time, one page per round-trip; pick for rendering; trade = repeated round-trips.
 // <- joined : [900000 rows] · CMP materializes 900000 rows in memory at once
 //    alt the query targets one order : ORD.fetch_all returns 1 row -> CMP joins 1 row -> the in-memory cost is negligible
 ```
@@ -205,7 +201,7 @@ _Role: databases_
 //    joined    : {}
 // DEF: compose_order · CALLED BY: CLI asking for order "O-101"
 // -> order_id : "O-101"
-// BUILD PHASE · run once per query · cost O(k)
+// BUILD PHASE · run once per query
 //    step 1 · CMP queries ORD    order_row : "none" -> { order_id:"O-101", cust_id:"C-77", total:120.00 }  BECAUSE ORD reads its own ORDDB
 //    -> input  : order_row = "none" (order_id = "O-101")
 //    <- output : order_row = { order_id:"O-101", cust_id:"C-77", total:120.00 }   BECAUSE ORD reads its own ORDDB
@@ -214,17 +210,16 @@ _Role: databases_
 //    decode 2a · extract the foreign key from the order row -> fk : "none" -> "C-77"
 //    decode 2b · resolve fk in CUST's database -> cust_row : "none" -> { id:"C-77", name:"Ada" }
 //    <- output : cust_row = { id:"C-77", name:"Ada" }   BECAUSE CUST reads its own CUSTDB by id "C-77"
-// QUERY PHASE · per join · cost O(1)
+// QUERY PHASE · per join
 //    step 3 · CMP joins in memory    joined : {} -> { order_id:"O-101", cust_id:"C-77", total:120.00, name:"Ada" }
 //    -> input  : joined = {} (order_row = { order_id:"O-101", cust_id:"C-77", total:120.00 }, cust_row = { id:"C-77", name:"Ada" })
 //    <- output : joined = { order_id:"O-101", cust_id:"C-77", total:120.00, name:"Ada" }   BECAUSE the composer merges the fragments on the foreign key
 //    step 4 · CMP returns one response    response : "none" -> { order_id:"O-101", name:"Ada", total:120.00 }
 //    -> input  : response = "none" (joined = { order_id:"O-101", cust_id:"C-77", total:120.00, name:"Ada" })
 //    <- output : response = { order_id:"O-101", name:"Ada", total:120.00 }   BECAUSE the composer returns the joined view to the client
-// COMPLEXITY · time(build) = O(k) to query k = 2 providers · time(query) = O(1) per join · space(extra) = O(1) per joined field
 // TRACE · order_id "O-101" -> CMP queries ORD: order_row = {order_id:"O-101", cust_id:"C-77", total:120.00} -> CMP queries CUST by fk "C-77": cust_row = {id:"C-77", name:"Ada"} -> join: joined = {order_id:"O-101", cust_id:"C-77", total:120.00, name:"Ada"} -> response = {order_id:"O-101", name:"Ada", total:120.00}
 // CORRECTNESS · invariant: the join keys each fragment on the shared id (cust_id "C-77" to id "C-77"), so the response always carries name from CUST and total from ORD, and the walk ends after k = 2 provider queries plus one in-memory join.
-// VARIANTS · (1) single shared database — one SQL JOIN, O(1); pick before Database per Service; trade = loses service data ownership. (2) CQRS read model — O(1) read of a precomputed view; pick for hot queries; trade = eventual consistency. (3) parallel provider queries — O(1) wall-clock; pick when providers are independent; trade = more error paths.
+// VARIANTS · (1) single shared database — one SQL JOIN, one statement; pick before Database per Service; trade = loses service data ownership. (2) CQRS read model — one read of a precomputed view; pick for hot queries; trade = eventual consistency. (3) parallel provider queries — all provider queries in one round-trip; pick when providers are independent; trade = more error paths.
 // <- outcome : CLI gets { order_id:"O-101", name:"Ada", total:120.00 }  BECAUSE the composer read each provider's fragment from its own database and joined them in memory
 ```
 

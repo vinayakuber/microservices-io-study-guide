@@ -23,7 +23,7 @@ registerChapter({
 //    kitchen : {}
 // DEF: create_order · CALLED BY: U1 placing an order (FTGO OrderService)
 // -> order_id : "PO-2001" · -> event : "OrderCreated"
-// BUILD PHASE · run once per order at write time · cost O(1)
+// BUILD PHASE · run once per order at write time
 //    step 1 · SVC writes the order locally      : orders : {} -> { "PO-2001": { status: "CREATED" } }
 //    -> input  : orders = {}
 //    <- output : orders = { "PO-2001": { status: "CREATED" } }   BECAUSE the order service persists the new order locally
@@ -37,16 +37,13 @@ registerChapter({
 //
 // DEF: consume · CALLED BY: CON polling BRK whenever it is ready
 // -> poll : channel = [ "OrderCreated(PO-2001)" ]
-// QUERY PHASE · per message read · cost O(1)
+// QUERY PHASE · per message read
 //    step 1 · CON receives the message          : channel : [ "OrderCreated(PO-2001)" ] -> []
 //    -> input  : channel = [ "OrderCreated(PO-2001)" ]
 //    <- output : channel = []   BECAUSE the consumer polls the broker and takes the message off the channel
 //    step 2 · CON starts cooking the order      : kitchen : {} -> { "PO-2001": "COOKING" }
 //    -> input  : kitchen = {}
 //    <- output : kitchen = { "PO-2001": "COOKING" }   BECAUSE the consumer handles the received message by starting the order
-// COMPLEXITY:
-//    time(build) = O(1) per order = 1 local write + 1 publish · time(query) = O(1) per message = 1 receive + 1 handle
-//    space(extra) = O(1) = the single channel slot holding the in-flight message
 // TRACE (one run, 1 order):
 //    phase  | channel                     | orders                      | kitchen
 //    build  | [ "OrderCreated(PO-2001)" ] | { "PO-2001": "CREATED" }   | {}
@@ -54,9 +51,9 @@ registerChapter({
 // CORRECTNESS (decoupling invariant): SVC writes the order then publishes and returns with no reply; CON
 //    takes the message off the channel later, so the two services never run at the same instant.
 // VARIANTS (when to pick which):
-//    point-to-point channel      -> one channel delivers to one consumer, O(1) per message, O(1) space   (use when one receiver should act)   <- THIS ONE
-//    request/response            -> add a reply-to channel and correlation id, O(1) per message             (use when the caller needs a reply)
-//    publish/subscribe           -> broker fans out to N subscribers, O(n) per message, O(n) space          (use when many services react)
+//    point-to-point channel      -> one channel delivers to one consumer, one message per slot   (use when one receiver should act)   <- THIS ONE
+//    request/response            -> add a reply-to channel and correlation id, one message each way   (use when the caller needs a reply)
+//    publish/subscribe           -> broker fans out to N subscribers, one copy per subscriber   (use when many services react)
 // <- message : "OrderCreated(PO-2001)" consumed · SVC and CON never run at the same instant`
     },
     {
@@ -110,9 +107,9 @@ registerChapter({
 //    inbox_kitchen : []
 // DEF: publish_order_created · CALLED BY: PUB after an order is created
 // -> event : "OrderCreated(PO-2001)"
-// BUILD PHASE · run once at startup · cost O(1)
+// BUILD PHASE · run once at startup
 //    subscribe both readers once -> topic["orders"] fans out to [ inbox_billing, inbox_kitchen ]
-// QUERY PHASE · per publish · cost O(n)
+// QUERY PHASE · per publish
 //    step 1 · PUB publishes once to the topic   : topic["orders"] : [] -> [ "OrderCreated(PO-2001)" ]
 //    -> input  : topic["orders"] = []
 //    <- output : topic["orders"] = [ "OrderCreated(PO-2001)" ]   BECAUSE the publisher writes one message to the topic
@@ -125,9 +122,6 @@ registerChapter({
 //    step 4 · the topic drains after fan-out    : topic["orders"] : [ "OrderCreated(PO-2001)" ] -> []
 //    -> input  : topic["orders"] = [ "OrderCreated(PO-2001)" ]
 //    <- output : topic["orders"] = []   BECAUSE fan-out is complete once every subscriber has its copy
-// COMPLEXITY:
-//    time(build) = O(1) = 1 subscription setup at startup · time(query) = O(n) per publish for n subscribers = n copies + 1 topic write
-//    space(extra) = O(n) = one inbox copy per subscriber
 // TRACE (one run, event = "OrderCreated(PO-2001)", n = 2 subscribers):
 //    phase  | topic["orders"]                 | inbox_billing              | inbox_kitchen
 //    input  | []                              | []                         | []
@@ -135,9 +129,9 @@ registerChapter({
 // CORRECTNESS (fan-out invariant): the broker copies one message into every subscriber's inbox and then
 //    drains the topic, so each subscriber receives exactly one copy — n copies for n subscribers, 0 for 0.
 // VARIANTS (when to pick which):
-//    fan-out to all subscribers   -> broker copies to every subscriber, O(n) per publish, O(n) space    (use when all readers react)   <- THIS ONE
-//    topic partition by key       -> route each key to one partition's subscribers, O(1) per publish      (use when per-key order matters)
-//    filtered topic               -> each subscriber declares a filter, O(n) per publish, O(n) space      (use when readers want subsets)
+//    fan-out to all subscribers   -> broker copies to every subscriber, one copy each    (use when all readers react)   <- THIS ONE
+//    topic partition by key       -> route each key to one partition's subscribers, one copy per partition    (use when per-key order matters)
+//    filtered topic               -> each subscriber declares a filter, one copy per match    (use when readers want subsets)
 // <- delivery : 2 copies of "OrderCreated(PO-2001)" · zero subscribers would mean 0 copies
 //    alt reader down : BRK holds its copy  BECAUSE the broker buffers per subscriber`
     },
@@ -333,23 +327,20 @@ registerChapter({
 //    inbox   : []   // CON's subscription mailbox
 // DEF: publish_consume · CALLED BY: PUB after creating order "PO-2001"
 // -> order_id : "PO-2001" · -> event : "OrderCreated"
-// BUILD PHASE · run once per message at write time · cost O(1)
+// BUILD PHASE · run once per message at write time
 //    step 1 · PUB builds the message    message : "none" -> "OrderCreated(PO-2001)"
 //    -> input  : order_id = "PO-2001" (event = "OrderCreated")
 //    <- output : message = "OrderCreated(PO-2001)"   BECAUSE the producer builds the message from the order it created
 //    step 2 · PUB publishes to the channel    channel : [] -> [ "OrderCreated(PO-2001)" ]
 //    -> input  : channel = []
 //    <- output : channel = [ "OrderCreated(PO-2001)" ]   BECAUSE the producer writes the message to the channel and returns at once
-// QUERY PHASE · per message read · cost O(1)
+// QUERY PHASE · per message read
 //    step 3 · BRK delivers a copy to CON's inbox    inbox : [] -> [ "OrderCreated(PO-2001)" ]
 //    -> input  : inbox = []
 //    <- output : inbox = [ "OrderCreated(PO-2001)" ]   BECAUSE the broker transports the message to the subscriber's mailbox
 //    step 4 · CON consumes and handles it    kitchen : {} -> { "PO-2001": "COOKING" }   BECAUSE the receiver reads the channel and handles the message
 //    -> input  : kitchen = {}
 //    <- output : kitchen = { "PO-2001": "COOKING" }   BECAUSE the receiver reads the channel and handles the message
-// COMPLEXITY:
-//    time(build) = O(1) per message = 1 build + 1 publish · time(query) = O(1) per message = 1 deliver + 1 consume
-//    space(extra) = O(1) = the channel slot + the inbox slot for one in-flight message
 // TRACE (one run, 1 message):
 //    phase  | channel                     | inbox                       | kitchen
 //    build  | [ "OrderCreated(PO-2001)" ] | []                          | {}
@@ -357,9 +348,9 @@ registerChapter({
 // CORRECTNESS (decoupling invariant): PUB builds and publishes, then returns with no reply; BRK delivers a
 //    copy to CON's inbox and CON handles it later, so sender and receiver never run at the same instant.
 // VARIANTS (when to pick which):
-//    point-to-point channel      -> one channel delivers to one consumer, O(1) per message, O(1) space   (use when one receiver should act)   <- THIS ONE
-//    request/response            -> add a reply-to channel and correlation id, O(1) per message             (use when the caller needs a reply)
-//    publish/subscribe           -> broker fans out to N subscribers, O(n) per message, O(n) space          (use when many services react)
+//    point-to-point channel      -> one channel delivers to one consumer, one message per slot   (use when one receiver should act)   <- THIS ONE
+//    request/response            -> add a reply-to channel and correlation id, one message each way   (use when the caller needs a reply)
+//    publish/subscribe           -> broker fans out to N subscribers, one copy per subscriber   (use when many services react)
 // <- outcome : CON handled "OrderCreated(PO-2001)" · PUB returned at once, no reply   BECAUSE sender and receiver never run at the same instant`
   },
   concepts: {

@@ -24,9 +24,9 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 7 · microservices
 //    remote_calls : 0
 // DEF: forward · CALLED BY: CLIENT, three requests in a row at 00:00:00, 00:00:01, 00:00:02
 // -> request : "get-user-1"
-// BUILD PHASE · run once at startup · cost O(1)
+// BUILD PHASE · run once at startup
 //    configure the breaker once with threshold = 3, timeout_s = 60, state = "CLOSED"
-// QUERY PHASE · per call · cost O(1)
+// QUERY PHASE · per call
 //    step 1 · PROXY forwards the call to SVC    : remote_calls : 0 -> 1
 //    -> input  : remote_calls = 0 (request = "get-user-1")
 //    <- output : remote_calls = 1   BECAUSE the proxy forwards the first call to the remote service
@@ -42,9 +42,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 7 · microservices
 //    step 5 · PROXY opens the circuit           : state : "CLOSED" -> "OPEN"
 //    -> input  : breaker.state = "CLOSED" (consecutive_failures = 3)
 //    <- output : breaker.state = "OPEN"   BECAUSE the failure count crossed the threshold, so the breaker trips
-// COMPLEXITY:
-//    time(build) = O(1)   · time(query) = O(1) = 1 counter increment + 1 threshold compare per call
-//    space(extra) = O(1) = the breaker object (state + counter + threshold + timeout)
 // TRACE (one run, threshold = 3):
 //    call # | consecutive_failures | breaker.state | verdict
 //      1    |          1           |    CLOSED     |  retry
@@ -53,9 +50,9 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 7 · microservices
 //    on a success, so it always equals the current streak; the state flips to "OPEN" exactly when 3 >= 3,
 //    never earlier and never after skipping a failure.
 // VARIANTS (when to pick which):
-//    consecutive-failure count -> trips after N failures in a row, O(1) per call, O(1) space        (use when outages arrive in bursts)   <- THIS ONE
-//    time-windowed count       -> trips after N failures within T seconds, O(1) per call, O(1) space  (use when failures are sporadic)
-//    error-rate breaker        -> trips when the rate over the last W calls exceeds p, O(1) amortized (use when you need a rate, not a count)
+//    consecutive-failure count -> trips after N failures in a row, one counter per call, one breaker object   (use when outages arrive in bursts)   <- THIS ONE
+//    time-windowed count       -> trips after N failures within T seconds, one counter per call, one breaker object   (use when failures are sporadic)
+//    error-rate breaker        -> trips when the rate over the last W calls exceeds p, one counter update per call   (use when you need a rate, not a count)
 // <- verdict : "OPEN" tripped at 00:00:02 · every later attempt fails immediately for the timeout
 ```
 
@@ -79,9 +76,9 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 7 · microservices
 //    elapsed : 0
 // DEF: reject · CALLED BY: CLIENT, requests arriving at 00:00:10 and 00:00:30 inside the 60 s window
 // -> request : "get-user-2" at 00:00:10
-// BUILD PHASE · run once at startup · cost O(1)
+// BUILD PHASE · run once at startup
 //    configure the breaker once with state = "OPEN", timeout_s = 60, opened_at = "00:00:02"
-// QUERY PHASE · per call · cost O(1)
+// QUERY PHASE · per call
 //    step 1 · PROXY sees the window is not over : elapsed : 0 -> 8  BECAUSE 00:00:10 - 00:00:02 = 8 s < 60 s
 //    -> input  : elapsed = 0 (opened_at = "00:00:02", now = "00:00:10")
 //    <- output : elapsed = 8   BECAUSE 00:00:10 - 00:00:02 = 8 s < 60 s
@@ -94,9 +91,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 7 · microservices
 //    step 4 · SVC received nothing               : svc_calls : 0 -> 0  BECAUSE the breaker short-circuits
 //    -> input  : svc_calls = 0
 //    <- output : svc_calls = 0   BECAUSE the breaker short-circuits
-// COMPLEXITY:
-//    time(build) = O(1)   · time(query) = O(1) = 1 elapsed check + 1 rejection per call
-//    space(extra) = O(1) = the breaker object (state + opened_at + timeout)
 // TRACE (one run, timeout_s = 60):
 //    now      | elapsed = now - opened_at | window over? | svc_calls | verdict
 //    00:00:10 |          8 = 10 - 2        |      no      |     0     | FAIL_FAST
@@ -104,9 +98,9 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 7 · microservices
 // CORRECTNESS (short-circuit invariant): while state = "OPEN" and elapsed < timeout_s, every call is
 //    rejected before it reaches SVC, so svc_calls stays 0 and no caller thread blocks on the down service.
 // VARIANTS (when to pick which):
-//    fail fast with an error          -> reject immediately, O(1) per call, no extra space       (use when callers handle an error)   <- THIS ONE
-//    fail fast with a cached fallback -> reject but return a stale value, O(1) + a cache          (use when a stale answer beats none)
-//    fail fast with a queued retry    -> reject now, retry once after the window, O(1) + a queue  (use when the call must not be lost)
+//    fail fast with an error          -> reject immediately, no extra space       (use when callers handle an error)   <- THIS ONE
+//    fail fast with a cached fallback -> reject but return a stale value, keep one cached value          (use when a stale answer beats none)
+//    fail fast with a queued retry    -> reject now, retry once after the window, keep one queued entry  (use when the call must not be lost)
 // <- verdict : "FAIL_FAST" twice (00:00:10, 00:00:30) · threads freed at once, SVC untouched
 ```
 
@@ -128,9 +122,9 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 7 · microservices
 //    reply : null
 // DEF: probe · CALLED BY: CLIENT, the first request after the timeout, at 00:01:02
 // -> request : "get-user-3" at 00:01:02
-// BUILD PHASE · run once at startup · cost O(1)
+// BUILD PHASE · run once at startup
 //    configure the breaker once with state = "OPEN", timeout_s = 60, opened_at = "00:00:02"
-// QUERY PHASE · per probe · cost O(1)
+// QUERY PHASE · per probe
 //    step 1 · the timeout has expired           : state : "OPEN" -> "HALF-OPEN"  BECAUSE 00:01:02 - 00:00:02 = 60 s >= 60 s
 //    -> input  : breaker.state = "OPEN" (opened_at = "00:00:02", now = "00:01:02")
 //    <- output : breaker.state = "HALF-OPEN"   BECAUSE 00:01:02 - 00:00:02 = 60 s >= 60 s
@@ -146,18 +140,15 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 7 · microservices
 //    step 5 · the failure counter resets        : consecutive_failures : 3 -> 0
 //    -> input  : consecutive_failures = 3
 //    <- output : consecutive_failures = 0   BECAUSE normal operation resumed, so the failure counter is cleared
-// COMPLEXITY:
-//    time(build) = O(1)   · time(query) = O(1) = 1 elapsed check + 1 probe outcome per probe
-//    space(extra) = O(1) = the breaker object (state + counter + probe_count)
 // TRACE (one run, timeout_s = 60):
 //    now      | elapsed = now - opened_at | probe_count | reply     | breaker.state
 //    00:01:02 |         60 = 62 - 2        |      1      | "user-3"  |    CLOSED
 // CORRECTNESS (recovery lemma): a probe runs only when elapsed >= timeout_s, so at most one probe is in
 //    flight at a time; its reply decides CLOSED on success and OPEN on failure, so HALF-OPEN never stalls.
 // VARIANTS (when to pick which):
-//    single test request          -> let exactly 1 request through, O(1) per probe           (use when traffic is light)   <- THIS ONE
-//    limited burst of N requests  -> let up to N requests through, O(1) per probe            (use when one success is weak evidence)
-//    gradual ramp                 -> double the allowed count on each success, O(1) per probe (use when the service recovers slowly)
+//    single test request          -> let exactly 1 request through, one probe at a time           (use when traffic is light)   <- THIS ONE
+//    limited burst of N requests  -> let up to N requests through, N probes at a time            (use when one success is weak evidence)
+//    gradual ramp                 -> double the allowed count on each success, one probe per success (use when the service recovers slowly)
 // <- verdict : "CLOSED" resumed at 00:01:02 · normal operation restored
 //    alt test request fails : state : "HALF-OPEN" -> "OPEN"  BECAUSE the timeout period begins again
 ```
@@ -242,9 +233,9 @@ _Role: server_
 //    verdict : "UNSET"
 // DEF: call · CALLED BY: CLIENT, a request that keeps timing out
 // -> request : "charge-card-4"
-// BUILD PHASE · run once at startup · cost O(1)
+// BUILD PHASE · run once at startup
 //    configure the breaker once with threshold = 4, timeout_ms = 250, state = "CLOSED"
-// QUERY PHASE · per call · cost O(1)
+// QUERY PHASE · per call
 //    step 1 · CLIENT calls through the proxy : remote_calls : 0 -> 1
 //    -> input  : remote_calls = 0 (request = "charge-card-4")
 //    <- output : remote_calls = 1   BECAUSE the caller makes the remote call through the breaker proxy
@@ -257,9 +248,6 @@ _Role: server_
 //    step 4 · PROXY fails fast : verdict : "UNSET" -> "OPEN"
 //    -> input  : verdict = "UNSET" (breaker.state = "OPEN")
 //    <- output : verdict = "OPEN"   BECAUSE an open breaker rejects the call immediately
-// COMPLEXITY:
-//    time(build) = O(1) = 1 object allocation   · time(query) = O(1) = 1 counter increment + 1 compare per call
-//    space(extra) = O(1) = the breaker object (state + counter + threshold + timeout)
 // TRACE (one run, threshold = 4, timeout_ms = 250):
 //    call # | remote_calls | consecutive_failures | breaker.state | verdict
 //      1    |      1       |          1           |    CLOSED     |  retry
@@ -267,10 +255,10 @@ _Role: server_
 // CORRECTNESS (state invariant): breaker.state is "CLOSED" only while consecutive_failures < threshold;
 //    the counter moves 0 -> 4 in one step, so 4 >= 4 flips the state to "OPEN" and every later call fails fast.
 // VARIANTS (when to pick which):
-//    count-based breaker    -> trips after N consecutive failures, O(1) per call, O(1) space         (use when failures arrive in bursts)   <- THIS ONE
-//    time-windowed breaker  -> trips after N failures inside a T-second window, O(1) per call, O(1) space (use when failures are spread over time)
-//    sliding-window breaker -> trips when the failure rate over the last W calls exceeds p, O(1) amortized (use when you need a rate, not a count)
-//    adaptive breaker       -> tunes threshold and timeout from observed latency, O(1) per call        (use when load varies and you want it to self-tune)
+//    count-based breaker    -> trips after N consecutive failures, one counter per call, one breaker object         (use when failures arrive in bursts)   <- THIS ONE
+//    time-windowed breaker  -> trips after N failures inside a T-second window, one counter per call, one breaker object (use when failures are spread over time)
+//    sliding-window breaker -> trips when the failure rate over the last W calls exceeds p, one counter update per call (use when you need a rate, not a count)
+//    adaptive breaker       -> tunes threshold and timeout from observed latency, one counter update per call        (use when load varies and you want it to self-tune)
 // <- verdict : "OPEN" · further calls fail immediately without touching SVC
 //    alt after timeout : PROXY lets one test request through  BECAUSE a half-open breaker probes the service before resuming
 ```

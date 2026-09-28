@@ -24,9 +24,9 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.12 · microservices
 //    published : [ ]
 // DEF: poll_once · CALLED BY: a timer firing every 100 ms
 // -> query : SELECT * FROM outbox WHERE sent=false   // returns [ (1,"E1",sent=false), (2,"E2",sent=false) ]
-// BUILD PHASE · run once at write time · cost O(1)
+// BUILD PHASE · run once at write time
 //    the outbox pattern wrote these rows once -> outbox = [ (1,"E1",sent=false), (2,"E2",sent=false) ]
-// QUERY PHASE · per poll · cost O(k)
+// QUERY PHASE · per poll
 //    step 1 · fetch rows    : rows : [ ] -> [ (1,"E1",sent=false), (2,"E2",sent=false) ]
 //    -> input  : rows = [] (query = "SELECT * FROM outbox WHERE sent=false")
 //    <- output : rows = [ (1,"E1",sent=false), (2,"E2",sent=false) ]   BECAUSE the DB returns the two unsent outbox rows
@@ -42,18 +42,15 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.12 · microservices
 //    step 5 · mark row 2    : outbox : [(1,"E1",sent=true),(2,"E2",sent=false)] -> [(1,"E1",sent=true),(2,"E2",sent=true)]
 //    -> input  : outbox = [(1,"E1",sent=true),(2,"E2",sent=false)] (row_id = 2)
 //    <- output : outbox = [(1,"E1",sent=true),(2,"E2",sent=true)]   BECAUSE the relay sets row 2's sent flag to true
-// COMPLEXITY:
-//    time(build) = O(1) per event = the outbox write inside the app's transaction · time(query) = O(k) per poll for k unsent rows = 1 SELECT + k publishes + k mark-sent updates
-//    space(extra) = O(k) = the rows list + the published list of k events
 // TRACE (one run, k = 2 unsent rows):
 //    poll  | rows fetched               | published        | outbox state
 //    t=0   | [ (1,"E1"), (2,"E2") ]     | [ "E1", "E2" ]   | both rows sent=true
 // CORRECTNESS (drain invariant): each poll selects only sent=false rows, publishes them, then flips each
 //    to sent=true, so a row is published exactly once and the next poll's SELECT sees 0 unsent rows.
 // VARIANTS (when to pick which):
-//    per-row mark-sent            -> mark each row right after its publish, O(k) per poll, O(1) extra        (use when the broker may drop a message)   <- THIS ONE
-//    batch mark-sent              -> publish all rows then mark all at once, O(k) per poll, O(k) extra       (use when the broker acks in bulk)
-//    transactional poll-publish   -> publish + mark in one transaction, O(k) per poll                         (use when a duplicate is intolerable)
+//    per-row mark-sent            -> mark each row right after its publish, one update per row, no extra space        (use when the broker may drop a message)   <- THIS ONE
+//    batch mark-sent              -> publish all rows then mark all at once, one update per row, keep one list of k rows       (use when the broker acks in bulk)
+//    transactional poll-publish   -> publish + mark in one transaction, one update per row                         (use when a duplicate is intolerable)
 // <- output : BRK received [ "E1", "E2" ] · outbox now fully sent
 ```
 
@@ -73,7 +70,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.12 · microservices
 // STATE (before):
 //    outbox : [ (1, "E1", sent=false), (2, "E2", sent=false) ]
 //    published : [ ]
-// BUILD PHASE · run once at write time · cost O(1)
+// BUILD PHASE · run once at write time
 //    the outbox pattern wrote these rows once -> outbox = [ (1,"E1",sent=false), (2,"E2",sent=false) ]
 // DEF: poll_without_order · CALLED BY: the relay running a query with no ORDER BY
 // -> query : SELECT * FROM outbox WHERE sent=false   // returns rows in DB order, here id 2 first
@@ -85,7 +82,7 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.12 · microservices
 //    <- output : published = [ "E2", "E1" ]   BECAUSE the query returns id 1 after id 2
 // <- output : BRK receives [ "E2", "E1" ] · order WRONG (E1 should precede E2)
 // DEF: poll_with_order · CALLED BY: the relay adding ORDER BY id to the same query
-// QUERY PHASE · per poll · cost O(k)
+// QUERY PHASE · per poll
 // -> query : SELECT * FROM outbox WHERE sent=false ORDER BY id ASC   // returns id 1 then id 2
 //    step 1 · publish id 1 : published : [ ] -> [ "E1" ]     BECAUSE ORDER BY id returns the committed-first row first
 //    -> input  : published = [] (row = (1,"E1",sent=false))
@@ -93,9 +90,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.12 · microservices
 //    step 2 · publish id 2 : published : [ "E1" ] -> [ "E1", "E2" ]
 //    -> input  : published = [ "E1" ] (row = (2,"E2",sent=false))
 //    <- output : published = [ "E1", "E2" ]   BECAUSE ORDER BY id returns id 2 after id 1
-// COMPLEXITY:
-//    time(build) = O(1) per event = the outbox write inside the app's transaction · time(query) = O(k log k) per poll for k unsent rows = 1 SELECT with ORDER BY + k publishes + k mark-sent updates
-//    space(extra) = O(k) = the ordered rows list of k events
 // TRACE (one run, k = 2 events):
 //    query                            | published        | order
 //    SELECT ... WHERE sent=false      | [ "E2", "E1" ]   | WRONG (no ORDER BY)
@@ -103,9 +97,9 @@ _Also known as: Chris Richardson · Microservice Patterns Ch.12 · microservices
 // CORRECTNESS (order lemma): ORDER BY id reads rows in id order, and id grows in commit order, so the
 //    poll publishes E1 (id 1) before E2 (id 2) — exactly the insertion sequence, never the reversed order.
 // VARIANTS (when to pick which):
-//    ORDER BY outbox id           -> sort by the autoincrement id, O(k log k) per poll, O(k) space      (use when id = commit order)   <- THIS ONE
-//    ORDER BY event timestamp     -> sort by the domain timestamp, O(k log k) per poll, O(k) space      (use when wall-clock order is the contract)
-//    partition by aggregate       -> publish each aggregate's events in id order, O(k log k) per poll    (use when cross-aggregate order is irrelevant)
+//    ORDER BY outbox id           -> sort by the autoincrement id, one sort of k rows per poll, keep one ordered list of k rows      (use when id = commit order)   <- THIS ONE
+//    ORDER BY event timestamp     -> sort by the domain timestamp, one sort of k rows per poll, keep one ordered list of k rows      (use when wall-clock order is the contract)
+//    partition by aggregate       -> publish each aggregate's events in id order, one sort of k rows per poll    (use when cross-aggregate order is irrelevant)
 // <- output : BRK receives [ "E1", "E2" ] · order CORRECT
 ```
 
@@ -194,9 +188,9 @@ _Role: subscriber_
 //    status : "unsent"
 // DEF: poll_once · CALLED BY: a scheduler tick every 250 ms
 // -> query : "SELECT * FROM outbox WHERE sent=false ORDER BY id ASC"
-// BUILD PHASE · run once at write time · cost O(1)
+// BUILD PHASE · run once at write time
 //    the outbox pattern wrote these rows once -> outbox = [ (10, "OrderCreated", sent=false), (11, "PaymentAuthorized", sent=false) ]
-// QUERY PHASE · per poll · cost O(k)
+// QUERY PHASE · per poll
 //    step 1 · RLY fetches the unsent rows    list : [] -> [ (10, "OrderCreated"), (11, "PaymentAuthorized") ]   BECAUSE the query returns rows whose sent flag is false, ordered by id
 //    -> input  : list = [] (query = "SELECT * FROM outbox WHERE sent=false ORDER BY id ASC")
 //    <- output : list = [ (10, "OrderCreated"), (11, "PaymentAuthorized") ]   BECAUSE the query returns rows whose sent flag is false, ordered by id
@@ -209,18 +203,15 @@ _Role: subscriber_
 //    step 4 · SUB consumes "OrderCreated"    status : "unsent" -> "delivered"   BECAUSE the subscriber reads the event off BRK
 //    -> input  : status = "unsent" (brk = [ "OrderCreated", "PaymentAuthorized" ])
 //    <- output : status = "delivered"   BECAUSE the subscriber reads the event off BRK
-// COMPLEXITY:
-//    time(build) = O(1) per event = the outbox write inside the app's transaction · time(query) = O(k) per poll for k unsent rows = 1 SELECT + k publishes + k mark-sent updates
-//    space(extra) = O(k) = the list of k unsent rows the relay drains
 // TRACE (one run, k = 2 unsent rows):
 //    poll  | list                                                  | outbox state         | status
 //    t=0   | [ (10,"OrderCreated"), (11,"PaymentAuthorized") ]     | both rows sent=true  | delivered
 // CORRECTNESS (drain invariant): the relay selects sent=false rows in id order, publishes each, and marks it
 //    sent, so every row is published exactly once and SUB receives the events in the same id order.
 // VARIANTS (when to pick which):
-//    per-row mark-sent            -> mark each row right after its publish, O(k) per poll, O(1) extra        (use when the broker may drop a message)   <- THIS ONE
-//    batch mark-sent              -> publish all rows then mark all at once, O(k) per poll, O(k) extra       (use when the broker acks in bulk)
-//    transactional poll-publish   -> publish + mark in one transaction, O(k) per poll                         (use when a duplicate is intolerable)
+//    per-row mark-sent            -> mark each row right after its publish, one update per row, no extra space        (use when the broker may drop a message)   <- THIS ONE
+//    batch mark-sent              -> publish all rows then mark all at once, one update per row, keep one list of k rows       (use when the broker acks in bulk)
+//    transactional poll-publish   -> publish + mark in one transaction, one update per row                         (use when a duplicate is intolerable)
 // <- output : BRK holds [ "OrderCreated", "PaymentAuthorized" ] · SUB consumes them in id order
 ```
 

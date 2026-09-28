@@ -27,11 +27,11 @@ registerChapter({
 //    forwarded : "none"
 // DEF: a client sends a request · CALLED BY: CLI calling the router's well-known address
 // -> request : "POST http://router.example.com/orders"
-// BUILD PHASE · run once at startup, per instance · cost O(1)
+// BUILD PHASE · run once at startup, per instance
 //    step 0 · the instances write these rows at startup : registry["order-service"] : [] -> [{"host":"10.0.1.7","port":8080},{"host":"10.0.1.8","port":8080}]   BECAUSE each instance writes its own row on boot (self-registration)
 //    -> input  : registry["order-service"] = []
 //    <- output : registry["order-service"] = [{"host":"10.0.1.7","port":8080},{"host":"10.0.1.8","port":8080}]   BECAUSE each instance writes its own row on boot (self-registration)
-// QUERY PHASE · per lookup · cost O(1)
+// QUERY PHASE · per lookup
 //    step 1 · RTR queries REG : lookup : [] -> ["10.0.1.7:8080","10.0.1.8:8080"]   BECAUSE the router asks the registry for available instances
 //    -> input  : lookup = [] (registry = {"order-service" -> [{"host":"10.0.1.7","port":8080},{"host":"10.0.1.8","port":8080}]})
 //    <- output : lookup = ["10.0.1.7:8080","10.0.1.8:8080"]   BECAUSE the router asks the registry for available instances
@@ -41,18 +41,15 @@ registerChapter({
 //    step 3 · RTR forwards : forwarded : "none" -> "10.0.1.7:8080"   BECAUSE the router relays the request to the chosen instance
 //    -> input  : router_target = "10.0.1.7:8080" (forwarded = "none")
 //    <- output : forwarded = "10.0.1.7:8080"   BECAUSE the router relays the request to the chosen instance
-// COMPLEXITY:
-//    time(build) = O(1) per instance = 1 registry row write at startup · time(query) = O(1) per lookup = 1 read + 1 pick + 1 forward
-//    space(extra) = O(1) = the lookup list of 2 instances returned by the registry
 // TRACE (one run, 2 registered instances):
 //    lookup                            | router_target     | forwarded
 //    ["10.0.1.7:8080","10.0.1.8:8080"] | "10.0.1.7:8080"   | "10.0.1.7:8080"
 // CORRECTNESS (forwarding invariant): RTR queries REG, picks one instance from the returned lookup list,
 //    and forwards to it, so the client calls only the router and never resolves an instance itself.
 // VARIANTS (when to pick which):
-//    round-robin pick         -> cycles the target index, O(1) per lookup, O(1) extra space       (use when load is uniform)   <- THIS ONE
-//    least-connections pick   -> tracks per-instance in-flight counts, O(1) per lookup, O(n) space  (use when requests vary in cost)
-//    sticky-session pick      -> hashes the client to one instance, O(1) per lookup, O(1) space     (use when state lives on the instance)
+//    round-robin pick         -> cycles the target index, one index read per lookup, no extra space       (use when load is uniform)   <- THIS ONE
+//    least-connections pick   -> tracks per-instance in-flight counts, one counter read per lookup, one counter per instance  (use when requests vary in cost)
+//    sticky-session pick      -> hashes the client to one instance, one hash per lookup, no extra space     (use when state lives on the instance)
 // <- forwarded call : "POST http://10.0.1.7:8080/orders"   (the client never resolved the instance itself)`
     },
     {
@@ -102,9 +99,9 @@ registerChapter({
 //    forwarded : "none"
 // DEF: a client calls a service · CALLED BY: CLI connecting to the local proxy
 // -> connect : "localhost:8080"   (the port assigned to order-service)
-// BUILD PHASE · run once at startup · cost O(1)
+// BUILD PHASE · run once at startup
 //    configure cluster_map once with "order-service" -> "port 8080"
-// QUERY PHASE · per lookup · cost O(1)
+// QUERY PHASE · per lookup
 //    step 1 · proxy resolves the port : proxy_target : "unset" -> "order-service"   BECAUSE port 8080 is assigned to order-service in the cluster
 //    -> input  : proxy_target = "unset" (connect = "localhost:8080")
 //    <- output : proxy_target = "order-service"   BECAUSE port 8080 is assigned to order-service in the cluster
@@ -114,18 +111,15 @@ registerChapter({
 //    step 3 · proxy forwards : forwarded : "none" -> "10.0.4.9:8080"   BECAUSE it relays the request to that instance
 //    -> input  : selected = ["10.0.4.9:8080"] (forwarded = "none")
 //    <- output : forwarded = "10.0.4.9:8080"   BECAUSE it relays the request to that instance
-// COMPLEXITY:
-//    time(build) = O(1) = 1 cluster_map entry at startup · time(query) = O(1) per lookup = 1 port resolve + 1 instance find + 1 forward
-//    space(extra) = O(1) = the selected list of 1 instance
 // TRACE (one run):
 //    connect          | proxy_target    | selected          | forwarded
 //    "localhost:8080" | "order-service" | ["10.0.4.9:8080"] | "10.0.4.9:8080"
 // CORRECTNESS (forwarding invariant): the proxy resolves the port to a service name, then forwards to exactly
 //    one instance of that name, so the client only ever dials localhost:8080 and never a concrete cluster address.
 // VARIANTS (when to pick which):
-//    round-robin pick         -> cycles the target index, O(1) per lookup, O(1) extra space       (use when load is uniform)   <- THIS ONE
-//    least-connections pick   -> tracks per-instance in-flight counts, O(1) per lookup, O(n) space  (use when requests vary in cost)
-//    sticky-session pick      -> hashes the client to one instance, O(1) per lookup, O(1) space     (use when state lives on the instance)
+//    round-robin pick         -> cycles the target index, one index read per lookup, no extra space       (use when load is uniform)   <- THIS ONE
+//    least-connections pick   -> tracks per-instance in-flight counts, one counter read per lookup, one counter per instance  (use when requests vary in cost)
+//    sticky-session pick      -> hashes the client to one instance, one hash per lookup, no extra space     (use when state lives on the instance)
 // <- forwarded call : "POST http://10.0.4.9:8080/orders"   (the client only ever spoke to localhost:8080)
 //    alt another host : its local proxy forwards the same port to a different pod 10.0.4.12`
     },
@@ -309,9 +303,9 @@ registerChapter({
 //    status   : "none"
 // DEF: forward_request · CALLED BY: CLI calling the router's well-known address
 // -> request : "POST http://router.example.com/orders"
-// BUILD PHASE · run once at startup · cost O(1)
+// BUILD PHASE · run once at startup
 //    populate the registry once -> registry = {"order-service" -> ["10.0.1.7:8080", "10.0.1.8:8080"]}
-// QUERY PHASE · per lookup · cost O(1)
+// QUERY PHASE · per lookup
 //    step 1 · RTR queries REG for "order-service"    list : [] -> ["10.0.1.7:8080", "10.0.1.8:8080"]   BECAUSE the router asks the registry for available instances
 //    -> input  : list = [] (registry = {"order-service" -> ["10.0.1.7:8080", "10.0.1.8:8080"]})
 //    <- output : list = ["10.0.1.7:8080", "10.0.1.8:8080"]   BECAUSE the router asks the registry for available instances
@@ -321,18 +315,15 @@ registerChapter({
 //    step 3 · RTR forwards to the instance    status : "none" -> "200 OK"   BECAUSE the router relays the request to the chosen instance
 //    -> input  : target = "10.0.1.7:8080" (status = "none")
 //    <- output : status = "200 OK"   BECAUSE the router relays the request to the chosen instance
-// COMPLEXITY:
-//    time(build) = O(1) = 1 registry write at startup · time(query) = O(1) per lookup = 1 read + 1 pick + 1 forward
-//    space(extra) = O(1) = the list of 2 instances returned by the registry
 // TRACE (one run, 2 registered instances):
 //    list                              | target          | status
 //    ["10.0.1.7:8080","10.0.1.8:8080"] | "10.0.1.7:8080" | "200 OK"
 // CORRECTNESS (forwarding invariant): RTR queries REG, picks one element of the returned list, and forwards
 //    to it, so the client calls only the router and never resolves an instance itself.
 // VARIANTS (when to pick which):
-//    round-robin pick         -> cycles the target index, O(1) per lookup, O(1) extra space       (use when load is uniform)   <- THIS ONE
-//    least-connections pick   -> tracks per-instance in-flight counts, O(1) per lookup, O(n) space  (use when requests vary in cost)
-//    sticky-session pick      -> hashes the client to one instance, O(1) per lookup, O(1) space     (use when state lives on the instance)
+//    round-robin pick         -> cycles the target index, one index read per lookup, no extra space       (use when load is uniform)   <- THIS ONE
+//    least-connections pick   -> tracks per-instance in-flight counts, one counter read per lookup, one counter per instance  (use when requests vary in cost)
+//    sticky-session pick      -> hashes the client to one instance, one hash per lookup, no extra space     (use when state lives on the instance)
 // <- forwarded call : "POST http://10.0.1.7:8080/orders"   (the client never resolved an instance itself)`
   },
   concepts: {

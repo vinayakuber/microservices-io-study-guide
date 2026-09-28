@@ -64,9 +64,9 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 9 · microservices
 //    target : "none"
 // DEF: a client wants to call order-service · CALLED BY: CLI placing an order
 // -> request : "POST /orders"
-// BUILD PHASE · run once at startup, per instance · cost O(1)
+// BUILD PHASE · run once at startup, per instance
 //    self-register each instance -> registry["order-service"] = ["10.0.1.7:8080", "10.0.1.8:8080"]
-// QUERY PHASE · per lookup · cost O(1)
+// QUERY PHASE · per lookup
 //    step 1 · query the registry : CLI asks REG for "order-service"
 //    -> input  : request = "POST /orders" (logical name = "order-service")
 //    <- output : query_sent = "order-service"   BECAUSE the client asks the registry for the locations of all instances
@@ -76,9 +76,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 9 · microservices
 //    step 3 · pick one : target : "none" -> "10.0.1.7:8080"   BECAUSE the client load-balances across the returned set
 //    -> input  : resolved = ["10.0.1.7:8080","10.0.1.8:8080"] (target = "none")
 //    <- output : target = "10.0.1.7:8080"   BECAUSE the client load-balances across the returned set
-// COMPLEXITY:
-//    time(build) = O(1) per registration   · time(query) = O(1) = 1 map read + 1 pick, over n = 2 instances
-//    space(extra) = O(n) = the registry map (one entry per instance)
 // TRACE (one lookup, name = "order-service"):
 //    step     | resolved                             | target
 //    query    | ["10.0.1.7:8080","10.0.1.8:8080"]    | "none"
@@ -87,10 +84,10 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 9 · microservices
 //    is always one element of resolved; the pick selects exactly one element of resolved, so the direct call
 //    never dials an address REG no longer lists.
 // VARIANTS (when to pick which):
-//    query the registry every call -> always fresh, O(1) registry round-trip per call (use when instances churn fast)   <- THIS ONE
-//    cache the instance list       -> O(1) local read, but can go stale between calls    (use when instances churn slowly)
-//    DNS-based discovery (SRV)     -> name resolves via DNS, O(1), no custom registry     (use when you already run DNS)
-//    mesh sidecar lookup           -> a local proxy hides the registry, O(1)              (use when you run a service mesh)
+//    query the registry every call -> always fresh, one registry round-trip per call (use when instances churn fast)   <- THIS ONE
+//    cache the instance list       -> one local read, but can go stale between calls    (use when instances churn slowly)
+//    DNS-based discovery (SRV)     -> name resolves via DNS, no custom registry     (use when you already run DNS)
+//    mesh sidecar lookup           -> a local proxy hides the registry              (use when you run a service mesh)
 // <- call : "POST http://10.0.1.7:8080/orders"   (the client calls the instance directly)
 //    alt second attempt : the first instance is busy -> target : "10.0.1.7:8080" -> "10.0.1.8:8080"
 ```
@@ -118,9 +115,9 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 9 · microservices
 //    instances : []
 // DEF: the proxy registers a user · CALLED BY: CLI calling restTemplate.postForEntity
 // -> request_url : "http://REGISTRATION-SERVICE/user"   (a logical name, not an IP)
-// BUILD PHASE · run once at startup, per instance · cost O(1)
+// BUILD PHASE · run once at startup, per instance
 //    self-register each instance -> eureka_registry["registration-service"] = [{"host":"10.0.2.4","port":8080}]
-// QUERY PHASE · per lookup · cost O(1)
+// QUERY PHASE · per lookup
 //    step 1 · @LoadBalanced intercepts : restTemplate_target : "unresolved" -> "REGISTRATION-SERVICE"   BECAUSE the URL host is a logical service name
 //    -> input  : restTemplate_target = "unresolved" (request_url = "http://REGISTRATION-SERVICE/user")
 //    <- output : restTemplate_target = "REGISTRATION-SERVICE"   BECAUSE the URL host is a logical service name
@@ -130,9 +127,6 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 9 · microservices
 //    step 3 · route to the instance : restTemplate_target : "REGISTRATION-SERVICE" -> "10.0.2.4:8080"   BECAUSE Ribbon rewrites the logical name to a network location
 //    -> input  : restTemplate_target = "REGISTRATION-SERVICE" (instances = [{"host":"10.0.2.4","port":8080}])
 //    <- output : restTemplate_target = "10.0.2.4:8080"   BECAUSE Ribbon rewrites the logical name to a network location
-// COMPLEXITY:
-//    time(build) = O(1) per registration   · time(query) = O(1) = 1 Eureka query + 1 Ribbon rewrite per call
-//    space(extra) = O(n) = Eureka's name -> instances map (n = 1 instance here)
 // TRACE (one call, logical name = "REGISTRATION-SERVICE"):
 //    step            | restTemplate_target    | instances
 //    intercept       | "REGISTRATION-SERVICE" | []
@@ -142,9 +136,9 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 9 · microservices
 //    so the request always hits a registered instance; if EUK returns [], the target stays "unresolved" and the
 //    call fails rather than dialing a guessed address.
 // VARIANTS (when to pick which):
-//    Ribbon + Eureka framework -> O(1), declarative wiring via @LoadBalanced   (use with Spring Cloud)   <- THIS ONE
-//    hand-rolled lookup        -> O(1), full control of the algorithm           (use when you cannot adopt a framework)
-//    Prana HTTP proxy          -> O(1), non-JVM clients proxy to the registry   (use when your clients are not JVM)
+//    Ribbon + Eureka framework -> one registry query plus one rewrite, declarative wiring via @LoadBalanced   (use with Spring Cloud)   <- THIS ONE
+//    hand-rolled lookup        -> one registry query plus one pick, full control of the algorithm           (use when you cannot adopt a framework)
+//    Prana HTTP proxy          -> one registry query, non-JVM clients proxy to the registry   (use when your clients are not JVM)
 // <- http call : "POST http://10.0.2.4:8080/user"   (the request now hits a real instance)
 //    alt no instance found : Ribbon gets [] -> restTemplate_target : "REGISTRATION-SERVICE" -> "unresolved" (the call fails)
 ```
@@ -230,9 +224,9 @@ _Role: service instances_
 //    status   : "none"
 // DEF: resolve_and_call · CALLED BY: CLI placing an order
 // -> request : "POST /orders"
-// BUILD PHASE · run once at startup, per instance · cost O(1)
+// BUILD PHASE · run once at startup, per instance
 //    self-register each instance -> registry["order-service"] = ["10.0.1.7:8080", "10.0.1.8:8080"]
-// QUERY PHASE · per lookup · cost O(1)
+// QUERY PHASE · per lookup
 //    step 1 · CLI queries REG for "order-service"    list : [] -> ["10.0.1.7:8080", "10.0.1.8:8080"]   BECAUSE REG returns every known instance for the name
 //    -> input  : list = [] (registry = {"order-service" -> ["10.0.1.7:8080", "10.0.1.8:8080"]})
 //    <- output : list = ["10.0.1.7:8080", "10.0.1.8:8080"]   BECAUSE REG returns every known instance for the name
@@ -242,9 +236,6 @@ _Role: service instances_
 //    step 3 · CLI calls the instance directly    status : "none" -> "200 OK"   BECAUSE the request goes straight to the chosen instance, no router
 //    -> input  : target = "10.0.1.7:8080" (status = "none")
 //    <- output : status = "200 OK"   BECAUSE the request goes straight to the chosen instance, no router
-// COMPLEXITY:
-//    time(build) = O(1) per registration   · time(query) = O(1) = 1 map read + 1 pick + 1 direct call, over n = 2 instances
-//    space(extra) = O(n) = the registry map (one entry per instance)
 // TRACE (one lookup, name = "order-service"):
 //    step   | list                                  | target          | status
 //    query  | ["10.0.1.7:8080","10.0.1.8:8080"]     | "none"          | "none"
@@ -255,7 +246,7 @@ _Role: service instances_
 // VARIANTS (when to pick which):
 //    client-side discovery -> 2 hops, no router, client coupled to the registry      (use when you want fewer moving parts)   <- THIS ONE
 //    server-side discovery -> 3 hops, a router load-balances for the client          (use when clients must stay registry-agnostic)
-//    service-mesh discovery -> the sidecar proxies the registry, O(1) per call        (use when you run a mesh and want discovery out of the app)
+//    service-mesh discovery -> the sidecar proxies the registry, one hop per call        (use when you run a mesh and want discovery out of the app)
 // <- call : "POST http://10.0.1.7:8080/orders"   (2 hops: CLI->REG then CLI->SVC)
 ```
 

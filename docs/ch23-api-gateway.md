@@ -24,11 +24,11 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 23 · microservice
 //    roundtrips : 0                          // network calls made so far
 // DEF: render_product_page · CALLED BY: MOB displaying one product
 // -> product : "P-9"                         // the product the client must display
-// BUILD PHASE · run once per page · cost O(k)
+// BUILD PHASE · run once per page
 //    step 1 · call PROD    // page : {} -> {title:"POJOs in Action", author:"Chris Richardson"}  · roundtrips : 0 -> 1
 //    -> input  : page = {} (product = "P-9", roundtrips = 0)
 //    <- output : page = {title:"POJOs in Action", author:"Chris Richardson"} · roundtrips = 1   BECAUSE PROD returns the title and author
-// QUERY PHASE · per service call · cost O(1)
+// QUERY PHASE · per service call
 //    step 2 · call PRI     // page : {title:"POJOs in Action", author:"Chris Richardson"} -> {title:"POJOs in Action", author:"Chris Richardson", price:39.99}  · roundtrips : 1 -> 2
 //    -> input  : page = {title:"POJOs in Action", author:"Chris Richardson"} (roundtrips = 1)
 //    <- output : page = {title:"POJOs in Action", author:"Chris Richardson", price:39.99} · roundtrips = 2   BECAUSE PRI returns the price
@@ -38,10 +38,9 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 23 · microservice
 //    step 4 · call REV     // page : {title:"POJOs in Action", author:"Chris Richardson", price:39.99, stock:3} -> {title:"POJOs in Action", author:"Chris Richardson", price:39.99, stock:3, reviews:12}  · roundtrips : 3 -> 4
 //    -> input  : page = {title:"POJOs in Action", author:"Chris Richardson", price:39.99, stock:3} (roundtrips = 3)
 //    <- output : page = {title:"POJOs in Action", author:"Chris Richardson", price:39.99, stock:3, reviews:12} · roundtrips = 4   BECAUSE REV returns the review count
-// COMPLEXITY · time(build) = O(k) to call k = 4 services · time(query) = O(1) per service call · space(extra) = O(1) per page field
 // TRACE · product "P-9" -> PROD: page = {title:"POJOs in Action", author:"Chris Richardson"}, roundtrips = 1 -> PRI: page adds price 39.99, roundtrips = 2 -> INV: page adds stock 3, roundtrips = 3 -> REV: page adds reviews 12, roundtrips = 4
 // CORRECTNESS · invariant: each call adds exactly the fields that service owns, and roundtrips counts them, so after k = 4 calls the page holds all four fragments and roundtrips = 4. The walk ends when every owning service has been called once.
-// VARIANTS · (1) API gateway fan-out — O(1) client round-trip with the gateway doing k calls internally; pick for slow networks; trade = one extra hop. (2) parallel client calls — O(1) wall-clock for the client; pick when services are independent; trade = more client logic. (3) CQRS read model — O(1) read of a precomputed page; pick for hot reads; trade = eventual consistency.
+// VARIANTS · (1) API gateway fan-out — one client round-trip with the gateway doing the 4 calls internally; pick for slow networks; trade = one extra hop. (2) parallel client calls — all 4 calls fired at once, so the client waits once; pick when services are independent; trade = more client logic. (3) CQRS read model — one read of a precomputed page; pick for hot reads; trade = eventual consistency.
 // <- page : {title:"POJOs in Action", author:"Chris Richardson", price:39.99, stock:3, reviews:12}  · 4 round-trips over a slow mobile network
 //    alt the client is on a LAN : 4 round-trips are cheap -> a server-side web app can afford them, the mobile client cannot
 ```
@@ -65,21 +64,20 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 23 · microservice
 //    response : null
 // DEF: route_request · CALLED BY: GW handling one request
 // -> request : "GET /products/P-9"             // the client sends one request to the gateway
-// BUILD PHASE · run once at startup · cost O(1)
+// BUILD PHASE · run once at startup
 //    step 1 · match the path    // path : null -> "/products"  BECAUSE the gateway looks the URL up in its route table
 //    -> input  : path = null (request = "GET /products/P-9")
 //    <- output : path = "/products"   BECAUSE the gateway looks the URL up in its route table
-// QUERY PHASE · per request · cost O(1)
+// QUERY PHASE · per request
 //    step 2 · forward to the service    // target : null -> "PROD"  BECAUSE route_table maps "/products" to the Product Info Service
 //    -> input  : target = null (path = "/products", route_table = {"/products" : "PROD"})
 //    <- output : target = "PROD"   BECAUSE route_table maps "/products" to the Product Info Service
 //    step 3 · return the response    // response : null -> {title:"POJOs in Action", author:"Chris Richardson"}
 //    -> input  : response = null (target = "PROD")
 //    <- output : response = {title:"POJOs in Action", author:"Chris Richardson"}   BECAUSE PROD answers the proxied request
-// COMPLEXITY · time(build) = O(1) to populate route_table once · time(query) = O(1) per request lookup · space(extra) = O(1) per route entry
 // TRACE · request "GET /products/P-9" -> match: path = "/products" -> forward: target = "PROD" (route_table["/products"]) -> return: response = {title:"POJOs in Action", author:"Chris Richardson"}
 // CORRECTNESS · invariant: every path resolves to exactly one target via route_table, so the gateway forwards to a determined service and the client never sees the host — the walk ends after one match + one forward + one return.
-// VARIANTS · (1) prefix / longest-match routing — O(1) with a trie; pick when paths nest; trade = more complex table. (2) regex-based routing — O(1) per pattern with a compiled matcher; pick for expressive rules; trade = slower than exact hash. (3) service-discovery lookup per call — O(1) with a registry; pick when instances move; trade = registry dependency.
+// VARIANTS · (1) prefix / longest-match routing — one trie walk per path; pick when paths nest; trade = more complex table. (2) regex-based routing — one compiled-matcher test per path; pick for expressive rules; trade = slower than exact hash. (3) service-discovery lookup per call — one registry lookup per call; pick when instances move; trade = registry dependency.
 // <- response : {title:"POJOs in Action", author:"Chris Richardson"}  · the client never learned PROD's host or port
 //    alt the route table changes : "/products" now maps to "PROD-v2" -> the client keeps sending to the gateway unchanged
 ```
@@ -101,21 +99,20 @@ _Also known as: Chris Richardson · Microservice Patterns Ch. 23 · microservice
 //    response : {}                              // the composed response the gateway builds
 // DEF: compose_product_details · CALLED BY: GW answering one page request
 // -> request : "GET /product/P-9"               // the client sends one request, not four
-// BUILD PHASE · run once per request · cost O(k)
+// BUILD PHASE · run once per request
 //    step 1 · call PROD    // response : {} -> {title:"POJOs in Action", author:"Chris Richardson"}
 //    -> input  : response = {} (request = "GET /product/P-9")
 //    <- output : response = {title:"POJOs in Action", author:"Chris Richardson"}   BECAUSE PROD returns the title and author
-// QUERY PHASE · per service call · cost O(1)
+// QUERY PHASE · per service call
 //    step 2 · call PRI     // response : {title:"POJOs in Action", author:"Chris Richardson"} -> {title:"POJOs in Action", author:"Chris Richardson", price:39.99}
 //    -> input  : response = {title:"POJOs in Action", author:"Chris Richardson"}
 //    <- output : response = {title:"POJOs in Action", author:"Chris Richardson", price:39.99}   BECAUSE PRI returns the price
 //    step 3 · call REV     // response : {title:"POJOs in Action", author:"Chris Richardson", price:39.99} -> {title:"POJOs in Action", author:"Chris Richardson", price:39.99, reviews:12}
 //    -> input  : response = {title:"POJOs in Action", author:"Chris Richardson", price:39.99}
 //    <- output : response = {title:"POJOs in Action", author:"Chris Richardson", price:39.99, reviews:12}   BECAUSE REV returns the review count
-// COMPLEXITY · time(build) = O(k) to fan out to k = 3 services · time(query) = O(1) per service call · space(extra) = O(1) per merged field
 // TRACE · request "GET /product/P-9" -> PROD: response = {title:"POJOs in Action", author:"Chris Richardson"} -> PRI: response adds price 39.99 -> REV: response adds reviews 12 -> one composed response for the client
 // CORRECTNESS · invariant: the gateway merges each service's fragment into one response, so the client's round-trip count stays 1 while the gateway makes k = 3 internal calls — the walk ends after every fragment is gathered and merged.
-// VARIANTS · (1) client calls services directly — O(k) client round-trips; pick on a LAN; trade = slow for mobile. (2) parallel fan-out — O(1) wall-clock; pick when services are independent; trade = error-handling complexity. (3) circuit-breaker guarded fan-out — O(k) with per-service breaker; pick when a service can fail; trade = partial pages on failure.
+// VARIANTS · (1) client calls services directly — 3 client round-trips; pick on a LAN; trade = slow for mobile. (2) parallel fan-out — all 3 calls fired at once, one wall-clock wait; pick when services are independent; trade = error-handling complexity. (3) circuit-breaker guarded fan-out — 3 calls, each behind its own breaker; pick when a service can fail; trade = partial pages on failure.
 // <- response : {title:"POJOs in Action", author:"Chris Richardson", price:39.99, reviews:12}  · one round-trip for the client
 //    alt one service call fails : the gateway's circuit breaker opens -> the gateway returns a partial page instead of hanging
 ```
@@ -192,21 +189,20 @@ _Role: upstream services_
 //    response : {}                      // the composed product view, empty
 // DEF: get_product · CALLED BY: WEB requesting the product page for P-9
 // -> path : "/products/P-9"
-// BUILD PHASE · run once at startup · cost O(1)
+// BUILD PHASE · run once at startup
 //    step 1 · GW looks up the route table   // match : "" -> "PROD"   BECAUSE /products is registered to the product service
 //    -> input  : match = "" (path = "/products/P-9", routes = { "/products": "PROD" })
 //    <- output : match = "PROD"   BECAUSE /products is registered to the product service
-// QUERY PHASE · per request · cost O(1)
+// QUERY PHASE · per request
 //    step 2 · GW calls PROD for the product, PRI for the price, and REV for the reviews   // gathered : 0 -> 3   BECAUSE the gateway composes several upstream calls into one response
 //    -> input  : gathered = 0 (match = "PROD")
 //    <- output : gathered = 3   BECAUSE the gateway composes several upstream calls into one response
 //    step 3 · GW assembles the pieces and returns one JSON   // response : {} -> {"id":"P-9","price":39.99,"stock":3,"reviews":12}
 //    -> input  : response = {} (gathered = 3)
 //    <- output : response = {"id":"P-9","price":39.99,"stock":3,"reviews":12}   BECAUSE the gateway merges the three upstream results into one JSON
-// COMPLEXITY · time(build) = O(1) to register routes once · time(query) = O(1) per route lookup + O(k) per fan-out to k = 3 services · space(extra) = O(1) per route entry plus O(1) per response field
 // TRACE · path "/products/P-9" -> lookup: match = "PROD" -> fan-out: gathered = 0 -> 3 (PROD, PRI, REV) -> assemble: response = {"id":"P-9","price":39.99,"stock":3,"reviews":12}
 // CORRECTNESS · invariant: the gateway resolves the path to a backend, calls every upstream that owns a fragment, and merges them into one response — the walk ends after one lookup + k = 3 calls + one assemble, and the client made a single call.
-// VARIANTS · (1) proxy only, no composition — O(1) per request, one backend; pick for simple requests; trade = client still fans out. (2) Backends for frontends — one gateway per client type; pick when client shapes diverge; trade = more gateways to run. (3) CQRS view for the page — O(1) read of a precomposed page; pick for hot pages; trade = eventual consistency.
+// VARIANTS · (1) proxy only, no composition — one backend per request; pick for simple requests; trade = client still fans out. (2) Backends for frontends — one gateway per client type; pick when client shapes diverge; trade = more gateways to run. (3) CQRS view for the page — one read of a precomposed page; pick for hot pages; trade = eventual consistency.
 // <- outcome : response = {"id":"P-9","price":39.99,"stock":3,"reviews":12} · one client call, three upstream calls, one composed reply
 ```
 

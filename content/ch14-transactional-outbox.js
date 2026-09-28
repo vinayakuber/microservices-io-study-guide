@@ -23,7 +23,7 @@ registerChapter({
 //    tx : "none"
 // DEF: create_order · CALLED BY: U1 placing an order
 // -> order_id : "PO-2001" · -> total : 100.00
-// BUILD PHASE · run once per command · cost O(1)
+// BUILD PHASE · run once per command
 //    step 1 · begin T1          : tx : "none" -> "open"       BECAUSE SVC starts a local transaction (BRK is NOT enlisted, so no 2PC)
 //    -> input  : tx = "none" (order_id = "PO-2001", total = 100.00)
 //    <- output : tx = "open"   BECAUSE SVC starts a local transaction (BRK is NOT enlisted, so no 2PC)
@@ -33,13 +33,10 @@ registerChapter({
 //    step 3 · insert outbox row : outbox : [ ] -> [ (1, "order_created") ]
 //    -> input  : outbox = [] (event = "order_created")
 //    <- output : outbox = [ (1, "order_created") ]   BECAUSE SVC writes the event into the outbox table
-// QUERY PHASE · per commit · cost O(1)
+// QUERY PHASE · per commit
 //    step 4 · commit T1         : tx : "open" -> "committed"  BECAUSE both rows live in the same local transaction
 //    -> input  : tx = "open" (orders = { "PO-2001" : "PENDING" }, outbox = [ (1, "order_created") ])
 //    <- output : tx = "committed"   BECAUSE both rows live in the same local transaction
-// COMPLEXITY:
-//    time(build) = O(1) per command = 1 begin + 1 business insert + 1 outbox insert · time(query) = O(1) per commit = 1 atomic commit
-//    space(extra) = O(1) = the tx handle plus one outbox row
 // TRACE (one run, order "PO-2001"):
 //    phase  | tx           | orders                      | outbox
 //    build  | "open"       | { "PO-2001" : "PENDING" }   | [ (1, "order_created") ]
@@ -47,9 +44,9 @@ registerChapter({
 // CORRECTNESS (atomicity invariant): the business row and the outbox row live in the SAME transaction, so commit makes
 //    both durable together and rollback drops both — the event can never be published for a rolled-back write or lost for a committed one.
 // VARIANTS (when to pick which):
-//    outbox table in one DB   -> business row + outbox row share one local transaction, O(1) per command, O(1) space   (use for relational stores)   <- THIS ONE
-//    outbox on each record    -> store the event as a property of the aggregate record, O(1) per command               (use for NoSQL document stores)
-//    event table with CDC     -> rely on a log tailer instead of a polling relay, O(1) per command                      (use when a CDC tool is available)
+//    outbox table in one DB   -> business row + outbox row share one local transaction, one outbox insert per command, one outbox row   (use for relational stores)   <- THIS ONE
+//    outbox on each record    -> store the event as a property of the aggregate record, one event write per command               (use for NoSQL document stores)
+//    event table with CDC     -> rely on a log tailer instead of a polling relay, one event write per command                      (use when a CDC tool is available)
 // <- result : outbox : [ (1, "order_created") ] · BRK received 0 messages so far
 //    alt rollback T1 : orders : { } -> { } · outbox : [ (1, "order_created") ] -> [ ] · event NOT published  BECAUSE the rollback undoes both inserts`
     },
@@ -69,9 +66,9 @@ registerChapter({
 //    published : [ ]
 // DEF: relay_poll · CALLED BY: a polling loop, every 100 ms
 // -> query : SELECT * FROM outbox WHERE sent=false ORDER BY id ASC   // returns id 1 then id 2
-// BUILD PHASE · run once at write time · cost O(1)
+// BUILD PHASE · run once at write time
 //    the application wrote these rows once -> outbox = [ (1, "E1", sent=false), (2, "E2", sent=false) ]
-// QUERY PHASE · per poll · cost O(k)
+// QUERY PHASE · per poll
 //    step 1 · fetch rows  : pending : [ ] -> [ (1, "E1"), (2, "E2") ]   BECAUSE ORDER BY id returns the committed-first row first
 //    -> input  : pending = [] (query = "SELECT * FROM outbox WHERE sent=false ORDER BY id ASC")
 //    <- output : pending = [ (1, "E1"), (2, "E2") ]   BECAUSE ORDER BY id returns the committed-first row first
@@ -87,9 +84,6 @@ registerChapter({
 //    step 5 · mark id 2   : outbox : [(1,"E1",sent=true),(2,"E2",sent=false)] -> [(1,"E1",sent=true),(2,"E2",sent=true)]
 //    -> input  : outbox = [(1,"E1",sent=true),(2,"E2",sent=false)] (row_id = 2)
 //    <- output : outbox = [(1,"E1",sent=true),(2,"E2",sent=true)]   BECAUSE the relay sets row 2's sent flag to true
-// COMPLEXITY:
-//    time(build) = O(1) = 1 outbox insert per row at write time · time(query) = O(k) per poll for k unsent rows = k reads + k publishes + k marks
-//    space(extra) = O(k) = the pending list of k unsent rows
 // TRACE (one poll, k = 2 rows):
 //    phase  | pending                | published        | outbox
 //    input  | []                     | []               | [(1,"E1",sent=false),(2,"E2",sent=false)]
@@ -97,9 +91,9 @@ registerChapter({
 // CORRECTNESS (order lemma): ORDER BY id ASC returns rows in commit order, and the relay publishes id 1 then id 2 and
 //    marks each sent, so E1 reaches BRK before E2 exactly as the application wrote them.
 // VARIANTS (when to pick which):
-//    per-row mark-sent       -> mark each row sent right after its publish, O(k) per poll, O(k) space   (use when a crash must not skip a row)   <- THIS ONE
-//    batch mark-sent         -> publish all k rows then mark them sent in one UPDATE, O(k) per poll, O(k) space   (use when fewer round-trips matter)
-//    transactional poll-publish -> select + publish + mark in one relay transaction, O(k) per poll            (use when the relay must not duplicate)
+//    per-row mark-sent       -> mark each row sent right after its publish, one mark per row, keep one list of k rows   (use when a crash must not skip a row)   <- THIS ONE
+//    batch mark-sent         -> publish all k rows then mark them sent in one UPDATE, one mark per row, keep one list of k rows   (use when fewer round-trips matter)
+//    transactional poll-publish -> select + publish + mark in one relay transaction, one mark per row            (use when the relay must not duplicate)
 // <- output : BRK receives [ "E1", "E2" ] in id order · outbox fully sent`
     },
     {
@@ -119,7 +113,7 @@ registerChapter({
 //    processed : { }
 // DEF: relay_publish · CALLED BY: the relay on its next poll
 // -> row : (1, "E1", sent=false)
-// BUILD PHASE · run once per poll · cost O(1)
+// BUILD PHASE · run once per poll
 //    step 1 · publish E1 to BRK : published : [ ] -> [ "E1" ]       // BRK now holds one copy
 //    -> input  : published = [] (row = (1, "E1", sent=false))
 //    <- output : published = [ "E1" ]   BECAUSE the relay publishes row 1's event to the broker
@@ -129,7 +123,7 @@ registerChapter({
 // <- outcome : BRK delivered "E1" once · outbox row (1,"E1") still sent=false
 // DEF: relay_restart · CALLED BY: the relay after restart, polling again
 // -> query : SELECT * FROM outbox WHERE sent=false    // returns (1, "E1", sent=false) again
-// QUERY PHASE · per re-delivery · cost O(1)
+// QUERY PHASE · per re-delivery
 //    step 1 · re-publish E1 : published : [ "E1" ] -> [ "E1", "E1" ]   BECAUSE the row was never marked sent, so at-least-once duplicate
 //    -> input  : published = [ "E1" ] (query returns (1, "E1", sent=false) again)
 //    <- output : published = [ "E1", "E1" ]   BECAUSE the row was never marked sent, so at-least-once duplicate
@@ -139,9 +133,6 @@ registerChapter({
 //    step 3 · CNS dedupes   : processed : { } -> { "E1" : true }       BECAUSE CNS runs INSERT ... ON CONFLICT DO NOTHING on its processed table
 //    -> input  : processed = { } (delivered = [ "E1", "E1" ])
 //    <- output : processed = { "E1" : true }   BECAUSE CNS runs INSERT ... ON CONFLICT DO NOTHING on its processed table
-// COMPLEXITY:
-//    time(build) = O(1) per poll = 1 read + 1 publish · time(query) = O(1) per re-delivery = 1 re-publish + 1 mark + 1 dedupe hash
-//    space(extra) = O(1) per distinct message = one row in the processed set
 // TRACE (one run, crash after publish, then restart):
 //    phase  | published          | outbox                    | processed
 //    build  | [ "E1" ]           | [(1,"E1",sent=false)]     | { }
@@ -149,9 +140,9 @@ registerChapter({
 // CORRECTNESS (dedupe invariant): CNS inserts each delivered id into its processed set with ON CONFLICT DO NOTHING, so
 //    the first copy of "E1" inserts and is handled while the second copy conflicts and is idempotently skipped.
 // VARIANTS (when to pick which):
-//    consumer dedupe table       -> INSERT ON CONFLICT DO NOTHING on processed ids, O(1) per message, O(1) space per id   (use when the relay may re-publish)   <- THIS ONE
-//    mark-before-publish         -> mark the row sent then publish, O(1) per row, O(1) space                              (use when losing a message is cheaper than a duplicate)
-//    relay transaction           -> select + publish + mark in one relay transaction, O(1) per row                        (use when the relay must not duplicate)
+//    consumer dedupe table       -> INSERT ON CONFLICT DO NOTHING on processed ids, one row per message, one row per id   (use when the relay may re-publish)   <- THIS ONE
+//    mark-before-publish         -> mark the row sent then publish, one mark per row, no extra space                              (use when losing a message is cheaper than a duplicate)
+//    relay transaction           -> select + publish + mark in one relay transaction, one mark per row                        (use when the relay must not duplicate)
 // <- output : BRK delivered "E1" twice · CNS handled it once (the second copy is idempotently skipped)`
     },
     {
@@ -170,7 +161,7 @@ registerChapter({
 //    outbox : [ ]
 // DEF: tx_T1 · CALLED BY: SVC1 updating aggregate "PO-2001"
 // -> txn : "T1"
-// BUILD PHASE · run once per transaction · cost O(1)
+// BUILD PHASE · run once per transaction
 //    step 1 · update aggregate : aggregate : { "PO-2001" : "PENDING" } -> { "PO-2001" : "APPROVED" }
 //    -> input  : aggregate = { "PO-2001" : "PENDING" } (txn = "T1")
 //    <- output : aggregate = { "PO-2001" : "APPROVED" }   BECAUSE SVC1 updates the aggregate inside T1
@@ -180,16 +171,13 @@ registerChapter({
 // <- commit T1 : outbox now [ (1, "E1") ]
 // DEF: tx_T2 · CALLED BY: SVC2 updating the same aggregate "PO-2001"
 // -> txn : "T2"
-// QUERY PHASE · per next transaction · cost O(1)
+// QUERY PHASE · per next transaction
 //    step 1 · update aggregate : aggregate : { "PO-2001" : "APPROVED" } -> { "PO-2001" : "SHIPPED" }
 //    -> input  : aggregate = { "PO-2001" : "APPROVED" } (txn = "T2")
 //    <- output : aggregate = { "PO-2001" : "SHIPPED" }   BECAUSE SVC2 updates the aggregate inside T2
 //    step 2 · insert outbox    : outbox : [ (1, "E1") ] -> [ (1, "E1"), (2, "E2") ]   BECAUSE T2 commits after T1, its row gets id 2
 //    -> input  : outbox = [ (1, "E1") ] (event = "E2")
 //    <- output : outbox = [ (1, "E1"), (2, "E2") ]   BECAUSE T2 commits after T1, its row gets id 2
-// COMPLEXITY:
-//    time(build) = O(1) per transaction = 1 aggregate update + 1 outbox insert with a growing id · time(query) = O(1) per row = 1 id-ordered read + 1 publish
-//    space(extra) = O(1) per event = one outbox row
 // TRACE (two commits, T1 before T2):
 //    phase  | aggregate                  | outbox
 //    build  | { "PO-2001" : "APPROVED" } | [ (1, "E1") ]
@@ -197,9 +185,9 @@ registerChapter({
 // CORRECTNESS (ordering lemma): the outbox id grows with commit order (T1 -> id 1, T2 -> id 2), so a relay reading
 //    ORDER BY id publishes "E1" before "E2" even though SVC1 and SVC2 committed from different instances.
 // VARIANTS (when to pick which):
-//    monotonic row id          -> auto-increment id reproduces commit order, O(1) per event, O(1) space   (use for a single outbox table)   <- THIS ONE
-//    per-aggregate sequence    -> assign a sequence number per aggregate, O(1) per event                   (use when ordering matters only per aggregate)
-//    timestamp + id tiebreak    -> order by (commit timestamp, id), O(1) per event                          (use when clock skew must be disambiguated)
+//    monotonic row id          -> auto-increment id reproduces commit order, one id write per event, no extra space   (use for a single outbox table)   <- THIS ONE
+//    per-aggregate sequence    -> assign a sequence number per aggregate, one sequence write per event                   (use when ordering matters only per aggregate)
+//    timestamp + id tiebreak    -> order by (commit timestamp, id), one id write per event                          (use when clock skew must be disambiguated)
 // <- commit T2 : outbox now [ (1, "E1"), (2, "E2") ] · relay reads by id and publishes "E1" before "E2"`
     }
   ],
@@ -376,23 +364,20 @@ registerChapter({
 //    status : "unsent"
 // DEF: place_order · CALLED BY: SVC handling POST /orders
 // -> request : {"order_id":"PO-77"}
-// BUILD PHASE · run once per order · cost O(1)
+// BUILD PHASE · run once per order
 //    step 1 · SVC writes order and outbox row atomically    outbox : [] -> [ (1, "OrderPlaced", "PO-77") ]   BECAUSE both writes share one database transaction
 //    -> input  : outbox = [] (request = {"order_id":"PO-77"})
 //    <- output : outbox = [ (1, "OrderPlaced", "PO-77") ]   BECAUSE both writes share one database transaction
 //    step 2 · SVC commits the transaction    orders : [("PO-77","PENDING"),("PO-2001","APPROVED")] -> [("PO-77","PENDING"),("PO-2001","APPROVED")]   BECAUSE the order and event become visible together, never half-written
 //    -> input  : orders = [("PO-77","PENDING"),("PO-2001","APPROVED")] (outbox = [ (1, "OrderPlaced", "PO-77") ])
 //    <- output : orders = [("PO-77","PENDING"),("PO-2001","APPROVED")]   BECAUSE the order and event become visible together, never half-written
-// QUERY PHASE · per outbox row · cost O(1)
+// QUERY PHASE · per outbox row
 //    step 3 · RLY publishes the outbox row    event : "none" -> {"type":"OrderPlaced","order_id":"PO-77"}   BECAUSE the relay reads the row and hands it to BRK
 //    -> input  : event = "none" (outbox = [ (1, "OrderPlaced", "PO-77") ])
 //    <- output : event = {"type":"OrderPlaced","order_id":"PO-77"}   BECAUSE the relay reads the row and hands it to BRK
 //    step 4 · RLY marks the row relayed    status : "unsent" -> "sent"   BECAUSE the flag stops the row being republished
 //    -> input  : status = "unsent" (row_id = 1)
 //    <- output : status = "sent"   BECAUSE the flag stops the row being republished
-// COMPLEXITY:
-//    time(build) = O(1) per order = 1 atomic write of order + outbox row · time(query) = O(1) per row = 1 read + 1 publish + 1 mark
-//    space(extra) = O(1) = event + status for one in-flight row
 // TRACE (one order "PO-77"):
 //    phase  | outbox                          | event                                   | status
 //    build  | [ (1, "OrderPlaced", "PO-77") ] | "none"                                  | "unsent"
@@ -400,9 +385,9 @@ registerChapter({
 // CORRECTNESS (no-dual-write invariant): the order row and the outbox row commit in the same transaction, so they become
 //    visible together; the relay then publishes and marks, so the order and its event never diverge.
 // VARIANTS (when to pick which):
-//    polling relay            -> relay polls the outbox and publishes unsent rows, O(k) per poll, O(k) space   (use when a poll loop is acceptable)   <- THIS ONE
-//    log tailing relay        -> a CDC tailer reads the database log instead of polling, O(1) per entry           (use when you want lower latency)
-//    outbox on each record    -> store the event on the aggregate document (NoSQL), O(1) per write                  (use for document stores)
+//    polling relay            -> relay polls the outbox and publishes unsent rows, one poll of k rows, keep one list of k rows   (use when a poll loop is acceptable)   <- THIS ONE
+//    log tailing relay        -> a CDC tailer reads the database log instead of polling, one read per entry           (use when you want lower latency)
+//    outbox on each record    -> store the event on the aggregate document (NoSQL), one event write per write                  (use for document stores)
 // <- outcome : BRK holds [ "OrderPlaced" ] · the order and event never diverge (same tx)`
   },
   concepts: {
