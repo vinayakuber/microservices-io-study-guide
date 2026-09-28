@@ -16,11 +16,16 @@ registerChapter({
         { num: 3, title: 'No local ACID, no 2PC', detail: 'One local transaction cannot reach the database of another service, and two-phase commit is not an option.' }
       ],
       program: `// ORDER SERVICE SIDE — a local ACID transaction cannot reach the credit data that lives in another service
+// GOAL (what this is FOR): show why a single local transaction cannot complete a business flow that touches two services' data.
+//    THE NAIVE WAY (why we build anything at all): try to do the whole flow in one ACID transaction, deducting credit that
+//    lives in another database; the transaction cannot see that data, so the UPDATE fails and the whole transaction aborts.
 // PARTIES: ORD = Order Service · ORDDB = PostgreSQL 16 @ orders-db-1 · CS = Customer Service · CSDB = PostgreSQL 16 @ customers-db-1
 // DEF: credit — the customer's spending limit owned by the Customer Service = 100.00 (the order total that must not exceed it)
 // STATE (before):
 //    orders : {}
 //    customer_credit : {}          // owned by CS in CSDB, invisible to ORDDB
+//    WHY customer_credit is out of reach: it lives in CSDB, and ORDDB's local transaction can only see ORDDB; so the
+//    deduction hits "no such table" and the whole transaction rolls back — one database cannot span the two services.
 // DEF: create_order · CALLED BY: CLIENT via POST /orders
 // -> order_id : "PO-2001" · -> total : 100.00
 //    step 1 · BEGIN a local transaction on ORDDB (the broker and CSDB are NOT enlisted)
@@ -50,12 +55,17 @@ registerChapter({
         { num: 5, title: 'Approve, reject, or compensate', detail: 'The orchestrator approves or rejects the Order; on failure it runs compensating transactions that undo earlier steps.' }
       ],
       program: `// ORDER SERVICE SIDE — an orchestrated create-order saga across three services, with a failure and full compensation
+// GOAL (what this is FOR): drive a multi-service flow from one orchestrator that knows every forward step and every compensating step, so a failure in the middle unwinds cleanly.
+//    THE NAIVE WAY (why we build anything at all): let each service guess the next step and hope the failure path is
+//    consistent; a failure mid-flow leaves half the state changed with no owner to undo it. We replace that with an orchestrator that owns the sequence and compensates in reverse.
 // PARTIES: CLIENT = the user · ORD = Order Service (runs the orchestrator) · CS = Customer Service · KIT = Kitchen Service
 // DEF: credit — the customer's available balance a saga step reserves and releases = { "CUST-7" : 500.00 }
 // STATE (before):
 //    orders : {}
 //    customer_credit : { "CUST-7" : 500.00 }     // available credit, owned by Customer Service
 //    reserved : {}                               // sagas CS has already reserved for (idempotency guard)
+//    WHY reserved exists: without it, a retried ReserveCredit would deduct the credit twice; with it, each saga id is
+//    recorded once, so a repeated command for the same saga is skipped and the reservation happens exactly once.
 //    tickets : {}                                // owned by Kitchen Service
 // DEF: create-order saga orchestrator · created by ORD when CLIENT POSTs /orders
 // -> order_id : "PO-2001" · -> customer_id : "CUST-7" · -> total : 100.00
@@ -111,6 +121,9 @@ registerChapter({
         { num: 5, title: 'Approve or reject', detail: 'The Order Service event handler either approves or rejects the Order.' }
       ],
       program: `// ORDER SERVICE SIDE — choreography: each local transaction publishes a domain event that triggers the next local transaction
+// GOAL (what this is FOR): advance a saga with no central coordinator, by making each step's event the trigger for the next step.
+//    THE NAIVE WAY (why we build anything at all): keep an orchestrator that sends commands and tracks who has done what;
+//    that state is a component to maintain. We replace the coordinator with a chain where each local transaction publishes the event that names the next step.
 // PARTIES: ORD = Order Service · CS = Customer Service · BRK = the events travelling between them
 // DEF: credit — the customer's available balance a saga step reserves = { "CUST-7" : 500.00 }
 // DEF: event — a domain message a service publishes to trigger the next local transaction = "OrderCreated"
@@ -118,6 +131,8 @@ registerChapter({
 //    orders : {}
 //    customer_credit : { "CUST-7" : 500.00 }
 //    credit_events : []
+//    WHY credit_events exists: without it, each service would have to remember whom to notify and the chain would have no
+//    visible thread; with it, each published event is the trigger for the next local transaction, so the saga advances on its own.
 // DEF: choreographed handler chain · one event carries the saga forward, no orchestrator
 // -> POST /orders : total = 100.00
 // BUILD PHASE · run once per local transaction
@@ -160,10 +175,15 @@ registerChapter({
         { num: 4, title: 'Tell the client the outcome', detail: 'A synchronous initiator learns the result by waiting, by polling GET /orders/{id}, or by an event such as a webhook.' }
       ],
       program: `// ORDER SERVICE SIDE — how a synchronous client learns the outcome of an asynchronous saga
+// GOAL (what this is FOR): give a synchronous caller the saga's final answer without blocking the saga on the caller.
+//    THE NAIVE WAY (why we build anything at all): hold the HTTP connection open until the saga finishes; the caller ties
+//    up a thread for the whole saga. We replace that wait with a status the client polls until the saga is done.
 // PARTIES: CLIENT = the user · ORD = Order Service
 // STATE (before):
 //    orders : { "PO-2001" : { status : "PENDING" } }
 //    poll_count : 0
+//    WHY poll_count exists: without it, "how many times has the client asked?" is untracked and the trace cannot show the
+//    two polls; with it, each GET is one increment, so the first poll sees PENDING and the second sees APPROVED.
 // DEF: client outcome for order "PO-2001" · the POST returned the id while the saga was still running
 // -> GET /orders/PO-2001 : poll #1
 //    step 1 · first poll   // poll_count : 0 -> 1  BECAUSE the client issued its first status query
@@ -352,6 +372,9 @@ registerChapter({
     ],
     
     program: `// SYSTEM DESIGN — saga (orchestrated) as a pipeline: orchestrator -> participant services -> event/message broker (each step executes + records state, compensations on failure)
+// GOAL (what this is FOR): complete a business flow that spans services as a sequence of local transactions, with one owner that advances the state and compensates on failure.
+//    THE NAIVE WAY (why we build anything at all): span the services with one ACID transaction or a 2PC; a transaction
+//    cannot see another database, and 2PC couples and can block. We replace that with an orchestrator that orders each step and compensates the ones already done.
 // PARTIES: ORCH = saga orchestrator (orders steps, tracks state, compensates) · ORD = order service (participant) · CS = customer service (participant) · KIT = kitchen service (participant) · BRK = message broker (RabbitMQ)
 // DEF: orders — ORD's datastore; here PostgreSQL 16 @ orders-db-1, row ("PO-77", "PENDING")
 // DEF: customers — CS's datastore; here PostgreSQL 16 @ customers-db-1, row ("CUST-7", credit 500.00)
@@ -361,7 +384,11 @@ registerChapter({
 //    orders    : [ ("PO-77", "PENDING") ]
 //    customers : [ ("CUST-7", credit 500.00) ]
 //    events    : []
+//    WHY events exists: without it, each participant's outcome is spoken once and lost, and the orchestrator cannot tell
+//    which step finished; with it, every outcome is an appended event, so the saga's progress is a stream the orchestrator reads.
 //    state     : "NEW"
+//    WHY state exists: without it, "how far has this saga gotten?" has no single answer and a compensation decision is a
+//    guess; with it, one field advances NEW -> COMPLETED, so the orchestrator knows exactly which step is next.
 // DEF: run_saga · CALLED BY: ORCH receiving "OrderCreated" for PO-77
 // -> command : "reserve credit 100.00 for CUST-7"
 // BUILD PHASE · run once per saga

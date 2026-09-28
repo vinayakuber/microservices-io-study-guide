@@ -16,10 +16,15 @@ registerChapter({
         { num: 3, title: 'Send and forget', detail: 'A notification expects no reply and none is sent, so the sender returns immediately.' }
       ],
       program: `// ORDER SERVICE SIDE — publish an Order Created event to a channel; the consumer reads it later
+// GOAL (what this is FOR): let the sender finish without waiting on the receiver, by handing the event to a channel the receiver drains later.
+//    THE NAIVE WAY (why we build anything at all): call the receiver directly and block until it is done; one slow
+//    receiver stalls the sender. We replace that wait with a channel the sender writes and returns from at once.
 // PARTIES: SVC = Order Service · BRK = message broker · CON = Kitchen consumer
 // STATE (before):
 //    orders : {}
 //    channel : []
+//    WHY channel exists: without it, the sender would have to reach the receiver directly and stay coupled to its
+//    pace; with it, the event sits in the channel until the consumer polls, so the two never run at the same instant.
 //    kitchen : {}
 // DEF: create_order · CALLED BY: U1 placing an order (FTGO OrderService)
 // -> order_id : "PO-2001" · -> event : "OrderCreated"
@@ -66,12 +71,17 @@ registerChapter({
         { num: 3, title: 'Expect a prompt reply', detail: 'The reply is expected promptly, unlike the eventual reply of request/asynchronous response.' }
       ],
       program: `// CONSUMER SERVICE SIDE — request/response: send a request, expect a prompt reply over a channel
+// GOAL (what this is FOR): get a specific answer back to the exact caller that asked, without either side blocking the other.
+//    THE NAIVE WAY (why we build anything at all): one shared channel where everyone reads everything; the caller
+//    cannot tell which reply is its own. We replace that guess with a reply-to channel plus an id that matches replies to requests.
 // PARTIES: CLIENT = Consumer · BRK = message broker · SVC = Provider service
 // DEF: channel — a named conduit through which messages flow from sender to receiver; here the reply_to channel "reply_channel" carried "REQ-77:42.50"
 // DEF: reply — the answer the provider returns to the caller over the reply channel; here "42.50" for request "REQ-77"
 // STATE (before):
 //    request_channel : []
 //    reply_channel : []
+//    WHY reply_channel exists: without it, replies would land on the same channel as requests and no caller could
+//    tell which answer is its own; with it, the reply comes back on the channel named in reply_to, matched by id.
 // DEF: request_price · CALLED BY: CLIENT needing a price now
 // -> request : { id: "REQ-77", reply_to: "reply_channel", body: "get price" }
 //    step 1 · CLIENT sends the request to BRK   : request_channel : [] -> [ "REQ-77:get price" ]
@@ -99,12 +109,17 @@ registerChapter({
         { num: 3, title: 'Zero or more recipients', detail: 'With no subscribers the message goes nowhere; with several, each gets a copy.' }
       ],
       program: `// BROKER SIDE — publish/subscribe: one publisher, two subscribers (zero or more recipients)
+// GOAL (what this is FOR): deliver one event to every interested service, once each, from a single publish.
+//    THE NAIVE WAY (why we build anything at all): have the publisher call each subscriber itself; the publisher must
+//    know every reader and repeat the send. We replace that with a topic the broker fans out into per-subscriber inboxes.
 // PARTIES: PUB = Order Service · BRK = message broker · SUB1 = Billing · SUB2 = Kitchen
 // DEF: inbox — a per-subscriber mailbox the broker delivers one copy into; here inbox_billing and inbox_kitchen each receive "OrderCreated(PO-2001)"
 // STATE (before):
 //    topic : { "orders": [] }
 //    inbox_billing : []
 //    inbox_kitchen : []
+//    WHY inbox exists: without it, every subscriber would share one channel and a message read by one would vanish
+//    for the rest; with it, each subscriber gets its own copy, so n subscribers receive n copies, exactly one each.
 // DEF: publish_order_created · CALLED BY: PUB after an order is created
 // -> event : "OrderCreated(PO-2001)"
 // BUILD PHASE · run once at startup
@@ -146,9 +161,14 @@ registerChapter({
         { num: 4, title: 'Compose with outbox, saga, CQRS', detail: 'The Transactional Outbox sends messages inside a database transaction; Saga and CQRS build on messaging.' }
       ],
       program: `// BROKER SIDE — buffering buys availability: consumer down, broker holds the queue until it returns
+// GOAL (what this is FOR): let the publisher keep sending while the consumer is down, without losing a single message.
+//    THE NAIVE WAY (why we build anything at all): send straight to the consumer and stop when it is unavailable;
+//    messages sent during the outage are dropped. We replace that loss with a queue the broker holds and the consumer drains later.
 // PARTIES: BRK = message broker · SVC = Order Service (publisher) · CON = Consumer
 // STATE (before):
 //    queue : []
+//    WHY queue exists: without it, every message sent while the consumer is down is lost, and the sender must block
+//    or fail; with it, the broker buffers messages in order and the consumer drains them when it returns.
 //    con_status : "UP"
 // DEF: publish_while_down · CALLED BY: SVC publishing 5 orders while CON is down
 // -> count : 5
@@ -318,13 +338,20 @@ registerChapter({
     ],
     
     program: `// SYSTEM DESIGN — messaging as a pipeline: sender/producer (builds the message, sends it) -> transport (RabbitMQ channel) -> receiver/consumer (subscribes, handles the message)
+// GOAL (what this is FOR): move a message from a sender to a receiver with the sender returning at once and the receiver handling it later.
+//    THE NAIVE WAY (why we build anything at all): call the receiver directly and block for the duration; a dead
+//    receiver stalls the sender. We replace that wait with a channel plus a per-subscriber inbox the broker fills.
 // PARTIES: PUB = Order Service (producer/writer: builds the message and publishes it) · BRK = RabbitMQ broker (transport: the message channel) · CON = Kitchen consumer (reader: subscribes and handles messages)
 // DEF: message — the payload a sender writes to a channel; here "OrderCreated(PO-2001)"
 // DEF: channel — the named conduit through which messages flow from sender to receiver; here the RabbitMQ queue "orders"
 // DEF: inbox — a consumer's subscription mailbox the broker delivers one copy into; here "kitchen_inbox"
 // STATE (before):
 //    channel : []   // the RabbitMQ queue "orders" (transport)
+//    WHY channel exists: without it, the producer would reach the consumer directly and stay coupled to its pace; with
+//    it, the message sits in the named queue and the producer returns the moment it is written.
 //    inbox   : []   // CON's subscription mailbox
+//    WHY inbox exists: without it, every consumer would read from one shared queue and one reader would steal the
+//    message from the rest; with it, the broker copies the message into each subscriber's own mailbox.
 // DEF: publish_consume · CALLED BY: PUB after creating order "PO-2001"
 // -> order_id : "PO-2001" · -> event : "OrderCreated"
 // BUILD PHASE · run once per message at write time

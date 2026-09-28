@@ -16,12 +16,22 @@ registerChapter({
         { num: 3, title: 'Mark the row sent', detail: 'The relay updates the row so the next poll skips it.' }
       ],
       program: `// RELAY SIDE — one poll cycle moves unsent outbox rows to the broker
+// GOAL (what this is FOR): publish every stored event to the broker exactly once, without a transaction spanning the broker.
+//    THE NAIVE WAY (why we build anything at all): write to the database and the broker in one transaction; the broker
+//    is not transactional with the database, so a crash between the two loses or duplicates events. We replace that with
+//    an outbox table the relay drains on a timer.
 // PARTIES: RLY = relay · DB = PostgreSQL 16 @ orders-db-1 · BRK = message broker
 // STATE (before):
 //    outbox : [ (1, "E1", sent=false), (2, "E2", sent=false) ]
+//    WHY outbox exists: without it, the event lives only in the application's hand and vanishes if the process dies
+//    before publishing; with it, the event is a durable row the relay can find again and again until it is sent.
 //    published : [ ]
+//    WHY published exists: without it, "which rows went out this poll?" is untracked; with it, the relay records each
+//    row it handed to the broker, so a poll's work is a list, not a guess.
 // DEF: poll_once · CALLED BY: a timer firing every 100 ms
 // -> query : SELECT * FROM outbox WHERE sent=false   // returns [ (1,"E1",sent=false), (2,"E2",sent=false) ]
+//    WHO chose 100 ms: the relay operator, not the data. 100 ms here only to make the trace's poll a concrete tick; a
+//    production relay often polls every 1 to 10 seconds — shorter republishes sooner, longer adds delivery latency.
 // BUILD PHASE · run once at write time
 //    the outbox pattern wrote these rows once -> outbox = [ (1,"E1",sent=false), (2,"E2",sent=false) ]
 // QUERY PHASE · per poll
@@ -61,9 +71,14 @@ registerChapter({
         { num: 3, title: 'Add ORDER BY id', detail: 'Ordering the query by id makes the poll reproduce the insertion sequence.' }
       ],
       program: `// RELAY SIDE — the same aggregate's two events must reach the broker in commit order
+// GOAL (what this is FOR): reproduce the order events were committed, so a downstream consumer sees E1 before E2.
+//    THE NAIVE WAY (why we build anything at all): run SELECT with no ORDER BY and trust the database to hand rows back
+//    in insertion order; the database is free to return them in any order. We replace that trust with an explicit ORDER BY id.
 // PARTIES: RLY = relay · DB = PostgreSQL 16 @ orders-db-1 · BRK = message broker
 // STATE (before):
 //    outbox : [ (1, "E1", sent=false), (2, "E2", sent=false) ]
+//    WHY the order rule exists: id is an autoincrement that grows in commit order, so "id 1 before id 2" IS "E1 before
+//    E2"; ordering the poll by id is the only way to hand the broker the sequence the aggregate actually wrote.
 //    published : [ ]
 // BUILD PHASE · run once at write time
 //    the outbox pattern wrote these rows once -> outbox = [ (1,"E1",sent=false), (2,"E2",sent=false) ]
@@ -107,6 +122,9 @@ registerChapter({
         { num: 3, title: 'Use log tailing there', detail: 'For those stores, transaction log tailing is the alternative relay.' }
       ],
       program: `// RELAY SIDE — polling needs a queryable outbox: any SQL database has it, some NoSQL stores do not
+// GOAL (what this is FOR): know which events still need publishing by asking one store-wide question, not by hunting per record.
+//    THE NAIVE WAY (why we build anything at all): give each stored event its own sent flag and read them one at a
+//    time; with no store-wide "which are unsent?" query, the relay has no list to drain. We replace that hunt with a table the relay can SELECT.
 // PARTIES: RLY = relay · SQLDB = MySQL 8 @ orders-db-1 · NOSQL = MongoDB 7 @ orders-nosql-1 · BRK = message broker
 // DEF: outbox — the table of stored events awaiting publication to the broker = row (1, "E1", sent=false)
 // DEF: sql — the queryable relational access an SQL database gives the outbox = "SELECT * FROM outbox WHERE sent=false" returns 1 unsent row
@@ -114,6 +132,8 @@ registerChapter({
 //    outbox_sql : [ (1, "E1", sent=false) ]
 //    outbox_nosql : { "rec-9" : { "event" : "E1", "sent" : false } }
 //    published : [ ]
+//    WHY the queryable outbox matters: SELECT ... WHERE sent=false needs one table with a sent column; a per-record
+//    property with no global sent index answers "which are unsent?" with nothing, so no rows ever reach the broker.
 // DEF: poll_sql · CALLED BY: the relay against MySQL
 // -> query : SELECT * FROM outbox WHERE sent=false    // matches : 1 unsent row
 //    step 1 · publish E1 : published : [ ] -> [ "E1" ]          BECAUSE MySQL returns the one unsent row
@@ -295,15 +315,24 @@ registerChapter({
     ],
     
     program: `// SYSTEM DESIGN — polling publisher as a pipeline: source database (outbox table) -> polling publisher relay -> message broker -> subscriber (consumer)
+// GOAL (what this is FOR): publish each stored event to the broker exactly once, in id order, without a transaction spanning the broker.
+//    THE NAIVE WAY (why we build anything at all): write to the database and the broker in one transaction; the broker is
+//    not transactional with the database, so a crash between the two loses or duplicates events. We replace that with a durable outbox the relay drains on a timer.
 // PARTIES: DB = PostgreSQL 16 @ orders-db-1 (outbox table) · RLY = polling publisher relay (polls, publishes, marks) · BRK = message broker (RabbitMQ) · SUB = subscriber (consumer)
 // DEF: outbox — the table of events awaiting publication; here [ (10, "OrderCreated", sent=false), (11, "PaymentAuthorized", sent=false) ]
 // DEF: list — the rows one poll selects, then publishes; here [ (10, "OrderCreated"), (11, "PaymentAuthorized") ]
 // DEF: status — a row's sent flag; here false flipped to true
 // STATE (before):
 //    outbox : [ (10, "OrderCreated", sent=false), (11, "PaymentAuthorized", sent=false) ]
+//    WHY outbox exists: without it, the event lives only in the application's hand and is lost if the process dies
+//    before publishing; with it, each event is a durable row the relay can find again until it is sent.
 //    list   : []
+//    WHY list exists: without it, "which rows did this poll select?" is untracked; with it, the relay holds the rows
+//    it is about to publish, ordered by id so the broker sees them in commit order.
 //    status : "unsent"
 // DEF: poll_once · CALLED BY: a scheduler tick every 250 ms
+//    WHO chose 250 ms: the relay operator, not the data. 250 ms here only to give the trace a concrete tick; a production
+//    relay often polls every 1 to 10 seconds — shorter republishes sooner, longer adds delivery latency.
 // -> query : "SELECT * FROM outbox WHERE sent=false ORDER BY id ASC"
 // BUILD PHASE · run once at write time
 //    the outbox pattern wrote these rows once -> outbox = [ (10, "OrderCreated", sent=false), (11, "PaymentAuthorized", sent=false) ]

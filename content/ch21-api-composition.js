@@ -16,12 +16,17 @@ registerChapter({
         { num: 3, title: 'No shared table to JOIN', detail: 'There is no single database where one SQL statement can combine the rows.' }
       ],
       program: `// QUERY SIDE — why one logical query can no longer be a single SQL JOIN
+// GOAL (what this is FOR): assemble one answer from rows that live in two different service-owned databases, where no single SQL statement can reach both.
+//    THE NAIVE WAY (why we build anything at all): run one SQL JOIN across the two tables; the tables live in different
+//    databases owned by different services, so no single statement can see both. We replace the JOIN with two fetches and an in-memory merge.
 // PARTIES: CLI = client rendering an order page · CUST = Customer Service · ORD = Order Service
 // DEF: db — a service-owned database that holds only its own service's rows = a keyed store; here cust_db = {"C-77":{name:"Ada"}} and ord_db = {"O-101":{cust_id:"C-77", total:120.00}}
 // STATE (before):
 //    cust_db : { "C-77": {name:"Ada"} }                          // rows owned by CUST only
 //    ord_db  : { "O-101": {cust_id:"C-77", total:120.00} }       // rows owned by ORD only
 //    result  : {}
+//    WHY result exists: without it, the two fetched fragments stay apart and the client has to merge them itself; with
+//    it, the composer merges the order row and the customer row on the order id, so the client sees one joined row.
 // DEF: get_order_with_name · CALLED BY: CLI assembling an order page
 // -> order_id : "O-101"
 // BUILD PHASE · run once per query
@@ -51,10 +56,17 @@ registerChapter({
         { num: 3, title: 'Join the partial results', detail: 'The composer merges the returned fragments into one response object.' }
       ],
       program: `// COMPOSER SIDE — the API Composer fans out to the services that own the data
+// GOAL (what this is FOR): answer one multi-service query by calling each service that owns a piece of the answer and merging what comes back.
+//    THE NAIVE WAY (why we build anything at all): have the client call each service itself and stitch the pieces; every
+//    client repeats the stitching. We replace that with one composer that owns the fan-out and the assembled result.
 // PARTIES: CMP = API Composer · ORD = Order Service · CUST = Customer Service · INV = Inventory Service
 // STATE (before):
 //    joined : {}                         // assembled result, empty before the fan-out
+//    WHY joined exists: without it, each provider's fragment is dropped after the call and the answer is never assembled;
+//    with it, every fetch adds its field group to one growing result, so the answer is built one fragment at a time.
 //    calls  : 0                           // round-trips made so far
+//    WHY calls exists: without it, "how many providers have answered?" is untracked and the fan-out has no bound; with it,
+//    each fetch is one counted round-trip, so after k providers the composer knows it has called them all once.
 // DEF: compose_order_details · CALLED BY: CMP answering one order query
 // -> query : {"order_id":"O-101"}         // the one logical query to answer
 // BUILD PHASE · run once per query
@@ -84,6 +96,9 @@ registerChapter({
         { num: 3, title: 'Emit the assembled response', detail: 'The joined object is returned as if one query had produced it.' }
       ],
       program: `// COMPOSER SIDE — the in-memory join merges fragments on the shared key
+// GOAL (what this is FOR): combine two partial result sets into one joined set, attaching fields only where the shared id matches.
+//    THE NAIVE WAY (why we build anything at all): copy fields across fragments without checking the key; a customer name
+//    could be attached to the wrong order. We replace that guess with a join that matches each fragment on the shared id before merging.
 // PARTIES: CMP = API Composer · ORD = Order Service · CUST = Customer Service
 // DEF: row — one fragment/record returned by a service, keyed by the shared id = one element of ord_rows or cust_rows; here the order row {"O-101":{total:120.00}} and the customer row {"C-77":{name:"Ada"}}
 // STATE (before):
@@ -91,6 +106,10 @@ registerChapter({
 //    cust_rows : [{"C-77":{name:"Ada"}}]                                     // fetched from CUST
 //    joined    : []
 //    matched   : null
+//    WHY matched exists: without it, the composer merges blind and can attach a name to the wrong order; with it, the
+//    composer holds the one fragment that carries the key, so fields are attached only to the row with the matching id.
+//    WHY joined exists: without it, each merged row is discarded and the query returns nothing; with it, every matched
+//    row is appended, so the assembled set accumulates one merged row per key.
 // DEF: join_fragments · CALLED BY: CMP merging two partial results
 // -> key : "O-101"                                    // the shared id the join matches on
 // BUILD PHASE · run once per row
@@ -120,12 +139,17 @@ registerChapter({
         { num: 3, title: 'Prefer CQRS for those queries', detail: 'When the join is too large or too hot, CQRS is the alternative solution.' }
       ],
       program: `// COMPOSER SIDE — the tradeoff: joining a large dataset in memory gets inefficient
+// GOAL (what this is FOR): show why the in-memory join that works for one row stops working when the query selects the whole set.
+//    THE NAIVE WAY (why we build anything at all): join a full-history result set in the composer's RAM the same way as one
+//    row; the whole dataset must be loaded at once, so the composer's memory is the size of the largest fragment. We measure that cost to decide when to switch to a precomputed view.
 // PARTIES: CMP = API Composer · ORD = Order Service · CUST = Customer Service
 // DEF: row — one order or customer record pulled from a service = one element of ord_rows; here ORD.fetch_all("last 30 days") returns 900000 order rows
 // STATE (before):
 //    ord_rows  : []                         // order rows pulled from ORD
 //    cust_rows : []                         // customer rows pulled from CUST
 //    joined    : []                         // the assembled result
+//    WHY joined matters here: the composer holds the full joined set in memory at once, so its peak memory is the size of
+//    the largest fragment — 900000 rows here — and that is exactly the point where the pattern becomes inefficient.
 // DEF: join_large_dataset · CALLED BY: CMP answering a full-history query
 // -> scope : "last 30 days"                 // the query asks for the whole set, not one row
 // BUILD PHASE · run once per query
@@ -288,6 +312,9 @@ registerChapter({
     ],
     
     program: `// SYSTEM DESIGN — API composition as a pipeline: client -> API composer -> provider services -> their databases
+// GOAL (what this is FOR): answer a query whose data is split across service-owned databases, by reading each provider's fragment and joining them in memory.
+//    THE NAIVE WAY (why we build anything at all): run one SQL JOIN across the services; the rows live in different
+//    databases owned by different services, so no single statement can reach them. We replace that JOIN with provider queries plus an in-memory merge on the shared key.
 // PARTIES: CLI = client · CMP = API Composer (query orchestrator) · ORD = Order Service (provider service) · CUST = Customer Service (provider service) · ORDDB = PostgreSQL 16 @ orders-db-1 · CUSTDB = PostgreSQL 16 @ customers-db-1
 // DEF: fragment — one partial result a provider returns, keyed by a shared id; here the order fragment { order_id:"O-101", cust_id:"C-77", total:120.00 }
 // DEF: join — merging fragments in memory on the shared key; here cust_id "C-77" pulls in name "Ada"
@@ -296,6 +323,8 @@ registerChapter({
 //    orders    : [ { order_id:"O-101", cust_id:"C-77", total:120.00 } ]
 //    customers : [ { id:"C-77", name:"Ada" } ]
 //    joined    : {}
+//    WHY joined exists: without it, the order and customer fragments stay apart and the client must merge them itself;
+//    with it, the composer merges each fragment on the shared id, so the response carries name from CUST and total from ORD.
 // DEF: compose_order · CALLED BY: CLI asking for order "O-101"
 // -> order_id : "O-101"
 // BUILD PHASE · run once per query

@@ -16,11 +16,18 @@ registerChapter({
         { num: 3, title: 'Commit both or neither', detail: 'Commit makes the business row and the outbox row durable together; rollback drops both.' }
       ],
       program: `// ORDER SERVICE SIDE — commit a business write and its event together, without 2PC
+// GOAL (what this is FOR): make the data change and its event durable together, so one never escapes without the other, without enlisting the broker in the transaction.
+//    THE NAIVE WAY (why we build anything at all): write the business row and send the event to the broker in two steps,
+//    then span both with a 2PC; the broker is not transactional with the database, so a crash between the two loses or duplicates. We replace 2PC with an outbox row in the same local transaction.
 // PARTIES: SVC = Order Service · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox tables live in this ONE instance, so a single COMMIT covers both) · BRK = message broker
 // STATE (before):
 //    orders : { }
 //    outbox : [ ]
+//    WHY outbox exists: without it, the event lives only in the application's hand and can escape a rollback or vanish
+//    before publishing; with it, the event is a row in the same transaction, so commit makes both durable and rollback drops both.
 //    tx : "none"
+//    WHY tx exists: without it, the two writes have no shared fate and can diverge; with it, one local transaction
+//    covers the orders row and the outbox row, so the broker never sees an event for a rolled-back write.
 // DEF: create_order · CALLED BY: U1 placing an order
 // -> order_id : "PO-2001" · -> total : 100.00
 // BUILD PHASE · run once per command
@@ -60,11 +67,18 @@ registerChapter({
         { num: 3, title: 'Mark the row sent', detail: 'The relay updates the row so a later poll will not re-publish it.' }
       ],
       program: `// RELAY SIDE — publish unsent outbox rows to the broker in the order they were inserted
+// GOAL (what this is FOR): move every unsent outbox row to the broker, in id order, so downstream sees E1 before E2.
+//    THE NAIVE WAY (why we build anything at all): read rows with no ORDER BY and publish them as they come; the database
+//    is free to return them out of sequence. We replace that with a poll that selects only sent=false rows ordered by id.
 // PARTIES: RLY = message relay · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox tables live in this ONE instance, so a single COMMIT covers both) · BRK = message broker
 // STATE (before):
 //    outbox : [ (1, "E1", sent=false), (2, "E2", sent=false) ]
 //    published : [ ]
+//    WHY outbox exists: without it, "which events still await the broker?" has no answer and the relay has nothing to
+//    drain; with it, the relay selects the unsent rows, publishes each, and flips the sent flag so the next poll skips them.
 // DEF: relay_poll · CALLED BY: a polling loop, every 100 ms
+//    WHO chose 100 ms: the relay operator, not the data. 100 ms here only to make the trace's poll a concrete tick; a
+//    production relay often polls every 1 to 10 seconds — shorter republishes sooner, longer adds delivery latency.
 // -> query : SELECT * FROM outbox WHERE sent=false ORDER BY id ASC   // returns id 1 then id 2
 // BUILD PHASE · run once at write time
 //    the application wrote these rows once -> outbox = [ (1, "E1", sent=false), (2, "E2", sent=false) ]
@@ -106,11 +120,16 @@ registerChapter({
         { num: 3, title: 'Consumer dedupes', detail: 'The consumer records each processed message id and skips any it has already handled.' }
       ],
       program: `// RELAY + CONSUMER SIDE — a crash between publish and mark re-sends the row, so the consumer dedupes
+// GOAL (what this is FOR): let the consumer handle each event exactly once even though the relay can deliver it twice.
+//    THE NAIVE WAY (why we build anything at all): trust the relay never to redeliver; a crash between publish and
+//    mark-sent makes redelivery inevitable, so the consumer would act twice. We replace that trust with a processed set the consumer checks.
 // PARTIES: RLY = message relay · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox tables live in this ONE instance, so a single COMMIT covers both) · BRK = message broker · CNS = consumer service
 // STATE (before):
 //    outbox : [ (1, "E1", sent=false) ]
 //    published : [ ]
 //    processed : { }
+//    WHY processed exists: without it, the second copy of "E1" is indistinguishable from the first and the consumer acts
+//    twice; with it, each delivered id is recorded once and a duplicate is skipped by ON CONFLICT DO NOTHING.
 // DEF: relay_publish · CALLED BY: the relay on its next poll
 // -> row : (1, "E1", sent=false)
 // BUILD PHASE · run once per poll
@@ -155,10 +174,15 @@ registerChapter({
         { num: 3, title: 'Preserve T1 before T2', detail: 'Because T1 committed before T2, event E1 is published before E2.' }
       ],
       program: `// TWO SERVICE INSTANCES SIDE — one aggregate, two commits, and the broker still sees them in order
+// GOAL (what this is FOR): preserve event order across multiple service instances, so the broker sees the events in the order the transactions committed.
+//    THE NAIVE WAY (why we build anything at all): let each instance publish its event directly to the broker when it
+//    finishes; whichever instance happens to run first wins, and order is a race. We replace that race with one shared outbox whose row id grows in commit order.
 // PARTIES: SVC1 = Order Service instance A · SVC2 = Order Service instance B · DB = PostgreSQL 16 @ orders-db-1 (the ONE instance both order-service instances commit to) · BRK = message broker
 // STATE (before):
 //    aggregate : { "PO-2001" : "PENDING" }
 //    outbox : [ ]
+//    WHY outbox exists: without it, each instance publishes on its own and the broker sees whichever ran first, not the
+//    commit order; with it, every commit lands one row in a shared table whose id grows with commit order, so T1 -> id 1 and T2 -> id 2.
 // DEF: tx_T1 · CALLED BY: SVC1 updating aggregate "PO-2001"
 // -> txn : "T1"
 // BUILD PHASE · run once per transaction
@@ -352,6 +376,9 @@ registerChapter({
     ],
     
     program: `// SYSTEM DESIGN — transactional outbox as a pipeline: application tx -> outbox table (same database) -> relay publisher -> broker (reliable, no dual-write)
+// GOAL (what this is FOR): make the order and its event durable together, then let a relay publish the event, so the two never diverge.
+//    THE NAIVE WAY (why we build anything at all): write the order and send the event to the broker in two steps, or span
+//    both with a 2PC; the broker is not transactional with the database, so a crash between the two loses or duplicates. We replace that with an outbox row in the same local transaction.
 // PARTIES: SVC = order service (application) · DB = PostgreSQL 16 @ orders-db-1 (orders + outbox in one instance) · RLY = relay publisher · BRK = message broker (RabbitMQ) · CNS = subscriber
 // DEF: orders — the business table; here [ ("PO-77", "PENDING"), ("PO-2001", "APPROVED") ]
 // DEF: outbox — the event table written in the same tx; here [ (1, "OrderPlaced", "PO-77"), (2, "PaymentAuthorized", "PO-2001") ]
@@ -360,6 +387,8 @@ registerChapter({
 // STATE (before):
 //    orders : [ ("PO-77", "PENDING"), ("PO-2001", "APPROVED") ]
 //    outbox : []
+//    WHY outbox exists: without it, the event lives only in the application's hand and can escape a rollback or vanish
+//    before publishing; with it, the event is a row in the same transaction, so the order and its event commit together.
 //    event  : "none"
 //    status : "unsent"
 // DEF: place_order · CALLED BY: SVC handling POST /orders

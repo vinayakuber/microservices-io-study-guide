@@ -16,14 +16,25 @@ registerChapter({
         { num: 3, title: 'Open the circuit', detail: 'For the timeout period, all attempts fail immediately.' }
       ],
       program: `// PROXY SIDE — CLOSED state: a breaker trips when consecutive failures cross the threshold
+// GOAL (what this is FOR): answer "is SVC still usable?" without making every caller wait on a dead service.
+//    THE NAIVE WAY (why we build anything at all): forward every call and let each caller block; a dead service
+//    stalls every thread that calls it. We replace the wait with one counter — consecutive_failures — that
+//    trips the breaker open once it crosses the threshold.
 // PARTIES: CLIENT = caller thread · PROXY = circuit breaker · SVC = remote service (down)
 // STATE (before):
 //    breaker : { state: "CLOSED", consecutive_failures: 0, threshold: 3, timeout_s: 60 }
+//    WHY consecutive_failures exists: without it, "is SVC down?" is a guess; with it, three failed calls in a
+//    row is a count, and the breaker opens on a fact instead of an impression.
 //    remote_calls : 0
 // DEF: forward · CALLED BY: CLIENT, three requests in a row at 00:00:00, 00:00:01, 00:00:02
 // -> request : "get-user-1"
 // BUILD PHASE · run once at startup
 //    configure the breaker once with threshold = 3, timeout_s = 60, state = "CLOSED"
+//    WHO chose threshold: the breaker operator, not the data. threshold = 3 here only because the trace runs
+//    three failed calls; a production breaker trips after 5 or 10 consecutive failures. Lower opens sooner but
+//    risks a false trip on a transient blip.
+//    WHO chose timeout_s: the breaker operator, not the data. timeout_s = 60 here only to give the trace a
+//    concrete window; production breakers commonly wait 30 to 60 seconds before the first probe.
 // QUERY PHASE · per call
 //    step 1 · PROXY forwards the call to SVC    : remote_calls : 0 -> 1
 //    -> input  : remote_calls = 0 (request = "get-user-1")
@@ -63,9 +74,14 @@ registerChapter({
         { num: 3, title: 'Stop the cascade', detail: 'The failure of one service no longer drains the services that call it.' }
       ],
       program: `// PROXY SIDE — OPEN state: while open, every attempt fails immediately, so SVC is never touched
+// GOAL (what this is FOR): reject every new attempt without touching the down service while the breaker is open.
+//    THE NAIVE WAY (why we build anything at all): keep forwarding calls and let each caller thread wait out the
+//    timeout. We replace the wait with one clock comparison per attempt — elapsed = now - opened_at — and fail fast.
 // PARTIES: CLIENT = caller thread · PROXY = circuit breaker · SVC = remote service (down)
 // STATE (before):
 //    breaker : { state: "OPEN", timeout_s: 60, opened_at: "00:00:02" }
+//    WHY opened_at exists: without it the breaker cannot tell "still inside the timeout" from "time to probe";
+//    with it, one subtraction (now - opened_at) decides whether the window is over.
 //    attempts : 0
 //    svc_calls : 0
 //    elapsed : 0
@@ -108,9 +124,14 @@ registerChapter({
         { num: 3, title: 'Failure restarts the timeout', detail: 'If there is a failure, the timeout period begins again.' }
       ],
       program: `// PROXY SIDE — HALF-OPEN state: after the timeout, one test request is allowed through
+// GOAL (what this is FOR): let the breaker recover without flooding the service once the timeout has passed.
+//    THE NAIVE WAY (why we build anything at all): resume all traffic the moment the timeout ends; a still-broken
+//    service is slammed again. We replace that flood with one probe — a single test request whose outcome decides.
 // PARTIES: CLIENT = caller thread · PROXY = circuit breaker · SVC = remote service (recovered)
 // STATE (before):
 //    breaker : { state: "OPEN", consecutive_failures: 3, timeout_s: 60, opened_at: "00:00:02", probe_count: 0 }
+//    WHY probe_count exists: without it, "how many test requests may be in flight?" has no bound; with it, the
+//    breaker lets exactly one test request through at a time, so a broken service sees a trickle, not a flood.
 //    reply : null
 // DEF: probe · CALLED BY: CLIENT, the first request after the timeout, at 00:01:02
 // -> request : "get-user-3" at 00:01:02
@@ -154,9 +175,16 @@ registerChapter({
         { num: 3, title: 'The one hard dial', detail: 'The challenge is choosing values without false positives or excessive latency.' }
       ],
       program: `// PROXY SIDE — tuning: a too-short timeout marks a healthy but slow service as failed
+// GOAL (what this is FOR): decide how long the proxy should wait before it calls the service "dead", without marking a slow-but-alive service as failed.
+//    THE NAIVE WAY (why we build anything at all): wait forever, or wait a fixed guess with no rule; both hide the real
+//    question — the timeout is a cut line on the service's latency, and a bad cut line creates a false positive.
 // PARTIES: CLIENT = caller thread · PROXY = circuit breaker · SVC = remote service (slow but alive)
 // STATE (before):
 //    breaker : { state: "CLOSED", consecutive_failures: 0, threshold: 3, timeout_ms: 200 }
+//    WHY timeout_ms exists: without it, "how long may a call take?" has no answer, so the proxy cannot separate a slow
+//    reply from a dead service; with it, one comparison (reply time vs timeout_ms) decides whether to keep waiting.
+//    WHO chose timeout_ms: the breaker operator, not the data. timeout_ms = 200 here only so the 450 ms reply in the
+//    trace overshoots it and shows a false positive; production proxies often wait 500 to 1000 ms for a normal call.
 //    remote_calls : 0
 //    verdict : "UNSET"
 //    reply : null
@@ -311,6 +339,9 @@ registerChapter({
     ],
     
     program: `// SYSTEM DESIGN — the circuit breaker as a pipeline: caller -> breaker proxy -> downstream service
+// GOAL (what this is FOR): stop a caller from waiting on a service that keeps failing, using one counter and one clock instead of a pile-up of blocked threads.
+//    THE NAIVE WAY (why we build anything at all): let the caller retry straight through every failure; each retry holds a
+//    thread against a dead service. We replace that pile-up with a stateful proxy that counts failures and trips open.
 // PARTIES: CLIENT = client (caller: makes remote calls through the breaker) · PROXY = circuit breaker proxy (breaker: trips after a threshold of failures, fails fast, lets test requests through) · SVC = downstream service (server: answers the call)
 // DEF: breaker — the stateful switch between the caller and the service; here { state:"CLOSED", consecutive_failures:0, threshold:4, timeout_ms:250 }
 // DEF: failure — a call that ended in error or timeout; here "charge-card-4"
@@ -318,11 +349,17 @@ registerChapter({
 //    breaker : { state:"CLOSED", consecutive_failures:0, threshold:4, timeout_ms:250 }
 //    remote_calls : 0
 //    consecutive_failures : 0
+//    WHY consecutive_failures exists: without it, "is SVC down?" is a guess the proxy makes per call; with it, the
+//    proxy keeps one running count of failures and opens on a fact — the count crossing the threshold.
 //    verdict : "UNSET"
 // DEF: call · CALLED BY: CLIENT, a request that keeps timing out
 // -> request : "charge-card-4"
 // BUILD PHASE · run once at startup
 //    configure the breaker once with threshold = 4, timeout_ms = 250, state = "CLOSED"
+//    WHO chose threshold: the breaker operator, not the data. threshold = 4 here only because the trace runs four
+//    failed calls; a production breaker trips after 5 or 10 consecutive failures.
+//    WHO chose timeout_ms: the breaker operator, not the data. timeout_ms = 250 here only to give the trace a concrete
+//    window; production proxies often wait 500 to 1000 ms before declaring a call timed out.
 // QUERY PHASE · per call
 //    step 1 · CLIENT calls through the proxy : remote_calls : 0 -> 1
 //    -> input  : remote_calls = 0 (request = "charge-card-4")

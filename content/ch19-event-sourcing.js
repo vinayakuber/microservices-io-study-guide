@@ -16,10 +16,17 @@ registerChapter({
         { num: 3, title: 'Rely on the single-write atomicity', detail: 'Saving one event is one operation, so it is inherently atomic — no 2PC with the broker.' }
       ],
       program: `// EVENT SOURCING SIDE — the store holds events, not current state; each change is one atomic append
+// GOAL (what this is FOR): persist every state change and make it publishable as the same single write, so the data change and its event can never drift apart.
+//    THE NAIVE WAY (why we build anything at all): update a current-state row and send the event to a broker in two
+//    steps; a crash between the two loses one or the other. We replace the two-step write with one append — the event IS the state change.
 // PARTIES: SVC = Order Service · ES = EventStoreDB 24 @ orders-events-1 · CS = CustomerService (subscriber)
 // STATE (before):
 //    events : []                        // the Order's event list — its full history, empty before creation
+//    WHY events exists: without it, "what changed, and in what order?" is lost as soon as a row is overwritten; with it,
+//    each change is one appended event, so the full history is the source of truth and the publishable event is the same write.
 //    state : { orderState:null, customerId:null }
+//    WHY state exists: without it, a query has no ready answer to show; with it, the applied events are folded into one
+//    in-memory current state, so a read returns the latest value without a table holding it.
 // DEF: create order · CALLED BY: SVC processing a CreateOrderCommand
 // -> customerId : "C-100" · -> orderTotal : 125.00
 // BUILD PHASE · run once per command at write time
@@ -62,10 +69,15 @@ registerChapter({
         { num: 3, title: 'Stop at the last event', detail: 'The final folded value is the current state, with no separate current-state table.' }
       ],
       program: `// EVENT SOURCING SIDE — current state is never stored; it is re-derived by folding every event in order
+// GOAL (what this is FOR): rebuild the aggregate's current state from its history, landing on the same value every time.
+//    THE NAIVE WAY (why we build anything at all): keep a separate current-state row to read; that row can drift from the
+//    events that produced it. We replace the stored row with a replay — apply each event in write order and the final fold is the state.
 // PARTIES: SVC = Order Service · ES = EventStoreDB 24 @ orders-events-1
 // STATE (before):
 //    events : [E1:OrderCreated("C-100",125.00), E2:OrderApproved("C-100")]
 //    state : { orderState:null, customerId:null }      // empty before replay
+//    WHY the fold order matters: each apply builds on the previous state, so E1 then E2 lands on APPROVED; the wrong
+//    order (E2 then E1) would leave CREATED — replay must follow write order to be deterministic.
 // DEF: replay · CALLED BY: SVC loading the Order — reads the event list and applies each event in sequence
 // -> entityId : "PO-100"
 // BUILD PHASE · run once per load
@@ -95,10 +107,17 @@ registerChapter({
         { num: 3, title: 'Replay only the later events', detail: 'Fold the events since the snapshot, so there are fewer events to replay.' }
       ],
       program: `// EVENT SOURCING SIDE — a snapshot shortens replay: load the newest snapshot, then fold only the events after it
+// GOAL (what this is FOR): rebuild a long-lived entity's state without re-folding every event it has ever produced.
+//    THE NAIVE WAY (why we build anything at all): replay the whole history on every load; the work grows with the number
+//    of events. We replace the full replay with a saved snapshot plus a replay of only the events after it.
 // PARTIES: SVC = Customer Service · ES = EventStoreDB 24 @ orders-events-1
 // STATE (before):
 //    snapshot : { balance:100.00, seq:3 }      // Customer's state saved at event 3
+//    WHY snapshot exists: without it, every load folds E1..E4 from scratch; with it, the state up to seq 3 is already
+//    folded and stored, so only the events after seq 3 need replaying.
 //    events : [E1:Created, E2:Credit+50.00, E3:Credit+50.00, E4:Debit-25.00]
+//    WHO chose seq:3: the snapshot policy, not the data. seq 3 here only because the trace's history has 4 events; a
+//    production snapshot every k events keeps the tail short — e.g. snapshot every 100 or 1000 events — trading snapshot writes against replay work.
 // DEF: load · CALLED BY: SVC reading the Customer — finds the most recent snapshot, then only the events since it
 // -> entityId : "C-100"
 // BUILD PHASE · run once per load
@@ -127,9 +146,14 @@ registerChapter({
         { num: 3, title: 'Update the subscriber state', detail: 'The handler reads the event payload and updates its own aggregate, reserving credit for the order.' }
       ],
       program: `// EVENT SOURCING SIDE — the event store doubles as a broker, so a subscriber reacts to another service's events
+// GOAL (what this is FOR): let a subscriber update its own state the moment another service's event is saved, without rebuilding anything from the event history.
+//    THE NAIVE WAY (why we build anything at all): have the subscriber poll or replay the other service's events to learn
+//    of a change; that is slow and couples the subscriber to the writer's cadence. We replace that with a store that delivers each saved event to every subscriber.
 // PARTIES: SVC = CustomerService (subscriber) · ES = EventStoreDB 24 @ orders-events-1 (delivers like a broker)
 // STATE (before):
 //    reserved : {}                       // credit the Customer has reserved per order, empty
+//    WHY reserved exists: without it, each reservation is applied to the balance with no record of which order it belongs
+//    to; with it, the handler records one entry per order, so the balance and the per-order holds always reconcile.
 //    balance : 200.00
 // DEF: reserveCredit · CALLED BY: ES delivering an OrderCreatedEvent to the subscribed CustomerService
 // -> event : OrderCreatedEvent("C-100", 125.00) · -> orderId : "PO-100"
@@ -298,13 +322,20 @@ registerChapter({
     ],
     
     program: `// SYSTEM DESIGN — event sourcing as a pipeline: command -> event store (append) -> projector/event handler -> read model -> query
+// GOAL (what this is FOR): make the event log the source of truth and answer queries from a folded read model, so state is always reconstructable and reads never replay.
+//    THE NAIVE WAY (why we build anything at all): keep a current-state row and read it directly; that row can drift from
+//    the events that produced it, and history is lost. We replace the stored row with an appended event stream a projector folds into a view.
 // PARTIES: CMD = Order Service command side (writer) · ES = EventStoreDB 24 @ orders-events-1 (append-only event store) · PH = projector/event handler (consumer) · RM = read model database (PostgreSQL 16 @ orders-view-1) · QR = query side (reader)
 // DEF: event — one state-changing fact appended to the store; here E2 = OrderApprovedEvent("C-100")
 // DEF: view — the read model the projector folds events into; here { orderState:"APPROVED", customerId:"C-100" }
 // DEF: fold — apply() of one event onto the view; here E1 sets "CREATED", E2 sets "APPROVED"
 // STATE (before):
 //    events : [ E1:OrderCreated("C-100",125.00) ]
+//    WHY events exists: without it, "what changed?" has no durable record and a query cannot reconstruct the past; with
+//    it, every state change is an appended event, so the log is the source of truth the view is folded from.
 //    view   : { orderState:"CREATED", customerId:"C-100" }
+//    WHY view exists: without it, a query would have to fold the whole event list on every read; with it, the projector
+//    has already folded the events into a ready read model, so the query side reads the view directly with no replay.
 // DEF: approve_order · CALLED BY: CMD processing command "approve_order"
 // -> command : "approve_order"
 // BUILD PHASE · run once per command

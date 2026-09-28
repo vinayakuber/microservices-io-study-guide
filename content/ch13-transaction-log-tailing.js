@@ -16,11 +16,18 @@ registerChapter({
         { num: 3, title: 'Publish each entry', detail: 'The relay publishes the message embedded in each outbox insert to the broker.' }
       ],
       program: `// TAILER SIDE — the relay reads the database transaction log and publishes each committed outbox insert
+// GOAL (what this is FOR): publish each committed event exactly once, by reading what the database already recorded instead of polling the table.
+//    THE NAIVE WAY (why we build anything at all): poll the outbox table and re-scan it each time; that re-reads already-sent
+//    rows and adds load. We replace the rescan with a read of the log at a saved position, so each entry is seen once.
 // PARTIES: SVC = Order Service · DB = PostgreSQL 16 @ orders-db-1 · LOG = its write-ahead log (WAL) · TLR = log tailer · BRK = message broker
 // STATE (before):
 //    outbox : [ ]
 //    log : [ ]
+//    WHY log exists: without it, "what was just committed?" has no source of truth and the tailer must re-scan the table;
+//    with it, every commit is an append the tailer can follow, and rolled-back writes never appear.
 //    position : 0
+//    WHY position exists: without it, a restart re-reads the whole log and republishes everything; with it, the tailer
+//    resumes at the first unread entry, so each committed entry is read once and none is skipped.
 //    published : [ ]
 // DEF: commit_outbox · CALLED BY: SVC committing a transaction that inserts an outbox row
 // -> event : "E1"
@@ -67,10 +74,15 @@ registerChapter({
         { num: 3, title: 'No broker enlistment', detail: 'The broker is never part of the database transaction, so no 2PC is needed.' }
       ],
       program: `// TAILER SIDE — the log carries only committed writes, so a rolled-back event is never published
+// GOAL (what this is FOR): guarantee the broker sees only events that actually committed, without enlisting the broker in a transaction.
+//    THE NAIVE WAY (why we build anything at all): coordinate the database and the broker with a 2PC so only committed work
+//    is published; that enlist the broker in every transaction. We replace 2PC with a log that holds only committed writes.
 // PARTIES: SVC = Order Service · DB = MySQL 8 @ orders-db-1 · LOG = its binlog · TLR = log tailer · BRK = message broker
 // STATE (before):
 //    outbox : [ ]
 //    binlog : [ ]
+//    WHY binlog exists: without it, a rolled-back insert is indistinguishable from a committed one and the tailer might
+//    publish a cancelled event; with it, only committed writes are appended, so a rollback never reaches the broker.
 //    published : [ ]
 // DEF: commit_tx · CALLED BY: SVC committing a transaction
 // -> event : "E1"
@@ -104,12 +116,17 @@ registerChapter({
         { num: 3, title: 'Dedupe on the consumer', detail: 'A crash between publish and position-write re-reads an entry, so consumers must be idempotent.' }
       ],
       program: `// TAILER SIDE — a crash between publish and position-save re-reads an entry, so consumers dedupe
+// GOAL (what this is FOR): let the consumer handle each event exactly once even though the tailer can deliver it twice.
+//    THE NAIVE WAY (why we build anything at all): trust the tailer never to redeliver; a crash between publish and
+//    position-save makes redelivery inevitable, so the consumer would act twice. We replace that trust with a processed set the consumer checks.
 // PARTIES: TLR = log tailer · DB = MySQL 8 @ orders-db-1 · BRK = message broker · CNS = consumer service
 // STATE (before):
 //    binlog : [ { "seq":10, "row":(1,"E1") } ]
 //    position : 9
 //    published : [ ]
 //    processed : { }
+//    WHY processed exists: without it, the second copy of "E1" is indistinguishable from the first and the consumer acts
+//    twice; with it, each delivered id is recorded once and a duplicate is skipped by ON CONFLICT DO NOTHING.
 // DEF: tail_seq10 · CALLED BY: TLR reading the next binlog entry
 // -> read : entry seq 10
 // BUILD PHASE · run once per tail read
@@ -317,6 +334,9 @@ registerChapter({
     ],
     
     program: `// SYSTEM DESIGN — transaction log tailing as a pipeline: database transaction log -> log tailer/miner -> message broker -> subscriber (consumer)
+// GOAL (what this is FOR): publish each committed change to the broker in commit order, without the application writing an event at all.
+//    THE NAIVE WAY (why we build anything at all): have the application write both the database row and the event, and poll the
+//    table to publish; that re-scans the table and risks missing rows. We replace that with a tailer that follows the log the database already keeps.
 // PARTIES: DB = MySQL 8 @ orders-db-1 (source database) · TLR = log tailer (transaction log miner) · BRK = message broker (RabbitMQ) · CNS = subscriber (consumer)
 // DEF: binlog — the source database's transaction log; here [ (tx 91, "INSERT orders PO-77"), (tx 92, "UPDATE orders") ]
 // DEF: event — a domain event the tailer emits from a log record; here {"type":"OrderCreated","order_id":"PO-77"}
@@ -324,7 +344,11 @@ registerChapter({
 // DEF: status — whether an event reached the subscriber; here "pending" -> "delivered"
 // STATE (before):
 //    binlog   : [ (tx 91, "INSERT orders PO-77"), (tx 92, "UPDATE orders") ]
+//    WHY binlog exists: without it, "what changed?" has no source of truth and the app must remember to emit each event;
+//    with it, every committed change is an append the tailer can follow, and rolled-back writes never appear.
 //    position : 0
+//    WHY position exists: without it, a restart re-reads the whole log and republishes everything; with it, the tailer
+//    resumes at the first unread record, so every committed record is processed once in commit order.
 //    event    : "none"
 //    status   : "pending"
 // DEF: tail_and_publish · CALLED BY: TLR reading the log continuously

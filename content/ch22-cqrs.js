@@ -16,11 +16,16 @@ registerChapter({
         { num: 3, title: 'Queries no longer match the write model', detail: 'The write side is shaped for commands, which is a poor shape for reads.' }
       ],
       program: `// QUERY SIDE — why current state is hard to read when only events are stored
+// GOAL (what this is FOR): answer "what is the order's total now?" when the store holds only an append-only event log, not a current-state row.
+//    THE NAIVE WAY (why we build anything at all): read a current-state row; there is no such row, only events. We replace
+//    that missing row with a replay that folds each event in order until the last one wins.
 // PARTIES: QR = a query reader · EVS = EventStoreDB 24 @ orders-events-1
 // DEF: event — an immutable fact appended to the log; here {type:"order_created", order_id:"O-101", total:120.00}
 // STATE (before):
 //    event_log : [ {type:"order_created", order_id:"O-101", total:120.00},
 //                  {type:"order_updated", order_id:"O-101", total:95.00} ]   // append-only, no current-state row
+//    WHY event_log exists: without it, the order's history is gone and "how did the total get to 95.00?" is unanswerable;
+//    with it, every change is an appended fact, so a read must fold the log because no ready current-state row is kept.
 //    running : 0.00
 //    current : null
 // DEF: read_current_total · CALLED BY: QR asking for the order's current total
@@ -52,11 +57,16 @@ registerChapter({
         { num: 3, title: 'Keep it read-only', detail: 'The view is a replica; it is updated only by the subscription path, never by clients.' }
       ],
       program: `// READ SIDE — the view database is a read-only replica optimized for its query
+// GOAL (what this is FOR): answer one query in a single read, by shaping a read-only store exactly to that query.
+//    THE NAIVE WAY (why we build anything at all): answer from the write model, which needs joins and replay; the write
+//    shape is wrong for the read. We replace that with a denormalized view document nested under one key, so one lookup returns the whole answer.
 // PARTIES: VDB = MongoDB 7 @ orders-view-1 · QR = query reader
 // DEF: view — a precomputed, denormalized read model for ONE query; here {"order_history":{customer_id:"C-77", orders:[{order_id:"O-101", total:120.00}, {order_id:"O-102", total:80.00}]}}
 // DEF: db — a database holding records = a keyed store; here view_db = {"order_history":{customer_id:"C-77", orders:[{order_id:"O-101", total:120.00}, {order_id:"O-102", total:80.00}]}}
 // STATE (before):
 //    view_db : {}                             // the replica, empty and read-only by design
+//    WHY view_db exists: without it, the query joins service-owned tables or replays the event log on every read; with it,
+//    the answer is precomputed into one denormalized document, so a read is a single lookup and clients never write to it.
 //    doc     : {}
 // DEF: build_view_schema · CALLED BY: the team shaping the read side
 // -> query : "order history for one customer"
@@ -87,6 +97,9 @@ registerChapter({
         { num: 3, title: 'The read side subscribes and updates', detail: 'The view database subscribes to the event and updates its replica accordingly.' }
       ],
       program: `// COMMAND, THEN READ SIDE — a write updates the write side, then an event updates the view
+// GOAL (what this is FOR): keep the read side in step with the write side, so a change to the source of truth reaches the view through a published event.
+//    THE NAIVE WAY (why we build anything at all): let clients write the view directly, or leave the replica frozen; the
+//    view drifts from the source of truth. We replace that with a write side that publishes an event the read side subscribes to and applies.
 // PARTIES: WR = Order Service (write side) · BRK = message broker · RD = Order History Service (read side)
 // DEF: db — a database holding an order row = a keyed store; here write_db = {"O-101":{total:120.00}} and view_db = {"O-101":{total:120.00}}
 // DEF: view — the read-only replica updated by subscribed domain events = a keyed store; here view_db = {"O-101":{total:120.00}} -> {"O-101":{total:95.00}}
@@ -94,6 +107,8 @@ registerChapter({
 // STATE (before):
 //    write_db : { "O-101": {total:120.00} }        // the source of truth, in WR
 //    view_db  : { "O-101": {total:120.00} }        // the replica, about to go stale
+//    WHY view_db exists: without it, the read side has no ready shape for its query and must join or replay; with it, the
+//    read side applies each subscribed event to its own replica, so the view catches up to the write side event by event.
 //    outbox   : []                                 // WR's outbox of events to publish
 // DEF: change_order_total · CALLED BY: WR receiving a command
 // -> command : {"order_id":"O-101", "total":95.00}
@@ -124,6 +139,9 @@ registerChapter({
         { num: 3, title: 'The view lags the write side', detail: 'Because updates arrive asynchronously, the replica is only eventually consistent.' }
       ],
       program: `// READ SIDE — the view lags the write side, so it is only eventually consistent
+// GOAL (what this is FOR): measure how far the view trails the write side, so a reader knows it may see a stale value until the event is applied.
+//    THE NAIVE WAY (why we build anything at all): assume the replica is instantly current; the event is delivered
+//    asynchronously, so a reader between the write and the apply sees the old value. We replace that assumption with a lag counter that reaches 0 when the view catches up.
 // PARTIES: WR = Order Service · RD = Order History Service · BRK = message broker
 // DEF: db — a database holding an order row = a keyed store; here write_db = {"O-101":{total:95.00}} and view_db = {"O-101":{total:120.00}}
 // DEF: view — the read-only replica that lags behind the write side = a keyed store; here view_db = {"O-101":{total:120.00}} while the write side holds 95.00
@@ -132,6 +150,10 @@ registerChapter({
 //    write_db : { "O-101": {total:95.00} }        // just updated by WR
 //    view_db  : { "O-101": {total:120.00} }       // still shows the old total
 //    lag      : 0                                   // seconds behind the write side
+//    WHY lag exists: without it, "how stale is the view?" is a guess and a reader cannot know whether to expect the old or
+//    new value; with it, lag counts the seconds until the event is applied and drops to 0 when the replica matches the write side.
+//    WHO chose 2 seconds: the trace's workload, not the data. 2 seconds here only because the trace has the event wait
+//    before RD processes it; a production view's lag is whatever the delivery and handling actually take — often milliseconds to a few seconds.
 // DEF: measure_lag · CALLED BY: RD watching its own staleness
 // -> event : {"type":"order_updated","order_id":"O-101","total":95.00}   // published but not yet consumed by RD
 //    step 1 · event sits in the broker queue    // lag : 0 -> 2  BECAUSE the event waits before RD processes it
@@ -288,12 +310,19 @@ registerChapter({
     ],
     
     program: `// SYSTEM DESIGN — CQRS: command side -> event store -> projections -> query side, one order updated end to end
+// GOAL (what this is FOR): separate the write model from the read model, so a command appends an event and a projection folds it into a view the query side reads directly.
+//    THE NAIVE WAY (why we build anything at all): serve reads from the write model, which needs joins and replay; the write
+//    shape is wrong for reads. We replace that with an append-only event stream on the write side and a projection the query side reads with no replay.
 // PARTIES: SVC = Order Service (command side) · ES = EventStoreDB 24 @ orders-events-1 · OH = Order History Service (query side) · VDB = MongoDB 7 @ orders-view-1
 // DEF: event — an append-only fact in the write model; here order_created {"orderId":"O-101","total":120.00} then order_updated {"total":95.00}
 // DEF: projection — a read model the query side folds events into; here the order total, 120.00 -> 95.00
 // STATE (before):
 //    events : []                        // the event stream for order O-101, empty
+//    WHY events exists: without it, "what changed?" has no durable record and the projection has nothing to fold; with it,
+//    the command side appends facts, and the query side builds its view from the same stream the write side wrote.
 //    view : { "O-101": { "total": 120.00 } }   // the read model before the update
+//    WHY view exists: without it, a query would fold the event stream on every read; with it, the projection has already
+//    folded the events into a ready read model, so the query side reads its own materialized view and never replays.
 // DEF: update_order · CALLED BY: SVC when the customer changes order O-101
 // -> order_id : "O-101"
 // BUILD PHASE · run once per command
