@@ -34,22 +34,15 @@ const C = { ink: '#1b2430', line: '#5b6b7f', faint: '#c6d0db', dim: '#8a97a6', p
  *   steps    {object[]} { t, cap, draw(ctx) }  — draw returns an SVG string
  *   name, out
  */
-function buildDiagramWalkthrough(spec) {
-  const { W, panelH, title, subtitle, seedLine, steps: STEPS, name, out: OUTDIR } = spec;
-  const CAP_LINES = spec.capLines || 4, CAP_LH = 17;
-  const PAN_Y = spec.panY || 104;
-  // DERIVED, never typed: the panel bottom sets the step label, which sets the
-  // caption block, which sets the canvas bottom.
-  const Y = { title: 34, sub: 58, step: PAN_Y + panelH + 40, cap: PAN_Y + panelH + 72 };
-  const H = Y.cap + CAP_LINES * CAP_LH + 6;
-  const cv = Canvas(W, H);
-  const P = { main: { x: 24, y: PAN_Y, w: W - 48, h: panelH } };
-
-  // ---- painters every diagram needs, measured and registered ---------------
-  const ctx = {
+function makeCtx(cv, P, W, H, measuring) {
+  return {
     cv, C, P, W, H,
     panel(t, band, fill) {
-      return cv.rect(band, P.main.x, P.main.y, P.main.w, P.main.h, { fill: fill || C.panel, stroke: C.faint }) +
+      // During the MEASURING pass the panel's own background is skipped: it is the
+      // thing being sized, so registering it would measure the probe height and
+      // size the panel to 4000px. Its title still registers, since that sits above
+      // the panel and must be inside the canvas.
+      return (measuring ? '' : cv.rect(band, P.main.x, P.main.y, P.main.w, P.main.h, { fill: fill || C.panel, stroke: C.faint })) +
              cv.text(P.main.x + 10, P.main.y - 8, t, { size: 12, weight: 700, mono: false, fill: C.line, band: band + 'h' });
     },
     // a row of cells, optionally with an index label above each
@@ -82,8 +75,13 @@ function buildDiagramWalkthrough(spec) {
     },
     // a callout box whose height fits its (measured) lines
     note(band, x0, y, w, lines, col, fill) {
-      let s = cv.rect(band, x0, y, w, 22 + lines.length * 20, { fill, stroke: col, sw: 2 });
-      lines.forEach((l, i) => { s += cv.text(x0 + 14, y + 20 + i * 20, l, { size: 12, mono: false, weight: 700, fill: i === 0 ? C.ink : col, band: `${band}t${i}` }); });
+      // Each line is MEASURED and wrapped to the box, and the box is sized to the
+      // wrapped result. Previously a long line ran straight out of its own note and
+      // the author found out from a validator failure two steps later.
+      const flat = [];
+      lines.forEach((l, i) => cv.wrap(l, w - 28, 12, false).forEach(w2 => flat.push({ t: w2, head: i === 0 })));
+      let s = cv.rect(band, x0, y, w, 22 + flat.length * 20, { fill, stroke: col, sw: 2 });
+      flat.forEach((l, i) => { s += cv.text(x0 + 14, y + 20 + i * 20, l.t, { size: 12, mono: false, weight: 700, fill: l.head ? C.ink : col, band: `${band}t${i}` }); });
       return s;
     },
     // horizontal proportional bar, for costs
@@ -97,6 +95,30 @@ function buildDiagramWalkthrough(spec) {
     },
     line(x0, y, text, o = {}) { return cv.text(x0, y, text, Object.assign({ size: 12, mono: false, band: 'ln' + y + (o.band || '') }, o)); },
   };
+}
+
+function buildDiagramWalkthrough(spec) {
+  // AUTO GEOMETRY (the default). `panelH` may be omitted: the kit renders every
+  // step once against a generous canvas, asks how far down anything actually
+  // reached, and sizes the panel to that. Typing a panel height meant every new
+  // step risked a collision that was then fixed by nudging a coordinate — which is
+  // how the same class of defect kept coming back. Nothing is nudged now.
+  if (spec.panelH === undefined || spec.panelH === 'auto') {
+    const probe = measurePanelHeight(spec);
+    spec = Object.assign({}, spec, { panelH: probe });
+  }
+  const { W, panelH, title, subtitle, seedLine, steps: STEPS, name, out: OUTDIR } = spec;
+  const CAP_LINES = spec.capLines || 4, CAP_LH = 17;
+  const PAN_Y = spec.panY || 104;
+  // DERIVED, never typed: the panel bottom sets the step label, which sets the
+  // caption block, which sets the canvas bottom.
+  const Y = { title: 34, sub: 58, step: PAN_Y + panelH + 40, cap: PAN_Y + panelH + 72 };
+  const H = Y.cap + CAP_LINES * CAP_LH + 6;
+  const cv = Canvas(W, H);
+  const P = { main: { x: 24, y: PAN_Y, w: W - 48, h: panelH } };
+
+  // ---- painters every diagram needs, measured and registered ---------------
+  const ctx = makeCtx(cv, P, W, H);
 
   // HEADER PLACEMENT is measured, not assumed. A long title and a long seed line
   // on the same row collide, and every caller would have to check by hand — so
@@ -161,4 +183,24 @@ function buildDiagramWalkthrough(spec) {
       fs.writeFileSync(path.join(OUTDIR, 'embed.md'), md.join('\n') + '\n');
     } };
 }
+// Render every step against a deliberately oversized panel, and report how far
+// down the lowest drawn thing reached. Pure measurement: nothing is written.
+function measurePanelHeight(spec) {
+  const PROBE_H = 4000, PAN_Y = spec.panY || 104;
+  let deepest = 0;
+  for (const st of (spec.steps || [])) {
+    const cv = Canvas(spec.W, PROBE_H + 400);
+    const ctx = makeCtx(cv, { main: { x: 24, y: PAN_Y, w: spec.W - 48, h: PROBE_H } }, spec.W, PROBE_H + 400, true);
+    // NEVER swallow a painter error here. A silent catch produces an INCOMPLETE
+    // measurement — the panel is then sized to whatever was drawn before the
+    // throw, and the validator fails later pointing at a symptom. A skip must not
+    // look like a measurement.
+    try { st.draw(ctx); }
+    catch (e) { throw new Error(`[${spec.name}] step "${st.t}" threw while measuring: ${e.message}`); }
+    deepest = Math.max(deepest, cv.contentBottom());
+  }
+  // +18 bottom padding inside the panel; never smaller than a readable minimum
+  return Math.max(160, Math.ceil(deepest - PAN_Y + 18));
+}
+
 module.exports = { buildDiagramWalkthrough, C };

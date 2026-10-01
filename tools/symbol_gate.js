@@ -33,8 +33,17 @@ function check(file) {
 
   // pass 1 — collect definitions with the line they appear on
   src.forEach((raw, i) => {
-    const primitive = raw.match(/^\s*\/\/\s*primitive:\s*([A-Za-z_]\w*)/);
-    if (primitive) { if (!defined.has(primitive[1])) defined.set(primitive[1], i); return; }
+    // A primitive declaration may name SEVERAL things at once:
+    //   // primitive: rowStore / colStore / buf / segment — the four inputs
+    // Capturing only the first name declared one of four and reported the rest as
+    // undefined — a checker limitation, not a content defect. Names are taken up to
+    // the em-dash that begins the description.
+    const primitive = raw.match(/^\s*\/\/\s*primitive:\s*([^—\n]+)/);
+    if (primitive) {
+      for (const m of primitive[1].matchAll(/([A-Za-z_]\w*)/g))
+        if (!defined.has(m[1])) defined.set(m[1], i);
+      return;
+    }
     const line = raw.replace(/\/\/.*$/, '');
     let m;
     if ((m = line.match(/^\s*type\s+([A-Za-z_]\w*)/))) if (!defined.has(m[1])) defined.set(m[1], i);
@@ -80,6 +89,18 @@ if (!files.length) { console.error('no source.json found — a generator must pu
 let bad = 0;
 for (const f of files) {
   const { errs, nDefined, nLines } = check(f);
+  // A listing from which ZERO symbols were extracted has not been checked — it has
+  // been skipped. Prose blocks are entirely `//` comments, so this gate walked 39
+  // of them and reported "39/39 listings have every symbol defined" while
+  // extracting nothing at all. That is R53 (an empty input must FAIL, never pass)
+  // reappearing in a different guise: not an empty FILE, but an empty EXTRACTION.
+  if (nLines > 4 && nDefined === 0) {
+    console.log(`FAIL ${f}`);
+    console.log(`  NOTHING EXTRACTED: ${nLines} lines, 0 symbols. This gate checks CODE; a block that is`);
+    console.log(`  entirely comment prose cannot be symbol-checked at all, so passing it is a lie.`);
+    console.log(`  Such a block must be replaced by a generated listing, not patched.`);
+    bad++; continue;
+  }
   const seen = new Set(); const uniq = errs.filter(e => { const k = e.split('::')[0]; if (seen.has(k)) return false; seen.add(k); return true; });
   if (uniq.length) { bad++; console.log(`FAIL ${f}`); uniq.slice(0, 12).forEach(e => console.log('  ' + e)); }
   else console.log(`PASS ${f}  (${nLines} lines, ${nDefined} symbols, 0 undefined)`);

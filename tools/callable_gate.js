@@ -56,6 +56,44 @@ for (const dir of dirs) {
   });
 
   const findings = [];
+
+  // ---- RULE 2: every `fun` must carry a DECLARATION HEADER in the same form the
+  // primitives use. This is a rule about PRESENTATION, not about evidence, and it
+  // is why `lastIdx` slipped through: it had a description and two worked calls,
+  // but no `// primitive:`-shaped line, so a reader scanning the listing for
+  // "where is this defined" found a marker for `len` and nothing for `lastIdx`.
+  // 22 of 22 functions were in that state. Rule 1 below asks whether evidence
+  // EXISTS; this asks whether the reader can FIND it without reading the body.
+  src.forEach((raw, i) => {
+    const m = raw.match(/^fun\s+([A-Za-z_]\w*)\s*\(/);
+    if (!m) return;
+    const name = m[1];
+    // look upward past blank lines for `// function: name(` or `// primitive: name(`
+    let seen = false;
+    for (let j = i - 1; j >= 0 && j >= i - 6; j--) {
+      const l = src[j];
+      if (l.trim() === '') continue;
+      if (new RegExp(`//\\s*(?:function|primitive):\\s*${name}\\s*\\(`).test(l)) { seen = true; break; }
+      if (!/^\s*\/\//.test(l)) break;          // hit real code: no header
+    }
+    if (!seen) findings.push(`fun \`${name}\` (line ${i + 1}) has no declaration header — add \`// function: ${name}(params) — what it does\` directly above it, the same shape the primitives use, so the reader can find it by scanning`);
+  });
+
+  // ---- RULE 3: the header must come FIRST — before the worked calls and before
+  // the body. Inserting it directly above `fun` put it AFTER the examples for
+  // `lastIdx`, so the reader met the name twice before anything declared it.
+  // "Declared somewhere" is not the same as "declared before you need it".
+  src.forEach((raw, i) => {
+    const m = raw.match(/\/\/\s*(?:function|primitive):\s*([A-Za-z_]\w*)\s*\(/);
+    if (!m) return;
+    const name = m[1];
+    const earlier = src.findIndex((l, k) => k < i && /^\s*\/\//.test(l)
+      && new RegExp(`\\b${name}\\s*\\(`).test(l)
+      && !/\/\/\s*(?:function|primitive):/.test(l));
+    if (earlier !== -1)
+      findings.push(`\`${name}\` is mentioned on line ${earlier + 1} but only declared on line ${i + 1} — move the \`// ${/^fun /.test(src.find(l => new RegExp('^fun\\s+' + name).test(l)) || '') ? 'function' : 'primitive'}: ${name}(...)\` header ABOVE its worked calls`);
+  });
+
   for (const c of callables) {
     if (c.name === 'main') continue;
     nCall++;
@@ -66,7 +104,11 @@ for (const dir of dirs) {
     const decl = src[c.line];
     const dm = decl.match(new RegExp(`\\b${c.name}\\s*\\(([^)]*)\\)`));
     const takesArgs = !!(dm && dm[1].trim().length);
-    const example = src.some((l, j) => {
+    // A worked call may legitimately WRAP: a long example puts the call on one
+    // comment line and `= result` on the next. Checking line by line reported
+    // those as missing, so each line is joined with the one after it.
+    const joined = src.map((l, j) => l + ' ' + (src[j + 1] || '').replace(/^\s*\/\/\s*/, ' '));
+    const example = joined.some((l, j) => {
       // the declaration line itself is not a demonstration of the declaration
       // BALANCE the parens. `[^)]*` stopped at the first `)`, which for a nested
       // example call like field(readBlock(store, 0), "campaign") = 41 is the INNER
@@ -83,7 +125,11 @@ for (const dir of dirs) {
         const res = after[1].trim();
         if (takesArgs && !args.length) continue;
         // a concrete result: a number, quoted string, list/map, boolean or sentinel
+        // concrete: a number, quoted string, list/map, boolean, sentinel — or a
+        // CONSTRUCTOR call carrying concrete arguments, e.g. Bucket(41, [], 0).
         if (/^(?:[\d"'\[\{(]|true\b|false\b|NONE\b|-\d)/.test(res)) return true;
+        const ctor = l.slice(i).match(/^\s*(?:=|->)\s*([A-Za-z_]\w*)\s*\(([^)]*\)?[^)]*)\)/);
+        if (ctor && /[\d"'\[]/.test(ctor[2])) return true;
       }
       return false;
     });

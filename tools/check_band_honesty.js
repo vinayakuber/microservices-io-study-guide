@@ -43,31 +43,50 @@ const pending = new Set(
 const seen = new Set();
 const rendered = (name) => fs.existsSync(path.join('diagrams', 'anim', name, 'frames'));
 
+// Enumerate EVERY node carrying a `program` string, wherever it lives. The gate
+// used to walk `ch.flow` only, and 11 chapter-level `systemDesign` blocks — one
+// per chapter — were therefore invisible to it: 22 bands that named artifacts
+// they did not have and were never counted. That is the third time a gate's SCOPE
+// was narrower than the content it was supposed to cover (R47), so this walks the
+// chapter object generically instead of naming the containers it knows about.
+function bandNodes(ch) {
+  // A CONCEPT is a thing that owes the reader a DIAGRAM and a PROGRAM. Enumerate
+  // concepts, NOT program blocks:
+  //   (a) every flow section, always — a section with no program block still owes
+  //       both bands, and keying on `program` made COMPLETED concepts vanish from
+  //       the count the moment their duplicate prose was deleted (olap read 0/78
+  //       when 10 bands were in fact satisfied);
+  //   (b) every chapter-level object carrying a `program` or `walkthroughs` — this
+  //       is how the 11 `systemDesign` blocks, invisible to the earlier `ch.flow`-only
+  //       walk, come into scope and stay in scope after their prose is dropped.
+  const out = (ch.flow || []).map((s, i) => ({ node: s, label: s.section || `flow[${i}]` }));
+  for (const k of Object.keys(ch)) {
+    if (k === 'flow') continue;
+    const v = ch[k];
+    if (v && typeof v === 'object' && !Array.isArray(v) && (typeof v.program === 'string' || v.walkthroughs))
+      out.push({ node: v, label: k });
+  }
+  return out;
+}
+
 let lies = 0, stale = 0, debts = 0, dupes = 0, bands = 0;
 const seenKeys = new Set();
 for (const ch of CHAPTERS) {
-  for (const sec of (ch.flow || [])) {
+  for (const { node: sec, label } of bandNodes(ch)) {
     const ws = (sec.walkthroughs || []).filter(rendered);
-    // A band is SATISFIED by a rendered artifact, never by prose. DIAGRAM wants a
-    // stepped visual; PROGRAM wants one showing stack + heap (named `*-memory`).
     const has = {
       DIAGRAM: ws.some(w => !/-memory$/.test(w)),
       PROGRAM: ws.some(w => /-memory$/.test(w)),
     };
     for (const band of ['DIAGRAM', 'PROGRAM']) {
       bands++;
-      const key = `ch${String(ch.num).padStart(2, '0')}|${sec.section}|${band}`;
+      const key = `ch${String(ch.num).padStart(2, '0')}|${label}|${band}`;
       seenKeys.add(key);
-      // The block-claims-it-too case. This is the defect that survived 21 reports:
-      // a `program:` java block repeating, as prose, a concept the rendered
-      // sections below it already teach. Two explanations of one thing is the
-      // contradiction; the block is the copy, so the block goes.
       const claimsInBlock = sec.program && new RegExp(`^//\\s*${band}\\s+—`, 'm').test(sec.program);
       if (has[band] && claimsInBlock) {
         console.log(`DUPLICATE ${key}`);
         console.log(`  the rendered walkthrough(s) ${ws.join(', ')} already cover this band, AND the`);
-        console.log(`  section still carries a \`program:\` block with its own "${band} —" text.`);
-        console.log(`  Delete the block: it is the copy, and a reader now gets two versions of one concept.`);
+        console.log(`  block still carries its own "${band} —" prose. Delete the block: it is the copy.`);
         dupes++;
         continue;
       }

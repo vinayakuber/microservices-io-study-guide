@@ -51,11 +51,26 @@ function buildMemoryWalkthrough(spec) {
   // hard error: the first silently highlights nothing, the second silently
   // highlights the wrong line (this shipped once as "step 3 of 16" pointing
   // inside the wrong function).
-  const at = (...needles) => needles.map(nd => {
-    const hits = SRC.map((l, i) => l.includes(nd) ? i : -1).filter(i => i !== -1);
-    if (hits.length === 0) throw new Error(`[${name}] source line not found: "${nd}"`);
+  // A needle may be SCOPED as "anchor>needle": find `anchor` first, then the next
+  // `needle` at or after it. Two functions legitimately contain the same line
+  // (`for (c in COLUMNS)`, `return cost`), and without scoping the author must
+  // invent a distinguishing comment for each one — friction that recurs for every
+  // concept and tempts a weaker, non-throwing lookup. Scoping keeps the hard
+  // guarantee (0 or >1 matches is an error) while making the common case easy.
+  const at = (...needles) => needles.map(spec => {
+    const [scope, nd] = spec.includes('>') ? spec.split('>', 2) : [null, spec];
+    let from = 0;
+    if (scope !== null) {
+      const anchors = SRC.map((l, i) => l.includes(scope) ? i : -1).filter(i => i !== -1);
+      if (anchors.length === 0) throw new Error(`[${name}] scope not found: "${scope}" (in "${spec}")`);
+      if (anchors.length > 1) throw new Error(`[${name}] AMBIGUOUS scope "${scope}" matches lines ${anchors.map(i => i + 1).join(', ')}`);
+      from = anchors[0];
+    }
+    const hits = SRC.map((l, i) => (i >= from && l.includes(nd)) ? i : -1).filter(i => i !== -1);
+    if (hits.length === 0) throw new Error(`[${name}] source line not found: "${nd}"${scope ? ` after "${scope}"` : ''}`);
+    if (scope !== null) return hits[0];            // first match inside the scope
     if (hits.length > 1)
-      throw new Error(`[${name}] AMBIGUOUS needle "${nd}" matches lines ${hits.map(i => i + 1).join(', ')} — make it unique`);
+      throw new Error(`[${name}] AMBIGUOUS needle "${nd}" matches lines ${hits.map(i => i + 1).join(', ')} — make it unique, or scope it as "enclosingFunction>${nd}"`);
     return hits[0];
   });
   const lineOf = (needle) => at(needle)[0] + 1;

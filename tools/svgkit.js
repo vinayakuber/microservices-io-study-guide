@@ -86,7 +86,12 @@ function Canvas(W, H) {
     return errs;
   }
 
-  return { W, H, rect, text, textBlock, wrap, textW, validate,
+  // The lowest point anything registered reaches. Lets a caller SIZE a panel to
+  // what was actually drawn in it, instead of typing a height and discovering it
+  // was wrong when the validator fails.
+  const contentBottom = () => boxes.reduce((m, b) => Math.max(m, b.y + b.h), 0);
+
+  return { W, H, rect, text, textBlock, wrap, textW, validate, contentBottom,
            reset() { boxes.length = 0; overflow.length = 0; },
            head: (label) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${attr(label)}"><rect width="${W}" height="${H}" fill="#ffffff"/>` };
 }
